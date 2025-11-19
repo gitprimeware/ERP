@@ -16,7 +16,7 @@ namespace ERP.UI.Services
             RegisterForms();
         }
 
-        public UserControl ResolveForm(string formName)
+        public UserControl ResolveForm(string formName, Guid orderId = default)
         {
             if (!_formRegistry.ContainsKey(formName))
             {
@@ -24,6 +24,13 @@ namespace ERP.UI.Services
             }
 
             var metadata = _formRegistry[formName];
+            
+            // OrderEntryForm için özel işlem
+            if (metadata.FormType == typeof(OrderEntryForm) && orderId != Guid.Empty)
+            {
+                return new OrderEntryForm(orderId);
+            }
+
             return (UserControl)Activator.CreateInstance(metadata.FormType);
         }
 
@@ -38,24 +45,6 @@ namespace ERP.UI.Services
             RegisterForm("OrderCreate", typeof(OrderEntryForm), "Yeni Sipariş");
             RegisterForm("OrderEntry", typeof(OrderEntryForm), "Sipariş Girişi"); // Backward compatibility
             // Diğer formlar buraya eklenecek
-        }
-
-        public UserControl ResolveForm(string formName, int orderId = 0)
-        {
-            if (!_formRegistry.ContainsKey(formName))
-            {
-                return CreatePlaceholderControl(formName);
-            }
-
-            var metadata = _formRegistry[formName];
-            
-            // OrderEntryForm için özel işlem
-            if (metadata.FormType == typeof(OrderEntryForm) && orderId > 0)
-            {
-                return new OrderEntryForm(orderId);
-            }
-
-            return (UserControl)Activator.CreateInstance(metadata.FormType);
         }
 
         private void RegisterForm(string formName, Type formType, string displayName = null)

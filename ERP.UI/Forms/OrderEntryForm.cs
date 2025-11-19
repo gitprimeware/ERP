@@ -1,6 +1,9 @@
 using System;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
+using ERP.DAL.Repositories;
+using ERP.UI.Factories;
 using ERP.UI.UI;
 
 namespace ERP.UI.Forms
@@ -8,37 +11,52 @@ namespace ERP.UI.Forms
     public partial class OrderEntryForm : UserControl
     {
         private Panel mainPanel;
-        private TextBox txtOrderNo;
+        private TableLayoutPanel tableLayout;
+        private ComboBox cmbCompany;
+        private Button btnAddCompany;
+        private TextBox txtCustomerOrderNo;
+        private TextBox txtTrexOrderNo;
+        private TextBox txtDeviceName;
         private DateTimePicker dtpOrderDate;
-        private ComboBox cmbCustomer;
-        private DataGridView dgvOrderItems;
+        private DateTimePicker dtpTermDate;
+        private Button btnProductCode;
+        private TextBox txtProductCode;
+        private TextBox txtBypassSize;
+        private TextBox txtBypassType;
+        private ComboBox cmbLamelThickness;
+        private ComboBox cmbProductType;
+        private NumericUpDown nudQuantity;
+        private TextBox txtSalesPriceUSD;
+        private TextBox txtTotalPriceUSD;
+        private TextBox txtCurrencyRate;
+        private TextBox txtTotalPriceTL;
+        private DateTimePicker dtpShipmentDate;
         private Button btnSave;
         private Button btnCancel;
-        private Label lblTotal;
         private Label lblTitle;
 
-        private int _orderId = 0;
+        private Guid _orderId = Guid.Empty;
         private bool _isEditMode = false;
 
-        public int OrderId
+        public Guid OrderId
         {
             get => _orderId;
             set
             {
                 _orderId = value;
-                _isEditMode = value > 0;
+                _isEditMode = value != Guid.Empty;
                 UpdateFormTitle();
             }
         }
 
-        public OrderEntryForm() : this(0)
+        public OrderEntryForm() : this(Guid.Empty)
         {
         }
 
-        public OrderEntryForm(int orderId)
+        public OrderEntryForm(Guid orderId)
         {
             _orderId = orderId;
-            _isEditMode = orderId > 0;
+            _isEditMode = orderId != Guid.Empty;
             InitializeComponent();
             InitializeCustomComponents();
         }
@@ -50,6 +68,8 @@ namespace ERP.UI.Forms
             this.Padding = new Padding(20);
 
             CreateMainPanel();
+            GenerateTrexOrderNo();
+            SetDefaultDates();
         }
 
         private void CreateMainPanel()
@@ -58,7 +78,8 @@ namespace ERP.UI.Forms
             {
                 Dock = DockStyle.Fill,
                 BackColor = ThemeColors.Surface,
-                Padding = new Padding(30)
+                Padding = new Padding(30),
+                AutoScroll = true
             };
 
             UIHelper.ApplyCardStyle(mainPanel, 12);
@@ -73,170 +94,272 @@ namespace ERP.UI.Forms
                 Location = new Point(30, 30)
             };
 
-            // Sipariş Bilgileri Grubu
-            var orderGroup = CreateOrderInfoGroup();
-            orderGroup.Location = new Point(30, 80);
+            // TableLayoutPanel oluştur
+            CreateTableLayout();
 
-            // Sipariş Kalemleri
-            var itemsGroup = CreateOrderItemsGroup();
-            itemsGroup.Location = new Point(30, 200);
-
-            // Butonlar
+            // Butonlar - tableLayout'un altına yerleştir
             var buttonPanel = CreateButtonPanel();
-            buttonPanel.Location = new Point(30, 0);
-            buttonPanel.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            
+            // TableLayout'un boyutunu hesapla ve buton panelini konumlandır
+            void UpdateButtonPanelLocation()
+            {
+                if (buttonPanel != null && tableLayout != null)
+                {
+                    buttonPanel.Location = new Point(30, tableLayout.Bottom + 20);
+                }
+            }
+            
+            tableLayout.SizeChanged += (s, e) => UpdateButtonPanelLocation();
+            tableLayout.LocationChanged += (s, e) => UpdateButtonPanelLocation();
+            
+            // İlk konumlandırma
+            UpdateButtonPanelLocation();
 
             mainPanel.Controls.Add(lblTitle);
-            mainPanel.Controls.Add(orderGroup);
-            mainPanel.Controls.Add(itemsGroup);
+            mainPanel.Controls.Add(tableLayout);
             mainPanel.Controls.Add(buttonPanel);
 
             this.Controls.Add(mainPanel);
             mainPanel.BringToFront();
         }
 
-        private Panel CreateOrderInfoGroup()
+        private void CreateTableLayout()
         {
-            var panel = new Panel
+            tableLayout = new TableLayoutPanel
             {
-                Height = 100,
-                BackColor = Color.Transparent,
+                Location = new Point(30, 80),
+                Width = mainPanel.Width - 60,
+                AutoSize = true,
+                ColumnCount = 4,
+                RowCount = 0,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
-            
-            mainPanel.Resize += (s, e) => {
-                panel.Width = mainPanel.Width - 60;
-            };
 
-            // Sipariş No
-            var lblOrderNo = new Label
+            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 200)); // Label genişliği
+            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 35F)); // Input 1
+            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 200)); // Label 2
+            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 35F)); // Input 2
+
+            int row = 0;
+
+            // Firma satırı
+            AddTableRow("Firma:", CreateCompanyControl(), "+ Yeni Firma Ekle", CreateAddCompanyButton(), row++);
+
+            // Sipariş numaraları
+            AddTableRow("Müşteri Sipariş No:", CreateTextBox(txtCustomerOrderNo = new TextBox()), 
+                       "Trex Sipariş No:", CreateReadOnlyTextBox(txtTrexOrderNo = new TextBox()), row++);
+
+            // Cihaz adı ve Sipariş tarihi
+            AddTableRow("Cihaz Adı:", CreateTextBox(txtDeviceName = new TextBox()),
+                       "Sipariş Tarihi:", CreateDateTimePicker(dtpOrderDate = new DateTimePicker()), row++);
+
+            // Termin tarihi
+            AddTableRow("Termin Tarihi:", CreateDateTimePicker(dtpTermDate = new DateTimePicker()),
+                       "", new Panel(), row++);
+
+            // Ürün kodu ve Bypass ölçüsü
+            AddTableRow("Ürün Kodu:", CreateProductCodeControl(),
+                       "Bypass Ölçüsü:", CreateTextBox(txtBypassSize = new TextBox()), row++);
+
+            // Bypass türü ve Lamel kalınlığı
+            AddTableRow("Bypass Türü:", CreateTextBox(txtBypassType = new TextBox()),
+                       "Lamelle Kalınlığı:", CreateLamelThicknessCombo(), row++);
+
+            // Ürün türü ve Miktar
+            AddTableRow("Ürün Türü:", CreateProductTypeCombo(),
+                       "Miktar:", CreateQuantityControl(), row++);
+
+            // Satış fiyatı (USD) ve Toplam fiyat (USD)
+            AddTableRow("Satış Fiyatı (USD):", CreateTextBox(txtSalesPriceUSD = new TextBox()),
+                       "Toplam Fiyat (USD):", CreateReadOnlyTextBox(txtTotalPriceUSD = new TextBox()), row++);
+            txtSalesPriceUSD.TextChanged += TxtSalesPriceUSD_TextChanged;
+
+            // Kur ve Toplam fiyat (TL)
+            AddTableRow("Kur:", CreateReadOnlyTextBox(txtCurrencyRate = new TextBox()),
+                       "Toplam Fiyat (TL):", CreateReadOnlyTextBox(txtTotalPriceTL = new TextBox()), row++);
+            txtCurrencyRate.Text = "0,00";
+            txtTotalPriceTL.Text = "0,00";
+
+            // Sevk tarihi
+            AddTableRow("Sevk Tarihi:", CreateDisabledDateTimePicker(dtpShipmentDate = new DateTimePicker()),
+                       "", new Panel(), row++);
+
+            mainPanel.Resize += (s, e) =>
             {
-                Text = "Sipariş No:",
+                tableLayout.Width = mainPanel.Width - 60;
+            };
+        }
+
+        private void AddTableRow(string label1Text, Control control1, string label2Text, Control control2, int row)
+        {
+            tableLayout.RowCount = row + 1;
+            tableLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
+
+            var lbl1 = new Label
+            {
+                Text = label1Text,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 ForeColor = ThemeColors.TextPrimary,
-                AutoSize = true,
-                Location = new Point(0, 10)
+                AutoSize = false,
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleRight,
+                Padding = new Padding(0, 0, 10, 0)
             };
 
-            txtOrderNo = new TextBox
+            var lbl2 = new Label
             {
-                Width = 200,
-                Height = 30,
-                Font = new Font("Segoe UI", 10F),
-                Location = new Point(100, 8),
-                BorderStyle = BorderStyle.FixedSingle
-            };
-
-            // Sipariş Tarihi
-            var lblOrderDate = new Label
-            {
-                Text = "Sipariş Tarihi:",
+                Text = label2Text,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 ForeColor = ThemeColors.TextPrimary,
-                AutoSize = true,
-                Location = new Point(320, 10)
+                AutoSize = false,
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleRight,
+                Padding = new Padding(0, 0, 10, 0)
             };
 
-            dtpOrderDate = new DateTimePicker
+            control1.Dock = DockStyle.Fill;
+            control1.Margin = new Padding(5, 10, 5, 10);
+            control2.Dock = DockStyle.Fill;
+            control2.Margin = new Padding(5, 10, 5, 10);
+
+            tableLayout.Controls.Add(lbl1, 0, row);
+            tableLayout.Controls.Add(control1, 1, row);
+            tableLayout.Controls.Add(lbl2, 2, row);
+            tableLayout.Controls.Add(control2, 3, row);
+        }
+
+        private Control CreateCompanyControl()
+        {
+            cmbCompany = new ComboBox
             {
-                Width = 200,
                 Height = 30,
                 Font = new Font("Segoe UI", 10F),
-                Location = new Point(430, 8),
-                Format = DateTimePickerFormat.Short
-            };
-
-            // Müşteri
-            var lblCustomer = new Label
-            {
-                Text = "Müşteri:",
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                ForeColor = ThemeColors.TextPrimary,
-                AutoSize = true,
-                Location = new Point(0, 50)
-            };
-
-            cmbCustomer = new ComboBox
-            {
-                Width = 300,
-                Height = 30,
-                Font = new Font("Segoe UI", 10F),
-                Location = new Point(100, 48),
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
-            cmbCustomer.Items.AddRange(new[] { "Müşteri 1", "Müşteri 2", "Müşteri 3" });
+            LoadCompanies();
+            return cmbCompany;
+        }
 
-            panel.Controls.Add(lblOrderNo);
-            panel.Controls.Add(txtOrderNo);
-            panel.Controls.Add(lblOrderDate);
-            panel.Controls.Add(dtpOrderDate);
-            panel.Controls.Add(lblCustomer);
-            panel.Controls.Add(cmbCustomer);
+        private Control CreateAddCompanyButton()
+        {
+            btnAddCompany = new Button
+            {
+                Text = "+ Yeni Firma Ekle",
+                Height = 30,
+                Font = new Font("Segoe UI", 9F),
+                BackColor = ThemeColors.Secondary,
+                ForeColor = Color.White,
+                Cursor = Cursors.Hand
+            };
+            UIHelper.ApplyRoundedButton(btnAddCompany, 4);
+            btnAddCompany.Click += BtnAddCompany_Click;
+            return btnAddCompany;
+        }
 
+        private Control CreateProductCodeControl()
+        {
+            var panel = new Panel();
+            txtProductCode = new TextBox
+            {
+                Height = 30,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                BorderStyle = BorderStyle.FixedSingle,
+                ReadOnly = true,
+                BackColor = ThemeColors.SurfaceDark,
+                Dock = DockStyle.Left,
+                Width = 300
+            };
+
+            btnProductCode = new Button
+            {
+                Text = "Seç",
+                Width = 80,
+                Height = 30,
+                Font = new Font("Segoe UI", 9F),
+                BackColor = ThemeColors.Info,
+                ForeColor = Color.White,
+                Cursor = Cursors.Hand,
+                Dock = DockStyle.Left
+            };
+            UIHelper.ApplyRoundedButton(btnProductCode, 4);
+            btnProductCode.Click += BtnProductCode_Click;
+
+            panel.Controls.Add(txtProductCode);
+            panel.Controls.Add(btnProductCode);
             return panel;
         }
 
-        private Panel CreateOrderItemsGroup()
+        private Control CreateLamelThicknessCombo()
         {
-            var panel = new Panel
+            cmbLamelThickness = new ComboBox
             {
-                Height = 300,
-                BackColor = Color.Transparent,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom
+                Height = 30,
+                Font = new Font("Segoe UI", 10F),
+                DropDownStyle = ComboBoxStyle.DropDownList
             };
-            
-            mainPanel.Resize += (s, e) => {
-                panel.Width = mainPanel.Width - 60;
-            };
+            cmbLamelThickness.Items.AddRange(new[] { "0.10", "0.12", "0.15" });
+            return cmbLamelThickness;
+        }
 
-            var lblItems = new Label
+        private Control CreateProductTypeCombo()
+        {
+            cmbProductType = new ComboBox
             {
-                Text = "Sipariş Kalemleri:",
-                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
-                ForeColor = ThemeColors.TextPrimary,
-                AutoSize = true,
-                Location = new Point(0, 0)
+                Height = 30,
+                Font = new Font("Segoe UI", 10F),
+                DropDownStyle = ComboBoxStyle.DropDownList
             };
+            cmbProductType.Items.AddRange(new[] { "Normal", "Epoksi Boyalı" });
+            return cmbProductType;
+        }
 
-            dgvOrderItems = new DataGridView
+        private Control CreateQuantityControl()
+        {
+            nudQuantity = new NumericUpDown
             {
-                Location = new Point(0, 30),
-                Width = panel.Width,
-                Height = 220,
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-                BackgroundColor = ThemeColors.Surface,
-                BorderStyle = BorderStyle.None,
-                AllowUserToAddRows = true,
-                RowHeadersVisible = false
+                Height = 30,
+                Font = new Font("Segoe UI", 10F),
+                Minimum = 1,
+                Maximum = 9999,
+                Value = 1
             };
+            nudQuantity.ValueChanged += NudQuantity_ValueChanged;
+            return nudQuantity;
+        }
 
-            dgvOrderItems.Columns.Add("ProductCode", "Ürün Kodu");
-            dgvOrderItems.Columns.Add("ProductName", "Ürün Adı");
-            dgvOrderItems.Columns.Add("Quantity", "Miktar");
-            dgvOrderItems.Columns.Add("UnitPrice", "Birim Fiyat");
-            dgvOrderItems.Columns.Add("Total", "Toplam");
+        private Control CreateTextBox(TextBox textBox)
+        {
+            textBox.Height = 30;
+            textBox.Font = new Font("Segoe UI", 10F);
+            textBox.BorderStyle = BorderStyle.FixedSingle;
+            return textBox;
+        }
 
-            foreach (DataGridViewColumn column in dgvOrderItems.Columns)
-            {
-                column.DefaultCellStyle.Font = new Font("Segoe UI", 9F);
-            }
+        private Control CreateReadOnlyTextBox(TextBox textBox)
+        {
+            textBox.Height = 30;
+            textBox.Font = new Font("Segoe UI", 10F);
+            textBox.BorderStyle = BorderStyle.FixedSingle;
+            textBox.ReadOnly = true;
+            textBox.BackColor = ThemeColors.SurfaceDark;
+            return textBox;
+        }
 
-            // Toplam Label
-            lblTotal = new Label
-            {
-                Text = "Toplam: 0,00 ₺",
-                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
-                ForeColor = ThemeColors.Primary,
-                AutoSize = true,
-                Location = new Point(panel.Width - 200, 260),
-                Anchor = AnchorStyles.Bottom | AnchorStyles.Right
-            };
+        private Control CreateDateTimePicker(DateTimePicker dateTimePicker)
+        {
+            dateTimePicker.Height = 30;
+            dateTimePicker.Font = new Font("Segoe UI", 10F);
+            dateTimePicker.Format = DateTimePickerFormat.Short;
+            return dateTimePicker;
+        }
 
-            panel.Controls.Add(lblItems);
-            panel.Controls.Add(dgvOrderItems);
-            panel.Controls.Add(lblTotal);
-
-            return panel;
+        private Control CreateDisabledDateTimePicker(DateTimePicker dateTimePicker)
+        {
+            dateTimePicker.Height = 30;
+            dateTimePicker.Font = new Font("Segoe UI", 10F);
+            dateTimePicker.Format = DateTimePickerFormat.Short;
+            dateTimePicker.Enabled = false;
+            return dateTimePicker;
         }
 
         private Panel CreateButtonPanel()
@@ -245,116 +368,486 @@ namespace ERP.UI.Forms
             {
                 Height = 50,
                 BackColor = Color.Transparent,
-                Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
+                Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top
             };
-            
-            mainPanel.Resize += (s, e) => {
+
+            // Panel genişliğini başlangıçta ayarla
+            if (mainPanel != null)
+            {
                 panel.Width = mainPanel.Width - 60;
+            }
+            else
+            {
+                panel.Width = 800; // Varsayılan genişlik
+            }
+
+            // Panel genişliğini güncelle
+            mainPanel.Resize += (s, e) =>
+            {
+                if (mainPanel != null && panel != null)
+                {
+                    panel.Width = mainPanel.Width - 60;
+                    UpdateButtonPositions(panel);
+                }
             };
 
-            btnSave = new Button
-            {
-                Text = "Kaydet",
-                Width = 120,
-                Height = 40,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                BackColor = ThemeColors.Success,
-                ForeColor = Color.White,
-                Cursor = Cursors.Hand,
-                Location = new Point(panel.Width - 260, 5)
-            };
-            UIHelper.ApplyRoundedButton(btnSave, 6);
+            btnSave = ButtonFactory.CreateSuccessButton("Siparişi Tamamla");
+            btnSave.Height = 35;
+            btnSave.Width = 140;
+            btnSave.Anchor = AnchorStyles.None;
             btnSave.Click += BtnSave_Click;
+            btnSave.Visible = true;
 
-            btnCancel = new Button
-            {
-                Text = "İptal",
-                Width = 120,
-                Height = 40,
-                Font = new Font("Segoe UI", 10F),
-                BackColor = ThemeColors.SurfaceDark,
-                ForeColor = ThemeColors.TextPrimary,
-                Cursor = Cursors.Hand,
-                Location = new Point(panel.Width - 130, 5)
-            };
-            UIHelper.ApplyRoundedButton(btnCancel, 6);
+            btnCancel = ButtonFactory.CreateCancelButton("İptal");
+            btnCancel.Height = 35;
+            btnCancel.Width = 120;
+            btnCancel.Anchor = AnchorStyles.None;
             btnCancel.Click += BtnCancel_Click;
+            btnCancel.Visible = true;
 
             panel.Controls.Add(btnSave);
             panel.Controls.Add(btnCancel);
 
+            // Buton konumlarını güncelle
+            UpdateButtonPositions(panel);
+
             return panel;
+        }
+
+        private void UpdateButtonPositions(Panel panel)
+        {
+            if (panel == null) return;
+
+            // Panel genişliği yoksa veya çok küçükse, varsayılan genişlik kullan
+            int panelWidth = panel.Width > 0 ? panel.Width : 800;
+            
+            int rightMargin = 10;
+            int buttonSpacing = 10;
+            int cancelButtonWidth = 120;
+            int saveButtonWidth = 140;
+
+            // İptal butonu (en sağda)
+            if (btnCancel != null)
+            {
+                int cancelX = panelWidth - rightMargin - cancelButtonWidth;
+                if (cancelX < 0) cancelX = 0;
+                btnCancel.Location = new Point(cancelX, 5);
+            }
+
+            // Siparişi Tamamla butonu (solda)
+            if (btnSave != null)
+            {
+                int saveX = panelWidth - rightMargin - cancelButtonWidth - buttonSpacing - saveButtonWidth;
+                if (saveX < 0) saveX = 0;
+                btnSave.Location = new Point(saveX, 5);
+            }
+        }
+
+        private void LoadCompanies()
+        {
+            try
+            {
+                cmbCompany.Items.Clear();
+                var companyRepository = new ERP.DAL.Repositories.CompanyRepository();
+                var companies = companyRepository.GetAll();
+                
+                foreach (var company in companies)
+                {
+                    cmbCompany.Items.Add(new { Id = company.Id, Name = company.Name });
+                }
+                
+                cmbCompany.DisplayMember = "Name";
+                cmbCompany.ValueMember = "Id";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Firmalar yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void GenerateTrexOrderNo()
+        {
+            if (!_isEditMode)
+            {
+                int year = DateTime.Now.Year;
+                int orderNumber = GetNextOrderNumber();
+                txtTrexOrderNo.Text = $"SP-{year}-{orderNumber:0000}";
+            }
+        }
+
+        private int GetNextOrderNumber()
+        {
+            try
+            {
+                var orderRepository = new OrderRepository();
+                return orderRepository.GetNextOrderNumber(DateTime.Now.Year);
+            }
+            catch
+            {
+                return 1; // Hata durumunda 1 döndür
+            }
+        }
+
+        private void SetDefaultDates()
+        {
+            dtpOrderDate.Value = DateTime.Now;
+            dtpTermDate.Value = DateTime.Now.AddDays(7);
         }
 
         private void UpdateFormTitle()
         {
             if (lblTitle != null)
             {
-                lblTitle.Text = _isEditMode ? $"Sipariş Güncelle (#{_orderId})" : "Yeni Sipariş";
+                lblTitle.Text = _isEditMode ? $"Sipariş Güncelle" : "Yeni Sipariş";
             }
         }
 
-        private void BtnSave_Click(object sender, EventArgs e)
+        private void TxtSalesPriceUSD_TextChanged(object sender, EventArgs e)
         {
-            if (ValidateForm())
+            CalculateTotalPriceUSD();
+        }
+
+        private void NudQuantity_ValueChanged(object sender, EventArgs e)
+        {
+            CalculateTotalPriceUSD();
+        }
+
+        private void CalculateTotalPriceUSD()
+        {
+            if (decimal.TryParse(txtSalesPriceUSD.Text.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal salesPrice))
             {
-                if (_isEditMode)
+                decimal quantity = nudQuantity.Value;
+                decimal totalUSD = salesPrice * quantity;
+                txtTotalPriceUSD.Text = totalUSD.ToString("N2") + " USD";
+            }
+            else
+            {
+                txtTotalPriceUSD.Text = "0,00 USD";
+            }
+        }
+
+        private void BtnAddCompany_Click(object sender, EventArgs e)
+        {
+            using (var dialog = new Form
+            {
+                Text = "Yeni Firma Ekle",
+                Width = 400,
+                Height = 150,
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false
+            })
+            {
+                var lblName = new Label
                 {
-                    // Update işlemi
-                    MessageBox.Show($"Sipariş #{_orderId} güncellendi!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    Text = "Firma Adı:",
+                    Location = new Point(20, 30),
+                    AutoSize = true
+                };
+
+                var txtName = new TextBox
+                {
+                    Location = new Point(100, 27),
+                    Width = 250,
+                    Height = 25
+                };
+
+                var btnOk = new Button
+                {
+                    Text = "Kaydet",
+                    DialogResult = DialogResult.OK,
+                    Location = new Point(200, 70),
+                    Width = 80
+                };
+
+                var btnCancel = new Button
+                {
+                    Text = "İptal",
+                    DialogResult = DialogResult.Cancel,
+                    Location = new Point(290, 70),
+                    Width = 80
+                };
+
+                dialog.Controls.AddRange(new Control[] { lblName, txtName, btnOk, btnCancel });
+                dialog.AcceptButton = btnOk;
+                dialog.CancelButton = btnCancel;
+
+                if (dialog.ShowDialog() == DialogResult.OK && !string.IsNullOrWhiteSpace(txtName.Text))
+                {
+                    try
+                    {
+                        var companyRepository = new CompanyRepository();
+                        var newCompany = new ERP.Core.Models.Company { Name = txtName.Text };
+                        var companyId = companyRepository.Insert(newCompany);
+                        
+                        LoadCompanies(); // Tüm firmaları yeniden yükle
+                        
+                        // Yeni eklenen firmayı seç
+                        foreach (var item in cmbCompany.Items)
+                        {
+                            var idProperty = item.GetType().GetProperty("Id");
+                            if (idProperty != null && idProperty.GetValue(item).Equals(companyId))
+                            {
+                                cmbCompany.SelectedItem = item;
+                                break;
+                            }
+                        }
+                        
+                        MessageBox.Show("Firma başarıyla eklendi!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Firma eklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
                 }
-                else
+            }
+        }
+
+        private void BtnProductCode_Click(object sender, EventArgs e)
+        {
+            using (var dialog = new ProductCodeSelectionDialog())
+            {
+                if (dialog.ShowDialog() == DialogResult.OK)
                 {
-                    // Create işlemi
-                    MessageBox.Show("Yeni sipariş kaydedildi!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    txtProductCode.Text = dialog.SelectedProductCode;
                 }
             }
         }
 
         private bool ValidateForm()
         {
-            if (string.IsNullOrWhiteSpace(txtOrderNo.Text))
+            if (cmbCompany.SelectedIndex < 0)
             {
-                MessageBox.Show("Sipariş numarası boş olamaz!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                txtOrderNo.Focus();
+                MessageBox.Show("Lütfen bir firma seçin!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                cmbCompany.Focus();
                 return false;
             }
 
-            if (cmbCustomer.SelectedIndex < 0)
+            if (string.IsNullOrWhiteSpace(txtCustomerOrderNo.Text))
             {
-                MessageBox.Show("Lütfen bir müşteri seçin!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                cmbCustomer.Focus();
+                MessageBox.Show("Müşteri sipariş numarası boş olamaz!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtCustomerOrderNo.Focus();
                 return false;
             }
 
             return true;
         }
 
-        public void LoadOrderData(int orderId)
+        private void BtnSave_Click(object sender, EventArgs e)
         {
-            _orderId = orderId;
-            _isEditMode = true;
-            UpdateFormTitle();
+            if (!ValidateForm())
+                return;
 
-            // Şimdilik örnek veri - sonra DAL'dan gelecek
-            txtOrderNo.Text = $"ORD-{orderId:0000}";
-            dtpOrderDate.Value = DateTime.Now;
-            cmbCustomer.SelectedIndex = 0;
+            try
+            {
+                var orderRepository = new OrderRepository();
+                var order = MapFormToOrder();
 
-            // Örnek sipariş kalemleri
-            dgvOrderItems.Rows.Clear();
-            dgvOrderItems.Rows.Add("PRD-001", "Ürün 1", 10, 150.00, 1500.00);
-            dgvOrderItems.Rows.Add("PRD-002", "Ürün 2", 5, 200.00, 1000.00);
+                if (_isEditMode)
+                {
+                    orderRepository.Update(order);
+                    UpdateFormTitle(); // Buton metnini güncelle
+                    MessageBox.Show("Sipariş tamamlandı!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    var orderId = orderRepository.Insert(order);
+                    _orderId = orderId;
+                    _isEditMode = true;
+                    UpdateFormTitle();
+                    // Buton konumlarını güncelle
+                    if (btnSave != null)
+                    {
+                        var buttonPanel = btnSave.Parent as Panel;
+                        if (buttonPanel != null)
+                        {
+                            UpdateButtonPositions(buttonPanel);
+                        }
+                    }
+                    MessageBox.Show("Sipariş tamamlandı!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Sipariş kaydedilirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
+
+        private ERP.Core.Models.Order MapFormToOrder()
+        {
+            var order = new ERP.Core.Models.Order
+            {
+                Id = _orderId != Guid.Empty ? _orderId : Guid.NewGuid(),
+                CustomerOrderNo = txtCustomerOrderNo.Text.Trim(),
+                TrexOrderNo = txtTrexOrderNo.Text.Trim(),
+                DeviceName = string.IsNullOrWhiteSpace(txtDeviceName.Text) ? null : txtDeviceName.Text.Trim(),
+                OrderDate = dtpOrderDate.Value,
+                TermDate = dtpTermDate.Value,
+                ProductCode = string.IsNullOrWhiteSpace(txtProductCode.Text) ? null : txtProductCode.Text.Trim(),
+                BypassSize = string.IsNullOrWhiteSpace(txtBypassSize.Text) ? null : txtBypassSize.Text.Trim(),
+                BypassType = string.IsNullOrWhiteSpace(txtBypassType.Text) ? null : txtBypassType.Text.Trim(),
+                ProductType = cmbProductType.SelectedItem?.ToString(),
+                Quantity = (int)nudQuantity.Value
+            };
+
+            // CompanyId
+            if (cmbCompany.SelectedItem != null)
+            {
+                var idProperty = cmbCompany.SelectedItem.GetType().GetProperty("Id");
+                if (idProperty != null)
+                {
+                    order.CompanyId = (Guid)idProperty.GetValue(cmbCompany.SelectedItem);
+                }
+            }
+
+            // LamelThickness
+            if (cmbLamelThickness.SelectedItem != null && decimal.TryParse(cmbLamelThickness.SelectedItem.ToString(), out decimal thickness))
+            {
+                order.LamelThickness = thickness;
+            }
+
+            // SalesPrice
+            if (decimal.TryParse(txtSalesPriceUSD.Text.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal salesPrice))
+            {
+                order.SalesPrice = salesPrice;
+            }
+
+            // TotalPrice
+            if (decimal.TryParse(txtTotalPriceUSD.Text.Replace(" USD", "").Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal totalPrice))
+            {
+                order.TotalPrice = totalPrice;
+            }
+
+            // CurrencyRate
+            if (decimal.TryParse(txtCurrencyRate.Text.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal rate))
+            {
+                order.CurrencyRate = rate;
+            }
+
+            // ShipmentDate
+            if (dtpShipmentDate.Enabled && dtpShipmentDate.Value != null)
+            {
+                order.ShipmentDate = dtpShipmentDate.Value;
+            }
+
+            // Status - Varsayılan "Yeni", kullanıcı görmesin
+            if (!_isEditMode)
+            {
+                order.Status = "Yeni";
+            }
+            // Update modunda mevcut status korunur (veritabanından gelecek)
+
+            return order;
+        }
+
 
         private void BtnCancel_Click(object sender, EventArgs e)
         {
             // Formu temizle
-            txtOrderNo.Clear();
+            cmbCompany.SelectedIndex = -1;
+            txtCustomerOrderNo.Clear();
+            txtDeviceName.Clear();
             dtpOrderDate.Value = DateTime.Now;
-            cmbCustomer.SelectedIndex = -1;
-            dgvOrderItems.Rows.Clear();
+            dtpTermDate.Value = DateTime.Now.AddDays(7);
+            txtProductCode.Clear();
+            txtBypassSize.Clear();
+            txtBypassType.Clear();
+            cmbLamelThickness.SelectedIndex = -1;
+            cmbProductType.SelectedIndex = -1;
+            nudQuantity.Value = 1;
+            txtSalesPriceUSD.Clear();
+            txtTotalPriceUSD.Text = "0,00 USD";
+            txtCurrencyRate.Text = "0,00";
+            txtTotalPriceTL.Text = "0,00";
+        }
+
+        public void LoadOrderData(Guid orderId)
+        {
+            try
+            {
+                var orderRepository = new OrderRepository();
+                var order = orderRepository.GetById(orderId);
+
+                if (order == null)
+                {
+                    MessageBox.Show("Sipariş bulunamadı!", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                _orderId = order.Id;
+                _isEditMode = true;
+                UpdateFormTitle();
+                
+                // Buton her zaman görünür, sadece metni güncellenir
+
+                // Company seç
+                LoadCompanies();
+                foreach (var item in cmbCompany.Items)
+                {
+                    var idProperty = item.GetType().GetProperty("Id");
+                    if (idProperty != null && idProperty.GetValue(item).Equals(order.CompanyId))
+                    {
+                        cmbCompany.SelectedItem = item;
+                        break;
+                    }
+                }
+
+                txtCustomerOrderNo.Text = order.CustomerOrderNo;
+                txtTrexOrderNo.Text = order.TrexOrderNo;
+                txtDeviceName.Text = order.DeviceName ?? "";
+                dtpOrderDate.Value = order.OrderDate;
+                dtpTermDate.Value = order.TermDate;
+                txtProductCode.Text = order.ProductCode ?? "";
+                txtBypassSize.Text = order.BypassSize ?? "";
+                txtBypassType.Text = order.BypassType ?? "";
+
+                if (order.LamelThickness.HasValue)
+                {
+                    // Decimal değeri string'e çevir (InvariantCulture kullan)
+                    var thicknessStr = order.LamelThickness.Value.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+                    
+                    // ComboBox'taki değerlerle karşılaştır
+                    for (int i = 0; i < cmbLamelThickness.Items.Count; i++)
+                    {
+                        var itemValue = cmbLamelThickness.Items[i].ToString();
+                        // Hem string hem de decimal karşılaştırması yap
+                        if (itemValue == thicknessStr || 
+                            (decimal.TryParse(itemValue, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal itemDecimal) && 
+                             itemDecimal == order.LamelThickness.Value))
+                        {
+                            cmbLamelThickness.SelectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(order.ProductType))
+                {
+                    for (int i = 0; i < cmbProductType.Items.Count; i++)
+                    {
+                        if (cmbProductType.Items[i].ToString() == order.ProductType)
+                        {
+                            cmbProductType.SelectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+
+                nudQuantity.Value = order.Quantity;
+                txtSalesPriceUSD.Text = order.SalesPrice?.ToString("N2") ?? "0,00";
+                CalculateTotalPriceUSD();
+                txtCurrencyRate.Text = order.CurrencyRate?.ToString("N4") ?? "0,00";
+
+                if (order.ShipmentDate.HasValue)
+                {
+                    dtpShipmentDate.Value = order.ShipmentDate.Value;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Sipariş yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
     }
 }
-

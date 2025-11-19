@@ -1,6 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
+using ERP.Core.Models;
+using ERP.DAL.Repositories;
 using ERP.UI.Factories;
 using ERP.UI.UI;
 
@@ -9,16 +13,23 @@ namespace ERP.UI.Forms
     public partial class OrderListForm : UserControl
     {
         private Panel _mainPanel;
-        private DataGridView _dgvOrders;
+        private FlowLayoutPanel _cardsPanel;
+        private TextBox _txtSearch;
+        private ComboBox _cmbCompanyFilter;
+        private Button _btnSearch;
         private Button _btnRefresh;
+        private OrderRepository _orderRepository;
+        private CompanyRepository _companyRepository;
 
-        public event EventHandler<int> OrderSelected;
-        public event EventHandler<int> OrderUpdateRequested;
-        public event EventHandler<int> OrderDeleteRequested;
+        public event EventHandler<Guid> OrderSelected;
+        public event EventHandler<Guid> OrderUpdateRequested;
+        public event EventHandler<Guid> OrderDeleteRequested;
 
         public OrderListForm()
         {
             InitializeComponent();
+            _orderRepository = new OrderRepository();
+            _companyRepository = new CompanyRepository();
             InitializeCustomComponents();
         }
 
@@ -53,170 +64,309 @@ namespace ERP.UI.Forms
                 Location = new Point(30, 30)
             };
 
-            // Yenile butonu
-            _btnRefresh = ButtonFactory.CreateActionButton("🔄 Yenile", ThemeColors.Info, Color.White, 120, 35);
-            _btnRefresh.Location = new Point(_mainPanel.Width - 150, 30);
-            _btnRefresh.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            _btnRefresh.Click += BtnRefresh_Click;
+            // Arama paneli
+            var searchPanel = CreateSearchPanel();
+            searchPanel.Location = new Point(30, 80);
 
-            // DataGridView
-            _dgvOrders = new DataGridView
+            // Cards panel
+            _cardsPanel = new FlowLayoutPanel
             {
-                Location = new Point(30, 80),
+                Location = new Point(30, 140),
                 Width = _mainPanel.Width - 60,
-                Height = _mainPanel.Height - 120,
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-                BackgroundColor = ThemeColors.Surface,
-                BorderStyle = BorderStyle.None,
-                AllowUserToAddRows = false,
-                RowHeadersVisible = false,
-                MultiSelect = false,
-                ReadOnly = true,
-                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                Height = _mainPanel.Height - 180,
+                AutoScroll = true,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = true,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom
             };
 
             _mainPanel.Resize += (s, e) =>
             {
-                _dgvOrders.Width = _mainPanel.Width - 60;
-                _dgvOrders.Height = _mainPanel.Height - 120;
+                searchPanel.Width = _mainPanel.Width - 60;
+                _cardsPanel.Width = _mainPanel.Width - 60;
+                _cardsPanel.Height = _mainPanel.Height - 180;
             };
 
-            SetupDataGridView();
-
             _mainPanel.Controls.Add(titleLabel);
-            _mainPanel.Controls.Add(_btnRefresh);
-            _mainPanel.Controls.Add(_dgvOrders);
+            _mainPanel.Controls.Add(searchPanel);
+            _mainPanel.Controls.Add(_cardsPanel);
 
             this.Controls.Add(_mainPanel);
             _mainPanel.BringToFront();
         }
 
-        private void SetupDataGridView()
+        private Panel CreateSearchPanel()
         {
-            _dgvOrders.Columns.Clear();
-
-            _dgvOrders.Columns.Add("OrderId", "Sipariş No");
-            _dgvOrders.Columns.Add("OrderDate", "Tarih");
-            _dgvOrders.Columns.Add("CustomerName", "Müşteri");
-            _dgvOrders.Columns.Add("TotalAmount", "Toplam");
-            _dgvOrders.Columns.Add("Status", "Durum");
-
-            // Action butonları için kolon
-            var actionColumn = new DataGridViewButtonColumn
+            var panel = new Panel
             {
-                Name = "Actions",
-                HeaderText = "İşlemler",
-                Text = "Düzenle",
-                UseColumnTextForButtonValue = false,
-                Width = 200
+                Height = 50,
+                BackColor = Color.Transparent,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
-            _dgvOrders.Columns.Add(actionColumn);
 
-            // Kolon genişlikleri
-            _dgvOrders.Columns["OrderId"].Width = 100;
-            _dgvOrders.Columns["OrderDate"].Width = 120;
-            _dgvOrders.Columns["CustomerName"].Width = 200;
-            _dgvOrders.Columns["TotalAmount"].Width = 120;
-            _dgvOrders.Columns["Status"].Width = 100;
-            _dgvOrders.Columns["Actions"].Width = 200;
-
-            // Stil ayarları
-            foreach (DataGridViewColumn column in _dgvOrders.Columns)
+            var lblSearch = new Label
             {
-                column.DefaultCellStyle.Font = new Font("Segoe UI", 9F);
-            }
+                Text = "Ara:",
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                ForeColor = ThemeColors.TextPrimary,
+                AutoSize = true,
+                Location = new Point(0, 15)
+            };
 
-            _dgvOrders.CellPainting += DgvOrders_CellPainting;
-            _dgvOrders.CellContentClick += DgvOrders_CellContentClick;
+            _txtSearch = new TextBox
+            {
+                Width = 300,
+                Height = 30,
+                Font = new Font("Segoe UI", 10F),
+                Location = new Point(50, 12),
+                BorderStyle = BorderStyle.FixedSingle
+            };
+            _txtSearch.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) PerformSearch(); };
+
+            var lblCompany = new Label
+            {
+                Text = "Firma:",
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                ForeColor = ThemeColors.TextPrimary,
+                AutoSize = true,
+                Location = new Point(370, 15)
+            };
+
+            _cmbCompanyFilter = new ComboBox
+            {
+                Width = 250,
+                Height = 30,
+                Font = new Font("Segoe UI", 10F),
+                Location = new Point(430, 12),
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            LoadCompaniesForFilter();
+
+            _btnSearch = ButtonFactory.CreateActionButton("🔍 Ara", ThemeColors.Info, Color.White, 100, 30);
+            _btnSearch.Location = new Point(700, 12);
+            _btnSearch.Click += (s, e) => PerformSearch();
+
+            _btnRefresh = ButtonFactory.CreateActionButton("🔄 Yenile", ThemeColors.Secondary, Color.White, 100, 30);
+            _btnRefresh.Location = new Point(810, 12);
+            _btnRefresh.Click += (s, e) => LoadOrders();
+
+            panel.Controls.Add(lblSearch);
+            panel.Controls.Add(_txtSearch);
+            panel.Controls.Add(lblCompany);
+            panel.Controls.Add(_cmbCompanyFilter);
+            panel.Controls.Add(_btnSearch);
+            panel.Controls.Add(_btnRefresh);
+
+            return panel;
         }
 
-        private void DgvOrders_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
+        private void LoadCompaniesForFilter()
         {
-            if (e.ColumnIndex == _dgvOrders.Columns["Actions"].Index && e.RowIndex >= 0)
+            try
             {
-                e.Paint(e.CellBounds, DataGridViewPaintParts.All);
+                _cmbCompanyFilter.Items.Clear();
+                _cmbCompanyFilter.Items.Add(new { Id = (Guid?)null, Name = "Tüm Firmalar" });
+                _cmbCompanyFilter.DisplayMember = "Name";
+                _cmbCompanyFilter.ValueMember = "Id";
+                _cmbCompanyFilter.SelectedIndex = 0;
 
-                var updateRect = new Rectangle(e.CellBounds.X + 5, e.CellBounds.Y + 5, 80, e.CellBounds.Height - 10);
-                var deleteRect = new Rectangle(e.CellBounds.X + 95, e.CellBounds.Y + 5, 80, e.CellBounds.Height - 10);
-
-                // Update butonu
-                using (var brush = new SolidBrush(ThemeColors.Info))
+                var companies = _companyRepository.GetAll();
+                foreach (var company in companies)
                 {
-                    e.Graphics.FillRectangle(brush, updateRect);
+                    _cmbCompanyFilter.Items.Add(new { Id = (Guid?)company.Id, Name = company.Name });
                 }
-                TextRenderer.DrawText(e.Graphics, "Güncelle", _dgvOrders.Font, updateRect, Color.White,
-                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-
-                // Delete butonu
-                using (var brush = new SolidBrush(ThemeColors.Error))
-                {
-                    e.Graphics.FillRectangle(brush, deleteRect);
-                }
-                TextRenderer.DrawText(e.Graphics, "Sil", _dgvOrders.Font, deleteRect, Color.White,
-                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-
-                e.Handled = true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Firmalar yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        private void DgvOrders_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        private void PerformSearch()
         {
-            if (e.RowIndex < 0 || e.ColumnIndex != _dgvOrders.Columns["Actions"].Index)
-                return;
+            string searchTerm = _txtSearch.Text.Trim();
+            Guid? companyId = null;
 
-            var orderId = Convert.ToInt32(_dgvOrders.Rows[e.RowIndex].Cells["OrderId"].Value);
-            
-            // Mouse pozisyonunu al
-            var mousePos = _dgvOrders.PointToClient(Cursor.Position);
-            var hitTest = _dgvOrders.HitTest(mousePos.X, mousePos.Y);
-            
-            if (hitTest.RowIndex != e.RowIndex || hitTest.ColumnIndex != e.ColumnIndex)
-                return;
-
-            var cellRect = _dgvOrders.GetCellDisplayRectangle(e.ColumnIndex, e.RowIndex, false);
-            var relativeX = mousePos.X - cellRect.X;
-            
-            // Buton pozisyonlarına göre kontrol et
-            if (relativeX >= 5 && relativeX <= 85) // Update butonu
+            if (_cmbCompanyFilter.SelectedItem != null)
             {
-                OrderUpdateRequested?.Invoke(this, orderId);
+                var selected = _cmbCompanyFilter.SelectedItem;
+                var idProperty = selected.GetType().GetProperty("Id");
+                if (idProperty != null)
+                {
+                    var idValue = idProperty.GetValue(selected);
+                    if (idValue != null && idValue != DBNull.Value)
+                    {
+                        companyId = (Guid?)idValue;
+                    }
+                }
             }
-            else if (relativeX >= 95 && relativeX <= 175) // Delete butonu
+
+            LoadOrders(searchTerm, companyId);
+        }
+
+        private void LoadOrders(string searchTerm = null, Guid? companyId = null)
+        {
+            try
+            {
+                _cardsPanel.Controls.Clear();
+
+                var orders = _orderRepository.GetAll(searchTerm, companyId);
+
+                if (orders.Count == 0)
+                {
+                    var noDataLabel = new Label
+                    {
+                        Text = "Sipariş bulunamadı.",
+                        Font = new Font("Segoe UI", 12F),
+                        ForeColor = ThemeColors.TextSecondary,
+                        AutoSize = true,
+                        Location = new Point(20, 20)
+                    };
+                    _cardsPanel.Controls.Add(noDataLabel);
+                    return;
+                }
+
+                foreach (var order in orders)
+                {
+                    var card = CreateOrderCard(order);
+                    _cardsPanel.Controls.Add(card);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Siparişler yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private Panel CreateOrderCard(Order order)
+        {
+            var card = new Panel
+            {
+                Width = 350,
+                Height = 280,
+                BackColor = ThemeColors.Surface,
+                Margin = new Padding(15),
+                Padding = new Padding(20)
+            };
+
+            UIHelper.ApplyCardStyle(card, 8);
+
+            int yPos = 15;
+
+            // Sipariş No
+            var lblOrderNo = new Label
+            {
+                Text = $"Sipariş No: {order.TrexOrderNo}",
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                ForeColor = ThemeColors.Primary,
+                AutoSize = true,
+                Location = new Point(15, yPos)
+            };
+            yPos += 30;
+
+            // Müşteri Sipariş No
+            var lblCustomerOrderNo = new Label
+            {
+                Text = $"Müşteri Sipariş: {order.CustomerOrderNo}",
+                Font = new Font("Segoe UI", 10F),
+                ForeColor = ThemeColors.TextPrimary,
+                AutoSize = true,
+                Location = new Point(15, yPos)
+            };
+            yPos += 25;
+
+            // Firma
+            var lblCompany = new Label
+            {
+                Text = $"Firma: {order.Company?.Name ?? "Bilinmiyor"}",
+                Font = new Font("Segoe UI", 10F),
+                ForeColor = ThemeColors.TextSecondary,
+                AutoSize = true,
+                Location = new Point(15, yPos),
+                MaximumSize = new Size(310, 0)
+            };
+            yPos += 25;
+
+            // Cihaz Adı
+            if (!string.IsNullOrEmpty(order.DeviceName))
+            {
+                var lblDevice = new Label
+                {
+                    Text = $"Cihaz: {order.DeviceName}",
+                    Font = new Font("Segoe UI", 10F),
+                    ForeColor = ThemeColors.TextSecondary,
+                    AutoSize = true,
+                    Location = new Point(15, yPos),
+                    MaximumSize = new Size(310, 0)
+                };
+                card.Controls.Add(lblDevice);
+                yPos += 25;
+            }
+
+            // Tarih
+            var lblDate = new Label
+            {
+                Text = $"Tarih: {order.OrderDate:dd.MM.yyyy}",
+                Font = new Font("Segoe UI", 9F),
+                ForeColor = ThemeColors.TextSecondary,
+                AutoSize = true,
+                Location = new Point(15, yPos)
+            };
+            yPos += 25;
+
+            // Termin Tarihi
+            var lblTermDate = new Label
+            {
+                Text = $"Termin: {order.TermDate:dd.MM.yyyy}",
+                Font = new Font("Segoe UI", 9F),
+                ForeColor = ThemeColors.TextSecondary,
+                AutoSize = true,
+                Location = new Point(15, yPos)
+            };
+            yPos += 25;
+
+            // Toplam Fiyat
+            var lblTotal = new Label
+            {
+                Text = $"Toplam: {order.TotalPrice:N2} ₺",
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                ForeColor = ThemeColors.Success,
+                AutoSize = true,
+                Location = new Point(15, yPos)
+            };
+            yPos += 35;
+
+            // Butonlar
+            var btnDetail = ButtonFactory.CreateActionButton("📋 Detay", ThemeColors.Info, Color.White, 140, 35);
+            btnDetail.Location = new Point(15, yPos);
+            btnDetail.Click += (s, e) => OrderUpdateRequested?.Invoke(this, order.Id);
+
+            var btnDelete = ButtonFactory.CreateActionButton("🗑️ Sil", ThemeColors.Error, Color.White, 140, 35);
+            btnDelete.Location = new Point(165, yPos);
+            btnDelete.Click += (s, e) =>
             {
                 var result = MessageBox.Show(
-                    $"Sipariş #{orderId} silinecek. Emin misiniz?",
+                    $"Sipariş {order.TrexOrderNo} silinecek. Emin misiniz?",
                     "Sipariş Sil",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Question);
 
                 if (result == DialogResult.Yes)
                 {
-                    OrderDeleteRequested?.Invoke(this, orderId);
+                    OrderDeleteRequested?.Invoke(this, order.Id);
                 }
-            }
-        }
+            };
 
-        private void LoadOrders()
-        {
-            // Şimdilik örnek veri - sonra DAL'dan gelecek
-            _dgvOrders.Rows.Clear();
+            card.Controls.Add(lblOrderNo);
+            card.Controls.Add(lblCustomerOrderNo);
+            card.Controls.Add(lblCompany);
+            card.Controls.Add(lblDate);
+            card.Controls.Add(lblTermDate);
+            card.Controls.Add(lblTotal);
+            card.Controls.Add(btnDetail);
+            card.Controls.Add(btnDelete);
 
-            // Örnek veriler
-            _dgvOrders.Rows.Add(1, "2024-01-15", "ABC Şirketi", "15.000,00 ₺", "Aktif");
-            _dgvOrders.Rows.Add(2, "2024-01-16", "XYZ Ltd.", "25.500,00 ₺", "Aktif");
-            _dgvOrders.Rows.Add(3, "2024-01-17", "Test Müşteri", "8.750,00 ₺", "İptal");
-        }
-
-        private void BtnRefresh_Click(object sender, EventArgs e)
-        {
-            LoadOrders();
-        }
-
-        public void RefreshData()
-        {
-            LoadOrders();
+            return card;
         }
     }
 }
-

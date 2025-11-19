@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Windows.Forms;
+using ERP.DAL.Repositories;
 using ERP.UI.Services;
 using ERP.UI.UI;
 
@@ -24,7 +25,7 @@ namespace ERP.UI.Managers
             _contentPanel.Padding = new Padding(20);
         }
 
-        public void ShowForm(string formName, int orderId = 0)
+        public void ShowForm(string formName, Guid orderId = default)
         {
             _contentPanel.Controls.Clear();
 
@@ -44,7 +45,7 @@ namespace ERP.UI.Managers
             }
         }
 
-        private void ShowOrderUpdate(int orderId)
+        private void ShowOrderUpdate(Guid orderId)
         {
             ShowForm("OrderCreate", orderId);
             
@@ -56,13 +57,21 @@ namespace ERP.UI.Managers
             }
         }
 
-        private void HandleOrderDelete(int orderId)
+        private void HandleOrderDelete(Guid orderId)
         {
-            // Silme işlemi - sonra DAL'dan yapılacak
-            MessageBox.Show($"Sipariş #{orderId} silindi!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            
-            // Listeyi yenile
-            ShowForm("OrderList");
+            try
+            {
+                var orderRepository = new ERP.DAL.Repositories.OrderRepository();
+                orderRepository.Delete(orderId);
+                MessageBox.Show("Sipariş silindi!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                
+                // Listeyi yenile
+                ShowForm("OrderList");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Sipariş silinirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         public void ShowWelcomePanel()
