@@ -33,10 +33,18 @@ namespace ERP.UI.Forms
         private DateTimePicker dtpShipmentDate;
         private Button btnSave;
         private Button btnCancel;
+        private Button btnDelete;
+        private Button btnSendToProduction;
+        private Button btnGetWorkOrder;
         private Label lblTitle;
 
         private Guid _orderId = Guid.Empty;
         private bool _isEditMode = false;
+        private bool _isReadOnly = false; // Üretimde veya Muhasebede ise true
+
+        public event EventHandler<Guid> OrderDeleteRequested;
+        public event EventHandler<Guid> OrderSendToProductionRequested;
+        public event EventHandler<Guid> OrderGetWorkOrderRequested;
 
         public Guid OrderId
         {
@@ -179,6 +187,9 @@ namespace ERP.UI.Forms
                        "Toplam Fiyat (TL):", CreateReadOnlyTextBox(txtTotalPriceTL = new TextBox()), row++);
             txtCurrencyRate.Text = "0,00";
             txtTotalPriceTL.Text = "0,00";
+            
+            // Kur değiştiğinde TL fiyatını hesapla (sadece gösterim için)
+            // Not: Kur readonly olduğu için bu event çalışmayacak ama yine de ekleyelim
 
             // Sevk tarihi
             AddTableRow("Sevk Tarihi:", CreateDisabledDateTimePicker(dtpShipmentDate = new DateTimePicker()),
@@ -297,7 +308,7 @@ namespace ERP.UI.Forms
                 Font = new Font("Segoe UI", 10F),
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
-            cmbLamelThickness.Items.AddRange(new[] { "0.10", "0.12", "0.15" });
+            cmbLamelThickness.Items.AddRange(new[] { "0.10", "0.12", "0.15", "0.165" });
             return cmbLamelThickness;
         }
 
@@ -423,24 +434,87 @@ namespace ERP.UI.Forms
             
             int rightMargin = 10;
             int buttonSpacing = 10;
-            int cancelButtonWidth = 120;
-            int saveButtonWidth = 140;
+            int yPos = 5;
+
+            // Butonları sağdan sola yerleştir
+            int currentX = panelWidth - rightMargin;
 
             // İptal butonu (en sağda)
-            if (btnCancel != null)
+            if (btnCancel != null && btnCancel.Visible)
             {
-                int cancelX = panelWidth - rightMargin - cancelButtonWidth;
-                if (cancelX < 0) cancelX = 0;
-                btnCancel.Location = new Point(cancelX, 5);
+                currentX -= btnCancel.Width;
+                btnCancel.Location = new Point(currentX, yPos);
+                currentX -= buttonSpacing;
             }
 
-            // Siparişi Tamamla butonu (solda)
-            if (btnSave != null)
+            // Siparişi Tamamla butonu
+            if (btnSave != null && btnSave.Visible)
             {
-                int saveX = panelWidth - rightMargin - cancelButtonWidth - buttonSpacing - saveButtonWidth;
-                if (saveX < 0) saveX = 0;
-                btnSave.Location = new Point(saveX, 5);
+                currentX -= btnSave.Width;
+                btnSave.Location = new Point(currentX, yPos);
+                currentX -= buttonSpacing;
             }
+
+            // İş Emri Al butonu
+            if (btnGetWorkOrder != null && btnGetWorkOrder.Visible)
+            {
+                currentX -= btnGetWorkOrder.Width;
+                btnGetWorkOrder.Location = new Point(currentX, yPos);
+                currentX -= buttonSpacing;
+            }
+
+            // Üretime Gönder butonu
+            if (btnSendToProduction != null && btnSendToProduction.Visible)
+            {
+                currentX -= btnSendToProduction.Width;
+                btnSendToProduction.Location = new Point(currentX, yPos);
+                currentX -= buttonSpacing;
+            }
+
+            // Sil butonu
+            if (btnDelete != null && btnDelete.Visible)
+            {
+                currentX -= btnDelete.Width;
+                btnDelete.Location = new Point(currentX, yPos);
+            }
+        }
+
+        private void BtnDelete_Click(object sender, EventArgs e)
+        {
+            if (_orderId == Guid.Empty) return;
+
+            var result = MessageBox.Show(
+                $"Sipariş {txtTrexOrderNo.Text} silinecek. Emin misiniz?",
+                "Sipariş Sil",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (result == DialogResult.Yes)
+            {
+                OrderDeleteRequested?.Invoke(this, _orderId);
+            }
+        }
+
+        private void BtnSendToProduction_Click(object sender, EventArgs e)
+        {
+            if (_orderId == Guid.Empty) return;
+
+            var result = MessageBox.Show(
+                $"Sipariş {txtTrexOrderNo.Text} üretime gönderilecek. Emin misiniz?",
+                "Üretime Gönder",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (result == DialogResult.Yes)
+            {
+                OrderSendToProductionRequested?.Invoke(this, _orderId);
+            }
+        }
+
+        private void BtnGetWorkOrder_Click(object sender, EventArgs e)
+        {
+            if (_orderId == Guid.Empty) return;
+            OrderGetWorkOrderRequested?.Invoke(this, _orderId);
         }
 
         private void LoadCompanies()
@@ -523,6 +597,46 @@ namespace ERP.UI.Forms
             else
             {
                 txtTotalPriceUSD.Text = "0,00 USD";
+            }
+            
+            // TL fiyatını da hesapla
+            CalculateTotalPriceTL();
+        }
+
+        private void CalculateTotalPriceTL()
+        {
+            try
+            {
+                // Kur'u al
+                if (!decimal.TryParse(txtCurrencyRate.Text.Replace(",", "."), 
+                    System.Globalization.NumberStyles.Any, 
+                    System.Globalization.CultureInfo.InvariantCulture, 
+                    out decimal currencyRate) || currencyRate == 0)
+                {
+                    txtTotalPriceTL.Text = "0,00";
+                    return;
+                }
+
+                // Satış Fiyatı USD'yi al
+                if (!decimal.TryParse(txtSalesPriceUSD.Text.Replace(",", "."), 
+                    System.Globalization.NumberStyles.Any, 
+                    System.Globalization.CultureInfo.InvariantCulture, 
+                    out decimal salesPriceUSD))
+                {
+                    txtTotalPriceTL.Text = "0,00";
+                    return;
+                }
+
+                // Adet'i al
+                decimal quantity = nudQuantity.Value;
+
+                // Toplam Fiyat TL = Satış Fiyatı USD * Kur * Adet
+                decimal totalPriceTL = salesPriceUSD * currencyRate * quantity;
+                txtTotalPriceTL.Text = totalPriceTL.ToString("N2");
+            }
+            catch
+            {
+                txtTotalPriceTL.Text = "0,00";
             }
         }
 
@@ -636,6 +750,38 @@ namespace ERP.UI.Forms
 
         private void BtnSave_Click(object sender, EventArgs e)
         {
+            // Readonly modda kaydetme yapılamaz (Sevkiyata Hazır hariç)
+            if (_isReadOnly)
+            {
+                var orderRepository = new OrderRepository();
+                var currentOrder = orderRepository.GetById(_orderId);
+                
+                if (currentOrder != null && (currentOrder.Status == "Üretimde" || currentOrder.Status == "Muhasebede"))
+                {
+                    MessageBox.Show("Bu sipariş üretimde veya muhasebede olduğu için güncellenemez!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Sevkiyata Hazır durumunda sadece sevk tarihi güncellenebilir
+                if (currentOrder != null && currentOrder.Status == "Sevkiyata Hazır")
+                {
+                    try
+                    {
+                        currentOrder.ShipmentDate = dtpShipmentDate.Value;
+                        // Sevk tarihi seçildiğinde durumu "Sevk Edildi" olarak güncelle
+                        currentOrder.Status = "Sevk Edildi";
+                        orderRepository.Update(currentOrder);
+                        MessageBox.Show("Sevk tarihi güncellendi ve sipariş 'Sevk Edildi' durumuna getirildi!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Sevk tarihi güncellenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+                }
+            }
+
             if (!ValidateForm())
                 return;
 
@@ -731,12 +877,32 @@ namespace ERP.UI.Forms
                 order.ShipmentDate = dtpShipmentDate.Value;
             }
 
-            // Status - Varsayılan "Yeni", kullanıcı görmesin
+            // Status
             if (!_isEditMode)
             {
+                // Yeni sipariş için "Yeni" status
                 order.Status = "Yeni";
             }
-            // Update modunda mevcut status korunur (veritabanından gelecek)
+            else
+            {
+                // Update modunda mevcut status'u veritabanından al ve koru
+                // Eğer sevk tarihi girildiyse ve status "Sevkiyata Hazır" ise "Sevk Edildi" yap
+                var orderRepository = new OrderRepository();
+                var currentOrder = orderRepository.GetById(_orderId);
+                if (currentOrder != null)
+                {
+                    // Sevkiyata Hazır durumunda sevk tarihi girildiyse "Sevk Edildi" yap
+                    if (currentOrder.Status == "Sevkiyata Hazır" && dtpShipmentDate.Enabled && dtpShipmentDate.Value != null)
+                    {
+                        order.Status = "Sevk Edildi";
+                    }
+                    else
+                    {
+                        // Diğer durumlarda mevcut status'u koru
+                        order.Status = currentOrder.Status;
+                    }
+                }
+            }
 
             return order;
         }
@@ -777,9 +943,26 @@ namespace ERP.UI.Forms
 
                 _orderId = order.Id;
                 _isEditMode = true;
-                UpdateFormTitle();
                 
-                // Buton her zaman görünür, sadece metni güncellenir
+                // Üretimde veya Muhasebede ise readonly yap
+                // Sevkiyata Hazır ise sadece sevk tarihi editable
+                _isReadOnly = order.Status == "Üretimde" || order.Status == "Muhasebede";
+                bool isReadyForShipment = order.Status == "Sevkiyata Hazır";
+                
+                UpdateFormTitle();
+                SetFormReadOnly(_isReadOnly, isReadyForShipment);
+                
+                // Buton görünürlüklerini güncelle
+                if (btnDelete != null) btnDelete.Visible = _isEditMode && !_isReadOnly;
+                if (btnSendToProduction != null) btnSendToProduction.Visible = _isEditMode && !_isReadOnly;
+                if (btnGetWorkOrder != null) btnGetWorkOrder.Visible = _isEditMode;
+                
+                // Buton pozisyonlarını güncelle
+                var buttonPanel = btnSave?.Parent as Panel;
+                if (buttonPanel != null)
+                {
+                    UpdateButtonPositions(buttonPanel);
+                }
 
                 // Company seç
                 LoadCompanies();
@@ -838,6 +1021,9 @@ namespace ERP.UI.Forms
                 txtSalesPriceUSD.Text = order.SalesPrice?.ToString("N2") ?? "0,00";
                 CalculateTotalPriceUSD();
                 txtCurrencyRate.Text = order.CurrencyRate?.ToString("N4") ?? "0,00";
+                
+                // Toplam fiyat TL'yi hesapla ve göster
+                CalculateTotalPriceTL();
 
                 if (order.ShipmentDate.HasValue)
                 {
@@ -847,6 +1033,71 @@ namespace ERP.UI.Forms
             catch (Exception ex)
             {
                 MessageBox.Show("Sipariş yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void SetFormReadOnly(bool readOnly, bool isReadyForShipment = false)
+        {
+            // Sevkiyata Hazır durumunda sadece sevk tarihi editable
+            if (isReadyForShipment)
+            {
+                // Tüm alanları readonly yap
+                if (cmbCompany != null) cmbCompany.Enabled = false;
+                if (btnAddCompany != null) btnAddCompany.Enabled = false;
+                if (txtCustomerOrderNo != null) txtCustomerOrderNo.ReadOnly = true;
+                if (txtDeviceName != null) txtDeviceName.ReadOnly = true;
+                if (dtpOrderDate != null) dtpOrderDate.Enabled = false;
+                if (dtpTermDate != null) dtpTermDate.Enabled = false;
+                if (btnProductCode != null) btnProductCode.Enabled = false;
+                if (txtProductCode != null) txtProductCode.ReadOnly = true;
+                if (txtBypassSize != null) txtBypassSize.ReadOnly = true;
+                if (txtBypassType != null) txtBypassType.ReadOnly = true;
+                if (cmbLamelThickness != null) cmbLamelThickness.Enabled = false;
+                if (cmbProductType != null) cmbProductType.Enabled = false;
+                if (nudQuantity != null) nudQuantity.Enabled = false;
+                if (txtSalesPriceUSD != null) txtSalesPriceUSD.ReadOnly = true;
+                
+                // Sadece sevk tarihi editable
+                if (dtpShipmentDate != null) dtpShipmentDate.Enabled = true;
+                
+                // Kaydet butonu görünür (sevk tarihi güncellemek için)
+                if (btnSave != null) btnSave.Visible = true;
+                
+                // Başlık güncelle
+                if (lblTitle != null)
+                {
+                    lblTitle.Text = "Sipariş Detayları - Sevkiyata Hazır (Sadece Sevk Tarihi Düzenlenebilir)";
+                    lblTitle.ForeColor = ThemeColors.Info;
+                }
+                
+                return;
+            }
+            
+            // Normal readonly modu (Üretimde veya Muhasebede)
+            if (cmbCompany != null) cmbCompany.Enabled = !readOnly;
+            if (btnAddCompany != null) btnAddCompany.Enabled = !readOnly;
+            if (txtCustomerOrderNo != null) txtCustomerOrderNo.ReadOnly = readOnly;
+            if (txtDeviceName != null) txtDeviceName.ReadOnly = readOnly;
+            if (dtpOrderDate != null) dtpOrderDate.Enabled = !readOnly;
+            if (dtpTermDate != null) dtpTermDate.Enabled = !readOnly;
+            if (btnProductCode != null) btnProductCode.Enabled = !readOnly;
+            if (txtProductCode != null) txtProductCode.ReadOnly = readOnly;
+            if (txtBypassSize != null) txtBypassSize.ReadOnly = readOnly;
+            if (txtBypassType != null) txtBypassType.ReadOnly = readOnly;
+            if (cmbLamelThickness != null) cmbLamelThickness.Enabled = !readOnly;
+            if (cmbProductType != null) cmbProductType.Enabled = !readOnly;
+            if (nudQuantity != null) nudQuantity.Enabled = !readOnly;
+            if (txtSalesPriceUSD != null) txtSalesPriceUSD.ReadOnly = readOnly;
+            if (dtpShipmentDate != null) dtpShipmentDate.Enabled = !readOnly;
+            
+            // Kaydet butonunu gizle
+            if (btnSave != null) btnSave.Visible = !readOnly;
+            
+            // Başlık güncelle
+            if (lblTitle != null && readOnly)
+            {
+                lblTitle.Text = "Sipariş Detayları (Sadece Görüntüleme)";
+                lblTitle.ForeColor = ThemeColors.Warning;
             }
         }
     }

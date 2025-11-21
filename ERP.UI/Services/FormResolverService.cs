@@ -31,6 +31,18 @@ namespace ERP.UI.Services
                 return new OrderEntryForm(orderId);
             }
 
+            // AccountingEntryForm için özel işlem
+            if (metadata.FormType == typeof(AccountingEntryForm) && orderId != Guid.Empty)
+            {
+                return new AccountingEntryForm(orderId);
+            }
+
+            // ProductionDetailForm için özel işlem
+            if (metadata.FormType == typeof(ProductionDetailForm) && orderId != Guid.Empty)
+            {
+                return new ProductionDetailForm(orderId);
+            }
+
             return (UserControl)Activator.CreateInstance(metadata.FormType);
         }
 
@@ -44,6 +56,15 @@ namespace ERP.UI.Services
             RegisterForm("OrderList", typeof(OrderListForm), "Siparişleri Görüntüle");
             RegisterForm("OrderCreate", typeof(OrderEntryForm), "Yeni Sipariş");
             RegisterForm("OrderEntry", typeof(OrderEntryForm), "Sipariş Girişi"); // Backward compatibility
+            RegisterForm("Accounting", typeof(AccountingForm), "Muhasebe");
+            RegisterForm("AccountingEntry", typeof(AccountingEntryForm), "Muhasebe İşlemi");
+            RegisterForm("Production", typeof(ProductionListForm), "Üretim");
+            RegisterForm("ProductionDetail", typeof(ProductionDetailForm), "Üretim Detayları");
+            RegisterForm("MRPReport", typeof(MRPReportForm), "MRP Raporu");
+            RegisterForm("CustomerReport", typeof(CustomerReportForm), "Cari Raporu");
+            RegisterForm("AnnualReport", typeof(AnnualReportForm), "Yıllık Rapor");
+            RegisterForm("GeneralReport", typeof(GeneralReportForm), "Genel Rapor");
+            RegisterForm("Reports", typeof(MRPReportForm), "Raporlar"); // Ana raporlar sayfası
             // Diğer formlar buraya eklenecek
         }
 

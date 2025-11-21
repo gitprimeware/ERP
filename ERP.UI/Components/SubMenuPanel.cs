@@ -33,11 +33,16 @@ namespace ERP.UI.Components
             if (!parentItem.HasSubMenu)
                 return;
 
+            // SubMenuContainer'ın yüksekliğini hesapla (her buton 45px)
+            int totalHeight = parentItem.SubMenuItems.Count * 45;
+            
             _subMenuContainer = new Panel
             {
                 Dock = DockStyle.Top,
                 BackColor = Color.FromArgb(45, 58, 66),
-                Padding = new Padding(0)
+                Padding = new Padding(0),
+                AutoSize = false,
+                Height = totalHeight
             };
 
             foreach (var subItem in parentItem.SubMenuItems.OrderBy(x => x.Order))
@@ -79,7 +84,22 @@ namespace ERP.UI.Components
         public void Toggle()
         {
             _isExpanded = !_isExpanded;
-            this.Height = _isExpanded ? _subMenuContainer?.Height ?? 0 : 0;
+            if (_isExpanded)
+            {
+                // Tüm sub-menu item'larının toplam yüksekliği
+                // _subMenuContainer zaten doğru yüksekliğe sahip (CreateSubMenu'de ayarlandı)
+                int totalHeight = _subMenuContainer?.Height ?? 0;
+                // Eğer hala 0 ise, kontrol sayısından hesapla
+                if (totalHeight == 0 && _subMenuContainer != null && _subMenuContainer.Controls.Count > 0)
+                {
+                    totalHeight = _subMenuContainer.Controls.Count * 45;
+                }
+                this.Height = totalHeight;
+            }
+            else
+            {
+                this.Height = 0;
+            }
         }
 
         public void Expand()
@@ -87,7 +107,12 @@ namespace ERP.UI.Components
             if (!_isExpanded)
             {
                 _isExpanded = true;
-                this.Height = _subMenuContainer?.Height ?? 0;
+                int totalHeight = _subMenuContainer?.Height ?? 0;
+                if (totalHeight == 0 && _subMenuContainer != null)
+                {
+                    totalHeight = _subMenuContainer.Controls.Count * 45;
+                }
+                this.Height = totalHeight;
             }
         }
 

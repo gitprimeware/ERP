@@ -97,6 +97,15 @@ namespace ERP.UI.Forms
             {
                 _contentManager.ShowForm("OrderCreate");
             }
+            else if (formTag == "Accounting")
+            {
+                _contentManager.ShowForm("Accounting");
+            }
+            else if (formTag == "ProductionFormul" || formTag == "ProductionReport")
+            {
+                // Alt menü item'ları ProductionListForm'u açsın
+                _contentManager.ShowForm("Production");
+            }
             else
             {
                 _contentManager.ShowForm(formTag);
