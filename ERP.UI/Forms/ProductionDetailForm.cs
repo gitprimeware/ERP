@@ -516,12 +516,13 @@ namespace ERP.UI.Forms
                 txtReportPlakaOlcusuCM.Text = txtPlakaOlcusuCM.Text;
 
             // Yükseklik (mm) - Yükseklik (mm) değerinden kapak boyu değerini çıkar
+            int raporYukseklikMM = 0;
             if (txtReportYukseklikCM != null && txtYukseklikMM != null && txtKapakBoyuMM != null)
             {
                 if (int.TryParse(txtYukseklikMM.Text, out int yukseklikMM) && int.TryParse(txtKapakBoyuMM.Text, out int kapakBoyuMM))
                 {
                     // Yükseklik (mm) - Kapak Boyu (mm) = Rapor Yükseklik (mm)
-                    int raporYukseklikMM = yukseklikMM - kapakBoyuMM;
+                    raporYukseklikMM = yukseklikMM - kapakBoyuMM;
                     txtReportYukseklikCM.Text = raporYukseklikMM.ToString();
                 }
                 else if (int.TryParse(txtYukseklikMM.Text, out int yukseklikMMOnly))
@@ -548,8 +549,8 @@ namespace ERP.UI.Forms
                                 // Eğer direkt sayı olarak parse edilebiliyorsa (eski format için)
                                 cikarilacakDeger = parsedKapak;
                             }
-                            
-                            int raporYukseklikMM = yukseklikMMOnly - cikarilacakDeger;
+
+                            raporYukseklikMM = yukseklikMMOnly - cikarilacakDeger;
                             txtReportYukseklikCM.Text = raporYukseklikMM.ToString();
                         }
                     }
@@ -560,17 +561,26 @@ namespace ERP.UI.Forms
             if (txtReportToplamSiparisAdedi != null && txtToplamAdet != null)
                 txtReportToplamSiparisAdedi.Text = txtToplamAdet.Text;
 
-            // Plaka Adedi - Formüldeki plaka adedi ile rapor sekmesindeki toplam sipariş adedi çarpılacak
-            if (txtReportPlakaAdedi != null && txtPlakaAdet != null && txtToplamAdet != null)
+            // Plaka Adedi - Yükseklikten 10 cm dilimlerini hesaplayarak sipariş adedi ve 10cm plaka adetini çarp
+            if (txtReportPlakaAdedi != null && txtYukseklikMM != null && txtSiparisAdedi != null && txtPlakaAdedi10cm != null)
             {
-                if (int.TryParse(txtPlakaAdet.Text, out int plakaAdet) && int.TryParse(txtToplamAdet.Text, out int toplamSiparisAdedi))
+                if (decimal.TryParse(txtYukseklikMM.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal yukseklikMM) &&
+                    int.TryParse(txtSiparisAdedi.Text, out int siparisAdedi) &&
+                    int.TryParse(txtPlakaAdedi10cm.Text, out int plakaAdedi10cm))
                 {
-                    int hesaplananPlakaAdedi = plakaAdet * toplamSiparisAdedi;
-                    txtReportPlakaAdedi.Text = hesaplananPlakaAdedi.ToString();
+                    // Yükseklik (mm) -> cm -> 10 cm dilimi (iki kez 10'a böl)
+                    decimal onCmDilimi = raporYukseklikMM / 100m;
+                    decimal hesaplananPlakaAdedi = onCmDilimi * siparisAdedi * plakaAdedi10cm;
+                    txtReportPlakaAdedi.Text = Math.Round(hesaplananPlakaAdedi, 0, MidpointRounding.AwayFromZero).ToString(CultureInfo.InvariantCulture);
+                }
+                else if (int.TryParse(txtPlakaAdet.Text, out int plakaAdetFallback) && int.TryParse(txtToplamAdet?.Text, out int toplamAdetFallback))
+                {
+                    // Eski mantığa geri dön
+                    txtReportPlakaAdedi.Text = (plakaAdetFallback * toplamAdetFallback).ToString();
                 }
                 else
                 {
-                    txtReportPlakaAdedi.Text = txtPlakaAdet.Text;
+                    txtReportPlakaAdedi.Text = txtPlakaAdet?.Text ?? "0";
                 }
             }
 

@@ -31,6 +31,11 @@ namespace ERP.UI.Services
 
             var consumptionItem = new MenuItem("⚡ Sarfiyat", "Consumption", "⚡", 6);
 
+            var stockItem = new MenuItem("📦 Stok Yönetimi", "Stock", "📦", 4);
+            stockItem.AddSubMenuItem(new MenuItem("📥 Malzeme Giriş", "MaterialEntry", "📥", 1));
+            stockItem.AddSubMenuItem(new MenuItem("📤 Malzeme Çıkış", "MaterialExit", "📤", 2));
+            stockItem.AddSubMenuItem(new MenuItem("📊 Stok Ayrıntı", "StockDetail", "📊", 3));
+
             var reportsItem = new MenuItem("📈 Raporlar", "Reports", "📈", 10);
             reportsItem.AddSubMenuItem(new MenuItem("📊 MRP Raporu", "MRPReport", "📊", 1));
             reportsItem.AddSubMenuItem(new MenuItem("🏢 Cari Raporu", "CustomerReport", "🏢", 2));
@@ -42,7 +47,7 @@ namespace ERP.UI.Services
                 new MenuItem("🏠 Ana Sayfa", "Home", "🏠", 1),
                 orderEntryItem,
                 new MenuItem("💰 Muhasebe", "Accounting", "💰", 3),
-                new MenuItem("📦 Stok Yönetimi", "Stock", "📦", 4),
+                stockItem,
                 productionItem,
                 consumptionItem,
                 new MenuItem("📊 Satış Yönetimi", "Sales", "📊", 7),

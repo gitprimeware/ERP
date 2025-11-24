@@ -7,7 +7,7 @@ namespace ERP.DAL
     public class DatabaseHelper
     {
         private static string? _connectionString;
-        private const string DatabaseName = "ERPDB";
+        private const string DatabaseName = "ERPDB2";
 
         public static string ConnectionString
         {

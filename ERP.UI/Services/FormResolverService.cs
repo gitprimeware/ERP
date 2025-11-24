@@ -68,6 +68,9 @@ namespace ERP.UI.Services
             RegisterForm("ProductionDetail", typeof(ProductionDetailForm), "Üretim Detayları");
             RegisterForm("Consumption", typeof(ConsumptionListForm), "Sarfiyat");
             RegisterForm("ConsumptionDetail", typeof(ConsumptionDetailForm), "Sarfiyat Detayları");
+            RegisterForm("MaterialEntry", typeof(MaterialEntryForm), "Malzeme Giriş");
+            RegisterForm("MaterialExit", typeof(MaterialExitForm), "Malzeme Çıkış");
+            RegisterForm("StockDetail", typeof(StockDetailForm), "Stok Ayrıntı");
             RegisterForm("MRPReport", typeof(MRPReportForm), "MRP Raporu");
             RegisterForm("CustomerReport", typeof(CustomerReportForm), "Cari Raporu");
             RegisterForm("AnnualReport", typeof(AnnualReportForm), "Yıllık Rapor");

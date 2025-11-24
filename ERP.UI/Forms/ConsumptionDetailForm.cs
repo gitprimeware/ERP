@@ -50,6 +50,7 @@ namespace ERP.UI.Forms
         private decimal _galvanizKapakAgirligi = 0;
         private int _kapakAdedi = 0;
         private char _modelLetter = ' '; // Hatve harf simgesi için
+        private int _plakaAdedi10cm = 0;
 
         public event EventHandler BackRequested;
 
@@ -258,8 +259,7 @@ namespace ERP.UI.Forms
                 {
                     decimal aluminyumKalinligi = _order.LamelThickness.Value;
                     txtPlakaKalinligi.Text = aluminyumKalinligi.ToString("0.000", CultureInfo.InvariantCulture);
-                    
-                    if (decimal.TryParse(txtUretimPlakaOlcusu.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal plakaOlcusuCM))
+                    if (TryParseDecimalInvariant(txtUretimPlakaOlcusu.Text, out decimal plakaOlcusuCM))
                     {
                         _plakaAgirligi = CalculatePlakaAgirligi(plakaOlcusuCM, aluminyumKalinligi);
                         if (_plakaAgirligi > 0)
@@ -270,7 +270,7 @@ namespace ERP.UI.Forms
                 }
 
                 // Galvaniz Kapak Ağırlığı hesapla
-                if (decimal.TryParse(txtUretimPlakaOlcusu.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal plakaOlcusuCM2))
+                if (TryParseDecimalInvariant(txtUretimPlakaOlcusu.Text, out decimal plakaOlcusuCM2))
                 {
                     _galvanizKapakAgirligi = CalculateGalvanizKapakAgirligi(plakaOlcusuCM2);
                     if (_galvanizKapakAgirligi > 0)
@@ -298,6 +298,8 @@ namespace ERP.UI.Forms
 
                 // Hesaplamaları yap
                 CalculateConsumption();
+
+                UpdateConsumptionPlakaAdedi();
             }
             catch (Exception ex)
             {
@@ -328,6 +330,9 @@ namespace ERP.UI.Forms
                     // Hatve yanında harf simgesi de göster
                     txtHatve.Text = $"{htave.ToString("F2", CultureInfo.InvariantCulture)} ({_modelLetter.ToString().ToUpper()})";
 
+                    // 10cm Plaka Adedi: H=32, D=24, M=17, L=12
+                    _plakaAdedi10cm = GetPlakaAdedi10cm(_modelLetter);
+
                     // Profil
                     txtProfil.Text = profileLetter.ToString().ToUpper();
 
@@ -347,7 +352,6 @@ namespace ERP.UI.Forms
 
                     // Plaka Adet: Plaka ölçüsü <= 1150 ise 1, > 1150 ise 4
                     _plakaAdet = plakaOlcusuMM <= 1150 ? 1 : 4;
-                    txtPlakaAdedi.Text = _plakaAdet.ToString();
                 }
 
                 // Yükseklik (mm): 1900
@@ -373,7 +377,7 @@ namespace ERP.UI.Forms
                     {
                         // Kapak adedi hesaplama mantığı buraya eklenecek
                         // Şimdilik sipariş adedi kullanıyoruz
-                        _kapakAdedi = _order.Quantity;
+                        _kapakAdedi = _order.Quantity*2;
                         txtKapakAdedi.Text = _kapakAdedi.ToString();
                     }
                 }
@@ -389,6 +393,10 @@ namespace ERP.UI.Forms
             // Toplam Alüminyum Ağırlığı = Plaka Ağırlığı * Plaka Adedi
             if (_plakaAgirligi > 0 && _plakaAdet > 0)
             {
+                decimal onCmDilimi = _yukseklikMM / 100m; // mm -> cm -> 10cm dilim
+                decimal hesaplananPlakaAdedi = onCmDilimi * _order.Quantity * _plakaAdedi10cm;
+                _plakaAdet = (Int32)Math.Round(hesaplananPlakaAdedi, 0, MidpointRounding.AwayFromZero);
+                    
                 decimal toplamAluminyumAgirligi = _plakaAgirligi * _plakaAdet;
                 txtToplamAluminyumAgirligi.Text = toplamAluminyumAgirligi.ToString("F3", CultureInfo.InvariantCulture);
             }
@@ -413,6 +421,28 @@ namespace ERP.UI.Forms
             }
         }
 
+        private void UpdateConsumptionPlakaAdedi()
+        {
+            if (txtPlakaAdedi == null)
+                return;
+
+            if (_yukseklikMM > 0 && _order != null && _order.Quantity > 0 && _plakaAdedi10cm > 0)
+            {
+                decimal onCmDilimi = _yukseklikMM / 100m; // mm -> cm -> 10cm dilim
+                decimal hesaplananPlakaAdedi = onCmDilimi * _order.Quantity * _plakaAdedi10cm;
+                txtPlakaAdedi.Text = Math.Round(hesaplananPlakaAdedi, 0, MidpointRounding.AwayFromZero)
+                    .ToString(CultureInfo.InvariantCulture);
+            }
+            else if (_plakaAdet > 0)
+            {
+                txtPlakaAdedi.Text = _plakaAdet.ToString();
+            }
+            else
+            {
+                txtPlakaAdedi.Text = "0";
+            }
+        }
+
         private decimal GetHtave(char modelLetter)
         {
             switch (char.ToUpper(modelLetter))
@@ -425,120 +455,149 @@ namespace ERP.UI.Forms
             }
         }
 
+        private int GetPlakaAdedi10cm(char modelLetter)
+        {
+            switch (char.ToUpper(modelLetter))
+            {
+                case 'H': return 32;
+                case 'D': return 24;
+                case 'M': return 17;
+                case 'L': return 12;
+                default: return 0;
+            }
+        }
+
         private decimal CalculatePlakaAgirligi(decimal plakaOlcusuCM, decimal aluminyumKalinligi)
         {
-            // ProductionDetailForm'dan alınan hesaplama mantığı
-            const decimal tolerance = 0.001m;
+            // Üretim tablolarında ölçüler 1 ondalık, kalınlıklar 3 ondalık hassasiyetinde tutuluyor.
+            var normalizedSize = Math.Round(plakaOlcusuCM, 1, MidpointRounding.AwayFromZero);
+            var normalizedThickness = Math.Round(aluminyumKalinligi, 3, MidpointRounding.AwayFromZero);
 
-            if (plakaOlcusuCM >= 18 && plakaOlcusuCM <= 24)
+            if (normalizedSize >= 18 && normalizedSize <= 24)
             {
-                if (Math.Abs(aluminyumKalinligi - 0.165m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.165m))
                     return 0.019m;
-                if (Math.Abs(aluminyumKalinligi - 0.12m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.12m))
                     return 0.014m;
             }
 
-            if (plakaOlcusuCM >= 28 && plakaOlcusuCM <= 34)
+            if (normalizedSize >= 28 && normalizedSize <= 34)
             {
-                if (Math.Abs(aluminyumKalinligi - 0.165m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.165m))
                     return 0.042m;
-                if (Math.Abs(aluminyumKalinligi - 0.15m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.15m))
                     return 0.038m;
-                if (Math.Abs(aluminyumKalinligi - 0.12m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.12m))
                     return 0.031m;
             }
 
-            if (plakaOlcusuCM >= 38 && plakaOlcusuCM <= 44)
+            if (normalizedSize >= 38 && normalizedSize <= 44)
             {
-                if (Math.Abs(aluminyumKalinligi - 0.15m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.15m))
                     return 0.068m;
-                if (Math.Abs(aluminyumKalinligi - 0.165m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.165m))
                     return 0.074m;
-                if (Math.Abs(aluminyumKalinligi - 0.12m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.12m))
                     return 0.054m;
             }
 
-            if (plakaOlcusuCM >= 48 && plakaOlcusuCM <= 54)
+            if (normalizedSize >= 48 && normalizedSize <= 54)
             {
-                if (Math.Abs(aluminyumKalinligi - 0.15m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.15m))
                     return 0.105m;
-                if (Math.Abs(aluminyumKalinligi - 0.165m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.165m))
                     return 0.115m;
-                if (Math.Abs(aluminyumKalinligi - 0.12m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.12m))
                     return 0.085m;
             }
 
-            if (plakaOlcusuCM >= 58 && plakaOlcusuCM <= 64)
+            if (normalizedSize >= 58 && normalizedSize <= 64)
             {
-                if (Math.Abs(aluminyumKalinligi - 0.15m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.15m))
                     return 0.150m;
-                if (Math.Abs(aluminyumKalinligi - 0.165m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.165m))
                     return 0.164m;
-                if (Math.Abs(aluminyumKalinligi - 0.12m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.12m))
                     return 0.120m;
             }
 
-            if (plakaOlcusuCM >= 68 && plakaOlcusuCM <= 74)
+            if (normalizedSize >= 68 && normalizedSize <= 74)
             {
-                if (Math.Abs(aluminyumKalinligi - 0.15m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.15m))
                     return 0.205m;
-                if (Math.Abs(aluminyumKalinligi - 0.165m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.165m))
                     return 0.224m;
-                if (Math.Abs(aluminyumKalinligi - 0.12m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.12m))
                     return 0.165m;
             }
 
-            if (plakaOlcusuCM >= 78 && plakaOlcusuCM <= 84)
+            if (normalizedSize >= 78 && normalizedSize <= 84)
             {
-                if (Math.Abs(aluminyumKalinligi - 0.15m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.15m))
                     return 0.270m;
-                if (Math.Abs(aluminyumKalinligi - 0.165m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.165m))
                     return 0.295m;
-                if (Math.Abs(aluminyumKalinligi - 0.12m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.12m))
                     return 0.218m;
             }
 
-            if (plakaOlcusuCM >= 88 && plakaOlcusuCM <= 94)
+            if (normalizedSize >= 88 && normalizedSize <= 94)
             {
-                if (Math.Abs(aluminyumKalinligi - 0.15m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.15m))
                     return 0.345m;
-                if (Math.Abs(aluminyumKalinligi - 0.165m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.165m))
                     return 0.377m;
-                if (Math.Abs(aluminyumKalinligi - 0.12m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.12m))
                     return 0.279m;
             }
 
-            if (plakaOlcusuCM >= 98 && plakaOlcusuCM <= 104)
+            if (normalizedSize >= 98 && normalizedSize <= 104)
             {
-                if (Math.Abs(aluminyumKalinligi - 0.15m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.15m))
                     return 0.430m;
-                if (Math.Abs(aluminyumKalinligi - 0.165m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.165m))
                     return 0.470m;
-                if (Math.Abs(aluminyumKalinligi - 0.12m) < tolerance)
+                if (ThicknessMatches(normalizedThickness, 0.12m))
                     return 0.348m;
             }
 
             return 0m;
         }
 
+        private bool ThicknessMatches(decimal actual, decimal expected)
+        {
+            return Math.Abs(actual - expected) <= 0.0005m;
+        }
+
+        private bool TryParseDecimalInvariant(string text, out decimal value)
+        {
+            value = 0m;
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+
+            var normalized = text.Replace(",", ".");
+            return decimal.TryParse(normalized, NumberStyles.Any, CultureInfo.InvariantCulture, out value);
+        }
+
         private decimal CalculateGalvanizKapakAgirligi(decimal plakaOlcusuCM)
         {
-            // ProductionDetailForm'dan alınan hesaplama mantığı
-            if (Math.Abs(plakaOlcusuCM - 20m) < 0.1m)
+            var normalizedSize = Math.Round(plakaOlcusuCM, 1, MidpointRounding.AwayFromZero);
+
+            if (normalizedSize >= 18 && normalizedSize <= 24)
                 return 0.421m;
-            if (Math.Abs(plakaOlcusuCM - 30m) < 0.1m)
+            if (normalizedSize >= 28 && normalizedSize <= 34)
                 return 0.663m;
-            if (Math.Abs(plakaOlcusuCM - 40m) < 0.1m)
+            if (normalizedSize >= 38 && normalizedSize <= 44)
                 return 1.358m;
-            if (Math.Abs(plakaOlcusuCM - 50m) < 0.1m)
+            if (normalizedSize >= 48 && normalizedSize <= 54)
                 return 2.026m;
-            if (Math.Abs(plakaOlcusuCM - 60m) < 0.1m)
+            if (normalizedSize >= 58 && normalizedSize <= 64)
                 return 2.828m;
-            if (Math.Abs(plakaOlcusuCM - 70m) < 0.1m)
+            if (normalizedSize >= 68 && normalizedSize <= 74)
                 return 3.764m;
-            if (Math.Abs(plakaOlcusuCM - 80m) < 0.1m)
+            if (normalizedSize >= 78 && normalizedSize <= 84)
                 return 5.5685m;
-            if (Math.Abs(plakaOlcusuCM - 100m) < 0.1m)
+            if (normalizedSize >= 98 && normalizedSize <= 104)
                 return 8.672m;
 
             return 0m;

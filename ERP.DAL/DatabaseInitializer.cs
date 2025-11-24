@@ -6,7 +6,7 @@ namespace ERP.DAL
 {
     public static class DatabaseInitializer
     {
-        private const string DatabaseName = "ERPDB";
+        private const string DatabaseName = "ERPDB2";
 
         public static void InitializeDatabase()
         {
@@ -21,7 +21,10 @@ namespace ERP.DAL
                     connection.Open();
                     
                     CreateCompaniesTable(connection);
+                    CreateSuppliersTable(connection);
                     CreateOrdersTable(connection);
+                    CreateMaterialEntriesTable(connection);
+                    CreateMaterialExitsTable(connection);
                 }
             }
             catch (Exception ex)
@@ -159,6 +162,127 @@ namespace ERP.DAL
                     // Migration hatası olursa devam et (tablo zaten doğru formatta olabilir)
                     System.Diagnostics.Debug.WriteLine($"Migration hatası: {ex.Message}");
                 }
+            }
+        }
+
+        private static void CreateSuppliersTable(SqlConnection connection)
+        {
+            var query = @"
+                IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Suppliers]') AND type in (N'U'))
+                BEGIN
+                    CREATE TABLE [dbo].[Suppliers] (
+                        [Id] UNIQUEIDENTIFIER PRIMARY KEY,
+                        [Name] NVARCHAR(200) NOT NULL,
+                        [Address] NVARCHAR(500) NULL,
+                        [Phone] NVARCHAR(50) NULL,
+                        [Email] NVARCHAR(100) NULL,
+                        [TaxNumber] NVARCHAR(50) NULL,
+                        [CreatedDate] DATETIME NOT NULL,
+                        [ModifiedDate] DATETIME NULL,
+                        [IsActive] BIT NOT NULL DEFAULT 1
+                    )
+                END";
+
+            using (var command = new SqlCommand(query, connection))
+            {
+                command.ExecuteNonQuery();
+            }
+        }
+
+        private static void CreateMaterialEntriesTable(SqlConnection connection)
+        {
+            var query = @"
+                IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[MaterialEntries]') AND type in (N'U'))
+                BEGIN
+                    CREATE TABLE [dbo].[MaterialEntries] (
+                        [Id] UNIQUEIDENTIFIER PRIMARY KEY,
+                        [TransactionType] NVARCHAR(50) NOT NULL,
+                        [MaterialType] NVARCHAR(50) NOT NULL,
+                        [MaterialSize] NVARCHAR(100) NOT NULL,
+                        [Size] INT NOT NULL,
+                        [Thickness] DECIMAL(10,3) NOT NULL,
+                        [SupplierId] UNIQUEIDENTIFIER NULL,
+                        [InvoiceNo] NVARCHAR(100) NULL,
+                        [TrexPurchaseNo] NVARCHAR(100) NULL,
+                        [EntryDate] DATETIME NOT NULL,
+                        [Quantity] DECIMAL(18,3) NOT NULL,
+                        [CreatedDate] DATETIME NOT NULL,
+                        [ModifiedDate] DATETIME NULL,
+                        [IsActive] BIT NOT NULL DEFAULT 1,
+                        FOREIGN KEY ([SupplierId]) REFERENCES [Suppliers]([Id])
+                    )
+                END";
+
+            using (var command = new SqlCommand(query, connection))
+            {
+                command.ExecuteNonQuery();
+            }
+
+            // Migration: Eğer tablo varsa ve Companies'a referans veriyorsa, Suppliers'a çevir
+            var migrationQuery = @"
+                IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[MaterialEntries]') AND type in (N'U'))
+                BEGIN
+                    -- Foreign key'i kontrol et ve gerekirse değiştir
+                    IF EXISTS (SELECT * FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID(N'[dbo].[MaterialEntries]') AND referenced_object_id = OBJECT_ID(N'[dbo].[Companies]'))
+                    BEGIN
+                        DECLARE @FKName NVARCHAR(128)
+                        SELECT @FKName = name FROM sys.foreign_keys 
+                        WHERE parent_object_id = OBJECT_ID(N'[dbo].[MaterialEntries]') 
+                        AND referenced_object_id = OBJECT_ID(N'[dbo].[Companies]')
+                        
+                        IF @FKName IS NOT NULL
+                        BEGIN
+                            EXEC('ALTER TABLE [dbo].[MaterialEntries] DROP CONSTRAINT ' + @FKName)
+                            ALTER TABLE [dbo].[MaterialEntries]
+                            ADD CONSTRAINT FK_MaterialEntries_Suppliers FOREIGN KEY ([SupplierId]) REFERENCES [Suppliers]([Id])
+                        END
+                    END
+                    ELSE IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID(N'[dbo].[MaterialEntries]') AND referenced_object_id = OBJECT_ID(N'[dbo].[Suppliers]'))
+                    BEGIN
+                        ALTER TABLE [dbo].[MaterialEntries]
+                        ADD CONSTRAINT FK_MaterialEntries_Suppliers FOREIGN KEY ([SupplierId]) REFERENCES [Suppliers]([Id])
+                    END
+                END";
+
+            using (var migrationCommand = new SqlCommand(migrationQuery, connection))
+            {
+                try
+                {
+                    migrationCommand.ExecuteNonQuery();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Migration hatası: {ex.Message}");
+                }
+            }
+        }
+
+        private static void CreateMaterialExitsTable(SqlConnection connection)
+        {
+            var query = @"
+                IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[MaterialExits]') AND type in (N'U'))
+                BEGIN
+                    CREATE TABLE [dbo].[MaterialExits] (
+                        [Id] UNIQUEIDENTIFIER PRIMARY KEY,
+                        [TransactionType] NVARCHAR(50) NOT NULL,
+                        [MaterialType] NVARCHAR(50) NOT NULL,
+                        [MaterialSize] NVARCHAR(100) NOT NULL,
+                        [Size] INT NOT NULL,
+                        [Thickness] DECIMAL(10,3) NOT NULL,
+                        [CompanyId] UNIQUEIDENTIFIER NULL,
+                        [TrexInvoiceNo] NVARCHAR(100) NULL,
+                        [ExitDate] DATETIME NOT NULL,
+                        [Quantity] DECIMAL(18,3) NOT NULL,
+                        [CreatedDate] DATETIME NOT NULL,
+                        [ModifiedDate] DATETIME NULL,
+                        [IsActive] BIT NOT NULL DEFAULT 1,
+                        FOREIGN KEY ([CompanyId]) REFERENCES [Companies]([Id])
+                    )
+                END";
+
+            using (var command = new SqlCommand(query, connection))
+            {
+                command.ExecuteNonQuery();
             }
         }
     }
