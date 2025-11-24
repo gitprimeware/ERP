@@ -155,7 +155,7 @@ namespace ERP.UI.Forms
 
             // Sipariş numaraları
             AddTableRow("Müşteri Sipariş No:", CreateTextBox(txtCustomerOrderNo = new TextBox()), 
-                       "Trex Sipariş No:", CreateReadOnlyTextBox(txtTrexOrderNo = new TextBox()), row++);
+                       "Trex Sipariş No:", CreateTextBox(txtTrexOrderNo = new TextBox()), row++);
 
             // Cihaz adı ve Sipariş tarihi
             AddTableRow("Cihaz Adı:", CreateTextBox(txtDeviceName = new TextBox()),
@@ -541,7 +541,8 @@ namespace ERP.UI.Forms
 
         private void GenerateTrexOrderNo()
         {
-            if (!_isEditMode)
+            // Boşsa veya yeni siparişse otomatik oluştur
+            if (string.IsNullOrWhiteSpace(txtTrexOrderNo.Text) || !_isEditMode)
             {
                 int year = DateTime.Now.Year;
                 int orderNumber = GetNextOrderNumber();
@@ -848,9 +849,15 @@ namespace ERP.UI.Forms
             }
 
             // LamelThickness
-            if (cmbLamelThickness.SelectedItem != null && decimal.TryParse(cmbLamelThickness.SelectedItem.ToString(), out decimal thickness))
+            if (cmbLamelThickness.SelectedItem != null)
             {
-                order.LamelThickness = thickness;
+                var thicknessStr = cmbLamelThickness.SelectedItem.ToString();
+                // Nokta ve virgül sorununu çözmek için InvariantCulture kullan
+                thicknessStr = thicknessStr.Replace(",", ".");
+                if (decimal.TryParse(thicknessStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal thickness))
+                {
+                    order.LamelThickness = thickness;
+                }
             }
 
             // SalesPrice
@@ -987,17 +994,13 @@ namespace ERP.UI.Forms
 
                 if (order.LamelThickness.HasValue)
                 {
-                    // Decimal değeri string'e çevir (InvariantCulture kullan)
-                    var thicknessStr = order.LamelThickness.Value.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
-                    
-                    // ComboBox'taki değerlerle karşılaştır
+                    // ComboBox'taki değerlerle decimal karşılaştırması yap
                     for (int i = 0; i < cmbLamelThickness.Items.Count; i++)
                     {
                         var itemValue = cmbLamelThickness.Items[i].ToString();
-                        // Hem string hem de decimal karşılaştırması yap
-                        if (itemValue == thicknessStr || 
-                            (decimal.TryParse(itemValue, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal itemDecimal) && 
-                             itemDecimal == order.LamelThickness.Value))
+                        // Decimal karşılaştırması yap (InvariantCulture kullan)
+                        if (decimal.TryParse(itemValue.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal itemDecimal) && 
+                            itemDecimal == order.LamelThickness.Value)
                         {
                             cmbLamelThickness.SelectedIndex = i;
                             break;
@@ -1045,6 +1048,7 @@ namespace ERP.UI.Forms
                 if (cmbCompany != null) cmbCompany.Enabled = false;
                 if (btnAddCompany != null) btnAddCompany.Enabled = false;
                 if (txtCustomerOrderNo != null) txtCustomerOrderNo.ReadOnly = true;
+                // txtTrexOrderNo readonly olmasın - düzeltilebilsin
                 if (txtDeviceName != null) txtDeviceName.ReadOnly = true;
                 if (dtpOrderDate != null) dtpOrderDate.Enabled = false;
                 if (dtpTermDate != null) dtpTermDate.Enabled = false;

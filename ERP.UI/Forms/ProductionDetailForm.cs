@@ -121,11 +121,20 @@ namespace ERP.UI.Forms
             CreateRaporTab(tabRapor);
             tabControl.TabPages.Add(tabRapor);
 
-            // Geri butonu
+            // Geri butonu - sağ üste
             btnBack = ButtonFactory.CreateActionButton("⬅️ Geri", ThemeColors.Secondary, Color.White, 120, 40);
-            btnBack.Location = new Point(30, 10);
-            btnBack.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+            btnBack.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnBack.Location = new Point(mainPanel.Width - btnBack.Width - 30, 10);
             btnBack.Click += BtnBack_Click;
+
+            // mainPanel resize olduğunda geri tuşunun konumunu güncelle
+            mainPanel.Resize += (s, e) =>
+            {
+                if (btnBack != null)
+                {
+                    btnBack.Location = new Point(mainPanel.Width - btnBack.Width - 30, 10);
+                }
+            };
 
             mainPanel.Controls.Add(tabControl);
             mainPanel.Controls.Add(btnBack);
@@ -333,7 +342,7 @@ namespace ERP.UI.Forms
 
             // Plaka Ölçüsü (cm)
             AddReportTableRow("Plaka Ölçüsü (cm):", CreateReadOnlyTextBox(txtReportPlakaOlcusuCM = new TextBox()),
-                       "Yükseklik (cm):", CreateReadOnlyTextBox(txtReportYukseklikCM = new TextBox()), row++);
+                       "Yükseklik (mm):", CreateReadOnlyTextBox(txtReportYukseklikCM = new TextBox()), row++);
 
             // Toplam Sipariş Adedi
             AddReportTableRow("Toplam Sipariş Adedi:", CreateReadOnlyTextBox(txtReportToplamSiparisAdedi = new TextBox()),
@@ -506,11 +515,45 @@ namespace ERP.UI.Forms
             if (txtReportPlakaOlcusuCM != null && txtPlakaOlcusuCM != null)
                 txtReportPlakaOlcusuCM.Text = txtPlakaOlcusuCM.Text;
 
-            // Yükseklik (cm) - Yükseklik com / 10
-            if (txtReportYukseklikCM != null && txtYukseklikCom != null && int.TryParse(txtYukseklikCom.Text, out int yukseklikCom))
+            // Yükseklik (mm) - Yükseklik (mm) değerinden kapak boyu değerini çıkar
+            if (txtReportYukseklikCM != null && txtYukseklikMM != null && txtKapakBoyuMM != null)
             {
-                decimal yukseklikCM = yukseklikCom / 10.0m;
-                txtReportYukseklikCM.Text = yukseklikCM.ToString("F1", CultureInfo.InvariantCulture);
+                if (int.TryParse(txtYukseklikMM.Text, out int yukseklikMM) && int.TryParse(txtKapakBoyuMM.Text, out int kapakBoyuMM))
+                {
+                    // Yükseklik (mm) - Kapak Boyu (mm) = Rapor Yükseklik (mm)
+                    int raporYukseklikMM = yukseklikMM - kapakBoyuMM;
+                    txtReportYukseklikCM.Text = raporYukseklikMM.ToString();
+                }
+                else if (int.TryParse(txtYukseklikMM.Text, out int yukseklikMMOnly))
+                {
+                    // Kapak boyu parse edilemezse, ürün kodundan kapak değerini çıkar
+                    // Ürün kodundan kapak değeri DisplayText formatında gelir: 030, 002, veya 016
+                    if (_order != null && !string.IsNullOrEmpty(_order.ProductCode))
+                    {
+                        var productCodeParts = _order.ProductCode.Split('-');
+                        if (productCodeParts.Length > 5)
+                        {
+                            string kapakDegeri = productCodeParts[5];
+                            int cikarilacakDeger = 0;
+                            
+                            // Ürün kodunda DisplayText formatı kullanılıyor: 030, 002, 016
+                            if (kapakDegeri == "030")
+                                cikarilacakDeger = 30;
+                            else if (kapakDegeri == "002")
+                                cikarilacakDeger = 2;
+                            else if (kapakDegeri == "016")
+                                cikarilacakDeger = 16;
+                            else if (int.TryParse(kapakDegeri, out int parsedKapak))
+                            {
+                                // Eğer direkt sayı olarak parse edilebiliyorsa (eski format için)
+                                cikarilacakDeger = parsedKapak;
+                            }
+                            
+                            int raporYukseklikMM = yukseklikMMOnly - cikarilacakDeger;
+                            txtReportYukseklikCM.Text = raporYukseklikMM.ToString();
+                        }
+                    }
+                }
             }
 
             // Toplam Sipariş Adedi
@@ -857,7 +900,7 @@ namespace ERP.UI.Forms
             if (txtAluminyumKalinligi != null && _order != null && _order.LamelThickness.HasValue)
             {
                 decimal lamelKalinligi = _order.LamelThickness.Value;
-                txtAluminyumKalinligi.Text = lamelKalinligi.ToString("0.00", CultureInfo.InvariantCulture);
+                txtAluminyumKalinligi.Text = lamelKalinligi.ToString("0.000", CultureInfo.InvariantCulture);
             }
             else if (txtAluminyumKalinligi != null)
             {

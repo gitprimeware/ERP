@@ -250,12 +250,24 @@ namespace ERP.UI.Forms
             {
                 Height = 30,
                 Font = new Font("Segoe UI", 10F),
-                DropDownStyle = ComboBoxStyle.DropDownList
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                DisplayMember = "DisplayText",
+                ValueMember = "Value"
             };
-            cmbCoverSize.Items.AddRange(new[] { "030", "002" });
+            // 3 seçenek: "030" (value: "30"), "002" (value: "2"), "016" (value: "16")
+            cmbCoverSize.Items.Add(new CoverSizeItem { DisplayText = "030", Value = "30" });
+            cmbCoverSize.Items.Add(new CoverSizeItem { DisplayText = "002", Value = "2" });
+            cmbCoverSize.Items.Add(new CoverSizeItem { DisplayText = "016", Value = "16" });
             cmbCoverSize.SelectedIndex = 0;
             cmbCoverSize.SelectedIndexChanged += (s, e) => GenerateProductCode();
             return cmbCoverSize;
+        }
+
+        // Saç kapak ölçüsü için wrapper class
+        private class CoverSizeItem
+        {
+            public string DisplayText { get; set; }
+            public string Value { get; set; }
         }
 
         private Control CreateProductCodeTextBox()
@@ -299,7 +311,19 @@ namespace ERP.UI.Forms
 
             // Ürün kodu oluştur: TREX-CR-HS-1422-1900-030 formatında
             // Format: TREX-CR/CN-plaka_harfi+profil_harfi-model_ölçüsü-eşanjör_uzunluğu-kapak_ölçüsü
-            string productCode = $"TREX-{cmbType.SelectedItem}-{plateLetter}{profileLetter}-{cmbModelSize.SelectedItem}-{nudExchangerLength.Value}-{cmbCoverSize.SelectedItem}";
+            // Kapak ölçüsü için DisplayText kullan (030, 002, 016)
+            string coverSizeValue = "030"; // Varsayılan değer (030 seçeneği)
+            if (cmbCoverSize.SelectedItem is CoverSizeItem coverItem)
+            {
+                coverSizeValue = coverItem.DisplayText; // 030, 002, veya 016
+            }
+            else if (cmbCoverSize.SelectedItem != null)
+            {
+                // Eski format için geriye dönük uyumluluk
+                coverSizeValue = cmbCoverSize.SelectedItem.ToString();
+            }
+            
+            string productCode = $"TREX-{cmbType.SelectedItem}-{plateLetter}{profileLetter}-{cmbModelSize.SelectedItem}-{nudExchangerLength.Value}-{coverSizeValue}";
             
             txtProductCode.Text = productCode;
         }

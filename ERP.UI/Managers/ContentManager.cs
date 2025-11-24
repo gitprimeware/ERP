@@ -1,8 +1,12 @@
+using System;
 using System.Linq;
 using System.Windows.Forms;
 using ERP.DAL.Repositories;
 using ERP.UI.Services;
 using ERP.UI.UI;
+using ReportsLib.Data;
+using ReportsLib.Reports;
+using DevExpress.XtraReports.UI;
 
 namespace ERP.UI.Managers
 {
@@ -43,6 +47,7 @@ namespace ERP.UI.Managers
                     orderListForm.OrderDeleteRequested += (s, id) => HandleOrderDelete(id);
                     orderListForm.OrderSendToProductionRequested += (s, id) => HandleSendToProduction(id);
                     orderListForm.OrderGetWorkOrderRequested += (s, id) => HandleGetWorkOrder(id);
+                    orderListForm.OrderGetBulkWorkOrderRequested += (s, ids) => HandleGetBulkWorkOrder(ids);
                 }
 
                 // AccountingForm için event'leri bağla
@@ -65,6 +70,18 @@ namespace ERP.UI.Managers
                     productionDetailForm.BackRequested += (s, e) => ShowForm("Production");
                     productionDetailForm.ReportRequested += (s, id) => HandleProductionReport(id);
                     productionDetailForm.SendToAccountingRequested += (s, id) => HandleSendToAccounting(id);
+                }
+
+                // ConsumptionListForm için event'leri bağla
+                if (control is Forms.ConsumptionListForm consumptionListForm)
+                {
+                    consumptionListForm.ConsumptionDetailRequested += (s, id) => ShowConsumptionDetail(id);
+                }
+
+                // ConsumptionDetailForm için event'leri bağla
+                if (control is Forms.ConsumptionDetailForm consumptionDetailForm)
+                {
+                    consumptionDetailForm.BackRequested += (s, e) => ShowForm("Consumption");
                 }
 
                 // OrderEntryForm için event'leri bağla
@@ -195,15 +212,311 @@ namespace ERP.UI.Managers
                 
                 if (order != null)
                 {
-                    // Burada iş emri raporu oluşturulacak (PDF, Excel vb.)
-                    // Şimdilik sadece mesaj göster
-                    MessageBox.Show($"Sipariş {order.TrexOrderNo} için iş emri raporu oluşturulacak. (Rapor oluşturma özelliği eklenecek)", 
-                        "İş Emri Raporu", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    // ReportData oluştur
+                    var reportData = ReportsLib.Data.ReportData.FromOrder(order);
+                    
+                    // WorkOrderReport oluştur
+                    var report = new ReportsLib.Reports.WorkOrderReport(reportData);
+                    
+                    // Raporu göster - DevExpress 22.1 kullanıyoruz
+                    // ReportPrintTool muhtemelen ayrı bir Win DLL'inde veya farklı bir namespace'de
+                    // Önce reflection ile bulmayı deniyoruz
+                    try
+                    {
+                        var assembly = typeof(DevExpress.XtraReports.UI.XtraReport).Assembly;
+                        
+                        // Farklı namespace'leri dene
+                        var printToolType = assembly.GetType("DevExpress.XtraReports.UI.ReportPrintTool") 
+                                         ?? assembly.GetType("DevExpress.XtraReports.Win.ReportPrintTool")
+                                         ?? assembly.GetType("DevExpress.XtraReports.ReportPrintTool");
+                        
+                        if (printToolType != null)
+                        {
+                            var printTool = Activator.CreateInstance(printToolType, report);
+                            var showPreviewMethod = printToolType.GetMethod("ShowPreviewDialog");
+                            if (showPreviewMethod != null)
+                            {
+                                showPreviewMethod.Invoke(printTool, null);
+                                return; // Başarılı oldu, çık
+                            }
+                        }
+                        
+                        // Alternatif: XtraReport'un ShowPreview metodunu dene
+                        var showPreviewMethod2 = typeof(DevExpress.XtraReports.UI.XtraReport).GetMethod("ShowPreview");
+                        if (showPreviewMethod2 != null)
+                        {
+                            showPreviewMethod2.Invoke(report, null);
+                            return;
+                        }
+                    }
+                    catch
+                    {
+                        // Reflection başarısız oldu, PDF export'a geç
+                    }
+                    
+                    // ReportPrintTool çalışmadı, PDF export'u dene
+                    // Not: DevExpress 22.1 .NET 8.0 ile PrintingPermission hatası verebilir
+                    string tempPath = null;
+                    bool exportSuccess = false;
+                    Exception lastException = null;
+                    
+                    // PDF export'u dene
+                    try
+                    {
+                        tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"WorkOrder_{order.TrexOrderNo}.pdf");
+                        report.ExportToPdf(tempPath);
+                        exportSuccess = true;
+                    }
+                    catch (TypeLoadException tle) when (tle.Message.Contains("PrintingPermission"))
+                    {
+                        lastException = tle;
+                        // PrintingPermission hatası - HTML export'u dene
+                        try
+                        {
+                            tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"WorkOrder_{order.TrexOrderNo}.html");
+                            report.ExportToHtml(tempPath);
+                            exportSuccess = true;
+                        }
+                        catch (Exception htmlEx)
+                        {
+                            lastException = htmlEx;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        lastException = ex;
+                    }
+                    
+                    if (exportSuccess && tempPath != null && System.IO.File.Exists(tempPath))
+                    {
+                        // Dosyayı varsayılan görüntüleyici ile aç
+                        try
+                        {
+                            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(tempPath) 
+                            { 
+                                UseShellExecute = true 
+                            });
+                            
+                            string format = tempPath.EndsWith(".pdf") ? "PDF" : "HTML";
+                            MessageBox.Show($"İş emri raporu başarıyla oluşturuldu ve {format} olarak açıldı.\n\n" +
+                                $"Sipariş No: {order.TrexOrderNo}\n" +
+                                $"Dosya Konumu: {tempPath}",
+                                "İş Emri Raporu", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+                        catch (Exception openEx)
+                        {
+                            MessageBox.Show($"Rapor oluşturuldu ancak açılamadı: {openEx.Message}\n\n" +
+                                $"Dosya Konumu: {tempPath}",
+                                "İş Emri Raporu", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }
+                    }
+                    else
+                    {
+                        // Export başarısız - kullanıcıya detaylı bilgi ver
+                        string errorDetails = lastException != null ? lastException.Message : "Bilinmeyen hata";
+                        string problemDescription = "";
+                        
+                        // Hata tipine göre açıklama
+                        if (errorDetails.Contains("PrintingPermission"))
+                        {
+                            problemDescription = "Sorun: DevExpress 22.1 .NET 6.0 ile tam uyumlu değil.\n" +
+                                "System.Drawing.Printing.PrintingPermission tipi .NET Core/.NET 6.0'da kaldırıldı.";
+                        }
+                        else if (errorDetails.Contains("AspNetHostingPermission"))
+                        {
+                            problemDescription = "Sorun: DevExpress 22.1 .NET 6.0 ile tam uyumlu değil.\n" +
+                                "System.Web.AspNetHostingPermission tipi .NET Core/.NET 6.0'da kaldırıldı.";
+                        }
+                        else
+                        {
+                            problemDescription = "Sorun: DevExpress 22.1 .NET 6.0 ile tam uyumlu değil.\n" +
+                                "Bazı güvenlik izin tipleri .NET Core/.NET 6.0'da kaldırıldı.";
+                        }
+                        
+                        MessageBox.Show($"İş emri raporu oluşturulamadı.\n\n" +
+                            $"Sipariş No: {order.TrexOrderNo}\n\n" +
+                            $"Hata Detayı: {errorDetails}\n\n" +
+                            $"{problemDescription}\n\n" +
+                            "Çözüm Önerileri:\n" +
+                            "1. DevExpress'in daha yeni bir versiyonunu kullanın (23.1 veya üzeri)\n" +
+                            "2. Projeyi .NET Framework 4.8'e geçirin\n" +
+                            "3. Raporu manuel olarak oluşturun",
+                            "İş Emri Raporu Hatası", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("Sipariş bulunamadı!", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
             catch (Exception ex)
             {
                 MessageBox.Show("İş emri raporu oluşturulurken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void HandleGetBulkWorkOrder(List<Guid> orderIds)
+        {
+            try
+            {
+                if (orderIds == null || orderIds.Count == 0)
+                {
+                    MessageBox.Show("Lütfen en az bir sipariş seçin.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                var orderRepository = new ERP.DAL.Repositories.OrderRepository();
+                var orders = new List<ERP.Core.Models.Order>();
+                
+                foreach (var orderId in orderIds)
+                {
+                    var order = orderRepository.GetById(orderId);
+                    if (order != null)
+                    {
+                        orders.Add(order);
+                    }
+                }
+
+                if (orders.Count == 0)
+                {
+                    MessageBox.Show("Seçili siparişler bulunamadı!", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                // Toplu ReportData oluştur
+                var reportData = ReportsLib.Data.ReportData.FromOrders(orders);
+                
+                // WorkOrderReport oluştur
+                var report = new ReportsLib.Reports.WorkOrderReport(reportData);
+                
+                // Raporu göster - DevExpress 23.1 kullanıyoruz
+                try
+                {
+                    var assembly = typeof(DevExpress.XtraReports.UI.XtraReport).Assembly;
+                    
+                    // Farklı namespace'leri dene
+                    var printToolType = assembly.GetType("DevExpress.XtraReports.UI.ReportPrintTool") 
+                                     ?? assembly.GetType("DevExpress.XtraReports.Win.ReportPrintTool")
+                                     ?? assembly.GetType("DevExpress.XtraReports.ReportPrintTool");
+                    
+                    if (printToolType != null)
+                    {
+                        var printTool = Activator.CreateInstance(printToolType, report);
+                        var showPreviewMethod = printToolType.GetMethod("ShowPreviewDialog");
+                        if (showPreviewMethod != null)
+                        {
+                            showPreviewMethod.Invoke(printTool, null);
+                            return; // Başarılı oldu, çık
+                        }
+                    }
+                    
+                    // Alternatif: XtraReport'un ShowPreview metodunu dene
+                    var showPreviewMethod2 = typeof(DevExpress.XtraReports.UI.XtraReport).GetMethod("ShowPreview");
+                    if (showPreviewMethod2 != null)
+                    {
+                        showPreviewMethod2.Invoke(report, null);
+                        return;
+                    }
+                }
+                catch
+                {
+                    // Reflection başarısız oldu, PDF export'a geç
+                }
+                
+                // ReportPrintTool çalışmadı, PDF export'u dene
+                string tempPath = null;
+                bool exportSuccess = false;
+                Exception lastException = null;
+                
+                // PDF export'u dene
+                try
+                {
+                    var orderNos = string.Join("_", orders.Select(o => o.TrexOrderNo).Take(3));
+                    tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"BulkWorkOrder_{orderNos}_{orders.Count}Orders.pdf");
+                    report.ExportToPdf(tempPath);
+                    exportSuccess = true;
+                }
+                catch (TypeLoadException tle) when (tle.Message.Contains("PrintingPermission") || tle.Message.Contains("AspNetHostingPermission"))
+                {
+                    lastException = tle;
+                    // Permission hatası - HTML export'u dene
+                    try
+                    {
+                        var orderNos = string.Join("_", orders.Select(o => o.TrexOrderNo).Take(3));
+                        tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"BulkWorkOrder_{orderNos}_{orders.Count}Orders.html");
+                        report.ExportToHtml(tempPath);
+                        exportSuccess = true;
+                    }
+                    catch (Exception htmlEx)
+                    {
+                        lastException = htmlEx;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    lastException = ex;
+                }
+                
+                if (exportSuccess && tempPath != null && System.IO.File.Exists(tempPath))
+                {
+                    // Dosyayı varsayılan görüntüleyici ile aç
+                    try
+                    {
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(tempPath) 
+                        { 
+                            UseShellExecute = true 
+                        });
+                        
+                        string format = tempPath.EndsWith(".pdf") ? "PDF" : "HTML";
+                        MessageBox.Show($"Toplu iş emri raporu başarıyla oluşturuldu ve {format} olarak açıldı.\n\n" +
+                            $"Seçili Sipariş Sayısı: {orders.Count}\n" +
+                            $"Dosya Konumu: {tempPath}",
+                            "Toplu İş Emri Raporu", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    catch (Exception openEx)
+                    {
+                        MessageBox.Show($"Rapor oluşturuldu ancak açılamadı: {openEx.Message}\n\n" +
+                            $"Dosya Konumu: {tempPath}",
+                            "Toplu İş Emri Raporu", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                }
+                else
+                {
+                    // Export başarısız - kullanıcıya detaylı bilgi ver
+                    string errorDetails = lastException != null ? lastException.Message : "Bilinmeyen hata";
+                    string problemDescription = "";
+                    
+                    // Hata tipine göre açıklama
+                    if (errorDetails.Contains("PrintingPermission"))
+                    {
+                        problemDescription = "Sorun: DevExpress 23.1 .NET 6.0 ile tam uyumlu değil.\n" +
+                            "System.Drawing.Printing.PrintingPermission tipi .NET Core/.NET 6.0'da kaldırıldı.";
+                    }
+                    else if (errorDetails.Contains("AspNetHostingPermission"))
+                    {
+                        problemDescription = "Sorun: DevExpress 23.1 .NET 6.0 ile tam uyumlu değil.\n" +
+                            "System.Web.AspNetHostingPermission tipi .NET Core/.NET 6.0'da kaldırıldı.";
+                    }
+                    else
+                    {
+                        problemDescription = "Sorun: DevExpress 23.1 .NET 6.0 ile tam uyumlu değil.\n" +
+                            "Bazı güvenlik izin tipleri .NET Core/.NET 6.0'da kaldırıldı.";
+                    }
+                    
+                    MessageBox.Show($"Toplu iş emri raporu oluşturulamadı.\n\n" +
+                        $"Seçili Sipariş Sayısı: {orders.Count}\n\n" +
+                        $"Hata Detayı: {errorDetails}\n\n" +
+                        $"{problemDescription}\n\n" +
+                        "Çözüm Önerileri:\n" +
+                        "1. DevExpress'in daha yeni bir versiyonunu kullanın (23.2 veya üzeri)\n" +
+                        "2. Projeyi .NET Framework 4.8'e geçirin\n" +
+                        "3. Raporu manuel olarak oluşturun",
+                        "Toplu İş Emri Raporu Hatası", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Toplu iş emri raporu oluşturulurken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -240,6 +553,11 @@ namespace ERP.UI.Managers
         private void ShowProductionDetail(Guid orderId)
         {
             ShowForm("ProductionDetail", orderId);
+        }
+
+        private void ShowConsumptionDetail(Guid orderId)
+        {
+            ShowForm("ConsumptionDetail", orderId);
         }
 
         private void HandleProductionReport(Guid orderId)

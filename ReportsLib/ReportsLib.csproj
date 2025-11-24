@@ -1,20 +1,27 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
     <TargetFramework>net6.0-windows</TargetFramework>
-
+    <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
-    <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ERP.BLL\ERP.BLL.csproj" />
-    <ProjectReference Include="..\ERP.DAL\ERP.DAL.csproj" />
     <ProjectReference Include="..\ERP.Core\ERP.Core.csproj" />
-    <ProjectReference Include="..\ReportsLib\ReportsLib.csproj" />
   </ItemGroup>
+
+  <!-- DevExpress assembly referansları -->
+  <!-- ÖNEMLİ: DevExpress'in kurulu olduğu yolu aşağıdaki HintPath'e göre güncelleyin -->
+  <!-- DevExpress'in kurulu olduğu yolu bulmak için: -->
+  <!-- 1. Visual Studio'da Solution Explorer'da ReportsLib projesine sağ tıklayın -->
+  <!-- 2. "Add" > "Reference" seçin -->
+  <!-- 3. "Browse" sekmesinden DevExpress.XtraReports DLL'ini bulun -->
+  <!-- 4. Bulduğunuz yolu aşağıdaki HintPath'e yazın -->
+  
+  <!-- Örnek yollar (sizin sisteminize göre güncelleyin): -->
+  <!-- C:\Program Files\DevExpress 23.2\Components\Bin\Framework\DevExpress.XtraReports.v23.2.dll -->
+  <!-- C:\Program Files (x86)\DevExpress 24.1\Components\Bin\Framework\DevExpress.XtraReports.v24.1.dll -->
   
   <!-- DevExpress 23.1 DLL referansları - XtraReports için -->
   <ItemGroup>
@@ -42,12 +49,11 @@
 		<PackageReference Include="DevExpress.Utils" Version="23.1.15" />
 		<PackageReference Include="DevExpress.Win.Design" Version="23.1.15" />
 	</ItemGroup>
-	
-  <ItemGroup>
-    <None Include="app.config" />
-  </ItemGroup>
-
   <!-- System.Security.Permissions .NET 6.0'ı desteklemiyor, kaldırıldı -->
+  
+  <!-- Metadata file hatasını önlemek için -->
+  <PropertyGroup>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+  </PropertyGroup>
 
 </Project>
-

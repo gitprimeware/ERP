@@ -30,6 +30,7 @@ namespace ERP.UI.Forms
         public event EventHandler<Guid> OrderDeleteRequested;
         public event EventHandler<Guid> OrderSendToProductionRequested;
         public event EventHandler<Guid> OrderGetWorkOrderRequested;
+        public event EventHandler<List<Guid>> OrderGetBulkWorkOrderRequested; // Toplu iş emri için
 
         public OrderListForm()
         {
@@ -109,15 +110,17 @@ namespace ERP.UI.Forms
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
                 AllowUserToAddRows = false,
                 AllowUserToDeleteRows = false,
-                ReadOnly = true,
+                ReadOnly = false, // Checkbox'ların çalışması için false olmalı
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-                MultiSelect = false,
+                MultiSelect = true, // Çoklu seçim için true yapıldı
                 BackgroundColor = ThemeColors.Background,
                 BorderStyle = BorderStyle.None,
                 Visible = _isTableView
             };
             _dataGridView.CellClick += DataGridView_CellClick;
             _dataGridView.CellDoubleClick += DataGridView_CellDoubleClick;
+            _dataGridView.CellValueChanged += DataGridView_CellValueChanged;
+            _dataGridView.CurrentCellDirtyStateChanged += DataGridView_CurrentCellDirtyStateChanged;
 
             _mainPanel.Resize += (s, e) =>
             {
@@ -128,9 +131,26 @@ namespace ERP.UI.Forms
                 _dataGridView.Height = _mainPanel.Height - 210;
             };
 
+            // Toplu iş emri butonu
+            var btnBulkWorkOrder = new Button
+            {
+                Text = "📄 Toplu İş Emri Al",
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = ThemeColors.Success,
+                Size = new Size(180, 35),
+                Location = new Point(_mainPanel.Width - 210, 140),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Cursor = Cursors.Hand,
+                FlatStyle = FlatStyle.Flat
+            };
+            btnBulkWorkOrder.FlatAppearance.BorderSize = 0;
+            btnBulkWorkOrder.Click += BtnBulkWorkOrder_Click;
+            
             _mainPanel.Controls.Add(titleLabel);
             _mainPanel.Controls.Add(searchPanel);
             _mainPanel.Controls.Add(_chkTableView);
+            _mainPanel.Controls.Add(btnBulkWorkOrder);
             _mainPanel.Controls.Add(_cardsPanel);
             _mainPanel.Controls.Add(_dataGridView);
 
@@ -305,6 +325,17 @@ namespace ERP.UI.Forms
 
             _dataGridView.AutoGenerateColumns = false;
             
+            // Checkbox kolonu (seçim için)
+            var checkboxColumn = new DataGridViewCheckBoxColumn
+            {
+                HeaderText = "Seç",
+                Name = "IsSelected",
+                DataPropertyName = "IsSelected", // DataSource'daki property ile bağla
+                Width = 50,
+                ReadOnly = false
+            };
+            _dataGridView.Columns.Add(checkboxColumn);
+            
             // Kolonları ekle
             _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
             {
@@ -383,16 +414,18 @@ namespace ERP.UI.Forms
             _dataGridView.Columns.Add(actionsColumn);
 
             // DataSource için özel bir liste oluştur (Company.Name için)
-            var dataSource = orders.Select(o => new
+            // Checkbox'ların çalışması için class kullanıyoruz
+            var dataSource = orders.Select(o => new OrderRowData
             {
-                o.Id,
-                o.TrexOrderNo,
-                o.CustomerOrderNo,
+                Id = o.Id,
+                IsSelected = false, // Checkbox için başlangıç değeri
+                TrexOrderNo = o.TrexOrderNo,
+                CustomerOrderNo = o.CustomerOrderNo,
                 CompanyName = o.Company?.Name ?? "",
-                o.DeviceName,
-                o.ProductCode,
-                o.Quantity,
-                o.Status,
+                DeviceName = o.DeviceName,
+                ProductCode = o.ProductCode,
+                Quantity = o.Quantity,
+                Status = o.Status,
                 OrderDate = o.OrderDate.ToString("dd.MM.yyyy"),
                 IsReadyForShipment = o.Status == "Sevkiyata Hazır"
             }).ToList();
@@ -400,10 +433,19 @@ namespace ERP.UI.Forms
             _dataGridView.DataSource = dataSource;
             _dataGridView.Tag = orders; // Orijinal order listesini sakla
 
-            // DataBindingComplete event'inde butonları doldur
+            // DataBindingComplete event'inde butonları doldur ve checkbox kolonunu ayarla
             _dataGridView.DataBindingComplete += (s, e) =>
             {
                 UpdateActionButtons();
+                
+                // Checkbox kolonu dışındaki tüm kolonları ReadOnly yap
+                foreach (DataGridViewColumn column in _dataGridView.Columns)
+                {
+                    if (column.Name != "IsSelected")
+                    {
+                        column.ReadOnly = true;
+                    }
+                }
             };
 
             // İlk yükleme için butonları güncelle
@@ -747,6 +789,44 @@ namespace ERP.UI.Forms
             return card;
         }
 
+        private void BtnBulkWorkOrder_Click(object sender, EventArgs e)
+        {
+            if (!_isTableView)
+            {
+                MessageBox.Show("Toplu iş emri almak için tablo görünümünde olmalısınız.", 
+                    "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // Seçili satırları al - Checkbox kolonundan oku
+            var selectedOrderIds = new List<Guid>();
+            
+            if (_dataGridView.Columns["IsSelected"] == null)
+            {
+                MessageBox.Show("Checkbox kolonu bulunamadı. Lütfen sayfayı yenileyin.", 
+                    "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            
+            foreach (DataGridViewRow row in _dataGridView.Rows)
+            {
+                if (row.DataBoundItem is OrderRowData rowData && rowData.IsSelected)
+                {
+                    selectedOrderIds.Add(rowData.Id);
+                }
+            }
+
+            if (selectedOrderIds.Count == 0)
+            {
+                MessageBox.Show("Lütfen en az bir sipariş seçin.", 
+                    "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Toplu iş emri event'ini tetikle
+            OrderGetBulkWorkOrderRequested?.Invoke(this, selectedOrderIds);
+        }
+
         private Color GetStatusColor(string? status)
         {
             if (string.IsNullOrEmpty(status))
@@ -764,5 +844,42 @@ namespace ERP.UI.Forms
                 _ => ThemeColors.TextSecondary
             };
         }
+
+        private void DataGridView_CurrentCellDirtyStateChanged(object sender, EventArgs e)
+        {
+            // Checkbox değiştiğinde commit et
+            if (_dataGridView.IsCurrentCellDirty && 
+                _dataGridView.CurrentCell is DataGridViewCheckBoxCell)
+            {
+                _dataGridView.CommitEdit(DataGridViewDataErrorContexts.Commit);
+            }
+        }
+
+        private void DataGridView_CellValueChanged(object sender, DataGridViewCellEventArgs e)
+        {
+            // Checkbox kolonu değiştiğinde
+            if (e.RowIndex >= 0 && e.ColumnIndex >= 0 && 
+                _dataGridView.Columns[e.ColumnIndex].Name == "IsSelected")
+            {
+                // Görsel güncelleme için refresh
+                _dataGridView.InvalidateRow(e.RowIndex);
+            }
+        }
+    }
+
+    // Checkbox'ların çalışması için wrapper class
+    public class OrderRowData
+    {
+        public Guid Id { get; set; }
+        public bool IsSelected { get; set; }
+        public string TrexOrderNo { get; set; }
+        public string CustomerOrderNo { get; set; }
+        public string CompanyName { get; set; }
+        public string DeviceName { get; set; }
+        public string ProductCode { get; set; }
+        public int Quantity { get; set; }
+        public string Status { get; set; }
+        public string OrderDate { get; set; }
+        public bool IsReadyForShipment { get; set; }
     }
 }

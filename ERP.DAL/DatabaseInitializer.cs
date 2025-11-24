@@ -102,7 +102,7 @@ namespace ERP.DAL
                         [ProductCode] NVARCHAR(200) NULL,
                         [BypassSize] NVARCHAR(100) NULL,
                         [BypassType] NVARCHAR(100) NULL,
-                        [LamelThickness] DECIMAL(10,2) NULL,
+                        [LamelThickness] DECIMAL(10,3) NULL,
                         [ProductType] NVARCHAR(50) NULL,
                         [Quantity] INT NOT NULL,
                         [SalesPrice] DECIMAL(18,2) NULL,
@@ -120,6 +120,45 @@ namespace ERP.DAL
             using (var command = new SqlCommand(query, connection))
             {
                 command.ExecuteNonQuery();
+            }
+
+            // Mevcut tablolar için migration: LamelThickness kolonunu DECIMAL(10,3) yap
+            var migrationQuery = @"
+                IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Orders]') AND type in (N'U'))
+                BEGIN
+                    -- Kolonun mevcut scale'ini kontrol et ve gerekirse güncelle
+                    IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Orders]') AND name = 'LamelThickness')
+                    BEGIN
+                        DECLARE @CurrentScale INT
+                        SELECT @CurrentScale = numeric_scale FROM sys.columns 
+                        WHERE object_id = OBJECT_ID(N'[dbo].[Orders]') AND name = 'LamelThickness'
+                        
+                        -- Eğer scale 2 ise (DECIMAL(10,2)), 3'e güncelle
+                        IF @CurrentScale = 2
+                        BEGIN
+                            BEGIN TRY
+                                ALTER TABLE [dbo].[Orders]
+                                ALTER COLUMN [LamelThickness] DECIMAL(10,3) NULL
+                                PRINT 'LamelThickness kolonu DECIMAL(10,3) olarak güncellendi.'
+                            END TRY
+                            BEGIN CATCH
+                                PRINT 'LamelThickness kolonu güncellenirken hata oluştu: ' + ERROR_MESSAGE()
+                            END CATCH
+                        END
+                    END
+                END";
+
+            using (var migrationCommand = new SqlCommand(migrationQuery, connection))
+            {
+                try
+                {
+                    migrationCommand.ExecuteNonQuery();
+                }
+                catch (Exception ex)
+                {
+                    // Migration hatası olursa devam et (tablo zaten doğru formatta olabilir)
+                    System.Diagnostics.Debug.WriteLine($"Migration hatası: {ex.Message}");
+                }
             }
         }
     }

@@ -43,6 +43,12 @@ namespace ERP.UI.Services
                 return new ProductionDetailForm(orderId);
             }
 
+            // ConsumptionDetailForm için özel işlem
+            if (metadata.FormType == typeof(ConsumptionDetailForm) && orderId != Guid.Empty)
+            {
+                return new ConsumptionDetailForm(orderId);
+            }
+
             return (UserControl)Activator.CreateInstance(metadata.FormType);
         }
 
@@ -60,6 +66,8 @@ namespace ERP.UI.Services
             RegisterForm("AccountingEntry", typeof(AccountingEntryForm), "Muhasebe İşlemi");
             RegisterForm("Production", typeof(ProductionListForm), "Üretim");
             RegisterForm("ProductionDetail", typeof(ProductionDetailForm), "Üretim Detayları");
+            RegisterForm("Consumption", typeof(ConsumptionListForm), "Sarfiyat");
+            RegisterForm("ConsumptionDetail", typeof(ConsumptionDetailForm), "Sarfiyat Detayları");
             RegisterForm("MRPReport", typeof(MRPReportForm), "MRP Raporu");
             RegisterForm("CustomerReport", typeof(CustomerReportForm), "Cari Raporu");
             RegisterForm("AnnualReport", typeof(AnnualReportForm), "Yıllık Rapor");

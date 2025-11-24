@@ -17,6 +17,8 @@ namespace ERP.UI.Forms
         private CompanyRepository _companyRepository;
         private int _currentYear;
         private ComboBox _cmbYear;
+        private ComboBox _cmbCompany;
+        private Guid? _selectedCompanyId;
 
         public CustomerReportForm()
         {
@@ -99,8 +101,61 @@ namespace ERP.UI.Forms
                 }
             };
 
+            // Firma seçimi
+            var companyPanel = new Panel
+            {
+                Location = new Point(170, 0),
+                Width = 300,
+                Height = 40
+            };
+
+            var lblCompany = new Label
+            {
+                Text = "Firma:",
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                ForeColor = ThemeColors.TextPrimary,
+                AutoSize = true,
+                Location = new Point(0, 10)
+            };
+
+            _cmbCompany = new ComboBox
+            {
+                Location = new Point(60, 7),
+                Width = 220,
+                Height = 30,
+                Font = new Font("Segoe UI", 10F),
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+
+            // Tüm firmaları ekle
+            _cmbCompany.Items.Add(new { Id = (Guid?)null, Name = "Tüm Firmalar" });
+            var allCompanies = _companyRepository.GetAll();
+            foreach (var company in allCompanies)
+            {
+                _cmbCompany.Items.Add(new { Id = (Guid?)company.Id, Name = company.Name });
+            }
+            _cmbCompany.DisplayMember = "Name";
+            _cmbCompany.ValueMember = "Id";
+            _cmbCompany.SelectedIndex = 0; // Tüm Firmalar seçili
+            _cmbCompany.SelectedIndexChanged += (s, e) =>
+            {
+                if (_cmbCompany.SelectedItem != null)
+                {
+                    var idProperty = _cmbCompany.SelectedItem.GetType().GetProperty("Id");
+                    if (idProperty != null)
+                    {
+                        _selectedCompanyId = (Guid?)idProperty.GetValue(_cmbCompany.SelectedItem);
+                        LoadReportData();
+                    }
+                }
+            };
+
+            companyPanel.Controls.Add(lblCompany);
+            companyPanel.Controls.Add(_cmbCompany);
+
             yearPanel.Controls.Add(lblYear);
             yearPanel.Controls.Add(_cmbYear);
+            yearPanel.Controls.Add(companyPanel);
 
             // Firmalar paneli (scroll edilebilir)
             _companiesPanel = new FlowLayoutPanel
@@ -144,8 +199,19 @@ namespace ERP.UI.Forms
             // Yıla göre filtrele
             var yearOrders = allOrders.Where(o => o.OrderDate.Year == _currentYear).ToList();
 
+            // Seçili firmaya göre filtrele
+            List<Company> companiesToShow;
+            if (_selectedCompanyId.HasValue)
+            {
+                companiesToShow = allCompanies.Where(c => c.Id == _selectedCompanyId.Value).ToList();
+            }
+            else
+            {
+                companiesToShow = allCompanies.ToList();
+            }
+
             // Her firma için rapor oluştur
-            foreach (var company in allCompanies)
+            foreach (var company in companiesToShow)
             {
                 var companyOrders = yearOrders.Where(o => o.CompanyId == company.Id).ToList();
                 var companyPanel = CreateCompanyReportPanel(company, companyOrders);
@@ -158,10 +224,10 @@ namespace ERP.UI.Forms
             var panel = new Panel
             {
                 Width = _companiesPanel.Width - 40,
-                Height = 480, // Yükseklik azaltıldı
+                Height = 500, // Yükseklik artırıldı (7 sütun için)
                 BackColor = ThemeColors.Surface,
                 Margin = new Padding(0, 0, 0, 20),
-                Padding = new Padding(15) // Padding azaltıldı
+                Padding = new Padding(15)
             };
 
             UIHelper.ApplyCardStyle(panel, 8);
@@ -182,15 +248,18 @@ namespace ERP.UI.Forms
                 Location = new Point(15, 50),
                 Width = panel.Width - 30,
                 AutoSize = true,
-                ColumnCount = 4,
+                ColumnCount = 7,
                 RowCount = 14, // 12 ay + başlık + toplam
                 CellBorderStyle = TableLayoutPanelCellBorderStyle.Single
             };
 
-            reportTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120)); // Ay sütunu küçültüldü
-            reportTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33F)); // Bekleyen
-            reportTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33F)); // Sevk Edilmiş
-            reportTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33F)); // Toplam
+            reportTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100)); // Ay sütunu
+            reportTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 16.66F)); // Bekleyen Adet
+            reportTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 16.66F)); // Bekleyen Fiyat
+            reportTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 16.66F)); // Sevk Edilmiş Adet
+            reportTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 16.66F)); // Sevk Edilmiş Fiyat
+            reportTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 16.66F)); // Toplam Adet
+            reportTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 16.66F)); // Toplam Fiyat
 
             // Satır yükseklikleri - daha kompakt
             reportTable.RowStyles.Add(new RowStyle(SizeType.Absolute, 35)); // Başlık küçültüldü
@@ -202,13 +271,19 @@ namespace ERP.UI.Forms
 
             // Başlık satırı
             AddHeaderCellToTable(reportTable, "Ay", 0, 0, ThemeColors.Primary, Color.White);
-            AddHeaderCellToTable(reportTable, "Bekleyen", 0, 1, ThemeColors.Warning, Color.White);
-            AddHeaderCellToTable(reportTable, "Sevk Edilmiş", 0, 2, ThemeColors.Success, Color.White);
-            AddHeaderCellToTable(reportTable, "Toplam", 0, 3, ThemeColors.Info, Color.White);
+            AddHeaderCellToTable(reportTable, "Bekleyen Adet", 0, 1, ThemeColors.Warning, Color.White);
+            AddHeaderCellToTable(reportTable, "Bekleyen Fiyat", 0, 2, ThemeColors.Warning, Color.White);
+            AddHeaderCellToTable(reportTable, "Sevk Edilmiş Adet", 0, 3, ThemeColors.Success, Color.White);
+            AddHeaderCellToTable(reportTable, "Sevk Edilmiş Fiyat", 0, 4, ThemeColors.Success, Color.White);
+            AddHeaderCellToTable(reportTable, "Toplam Adet", 0, 5, ThemeColors.Info, Color.White);
+            AddHeaderCellToTable(reportTable, "Toplam Fiyat", 0, 6, ThemeColors.Info, Color.White);
 
-            decimal totalNotShipped = 0;
-            decimal totalShipped = 0;
-            decimal grandTotal = 0;
+            int totalNotShippedCount = 0;
+            decimal totalNotShippedPrice = 0;
+            int totalShippedCount = 0;
+            decimal totalShippedPrice = 0;
+            int grandTotalCount = 0;
+            decimal grandTotalPrice = 0;
 
             // 12 ay için verileri hesapla
             for (int month = 1; month <= 12; month++)
@@ -217,38 +292,56 @@ namespace ERP.UI.Forms
 
                 // Bekleyen (Status != "Sevk Edildi")
                 var notShippedOrders = monthOrders.Where(o => o.Status != "Sevk Edildi").ToList();
-                decimal notShippedUSD = notShippedOrders.Sum(o => (o.SalesPrice ?? 0) * o.Quantity);
+                int notShippedCount = notShippedOrders.Sum(o => o.Quantity);
+                decimal notShippedPrice = notShippedOrders.Sum(o => (o.SalesPrice ?? 0) * o.Quantity);
 
                 // Sevk edilmiş (Status == "Sevk Edildi")
                 var shippedOrders = monthOrders.Where(o => o.Status == "Sevk Edildi").ToList();
-                decimal shippedUSD = shippedOrders.Sum(o => (o.SalesPrice ?? 0) * o.Quantity);
+                int shippedCount = shippedOrders.Sum(o => o.Quantity);
+                decimal shippedPrice = shippedOrders.Sum(o => (o.SalesPrice ?? 0) * o.Quantity);
 
                 // Toplam
-                decimal monthTotal = notShippedUSD + shippedUSD;
+                int monthTotalCount = notShippedCount + shippedCount;
+                decimal monthTotalPrice = notShippedPrice + shippedPrice;
 
-                totalNotShipped += notShippedUSD;
-                totalShipped += shippedUSD;
-                grandTotal += monthTotal;
+                totalNotShippedCount += notShippedCount;
+                totalNotShippedPrice += notShippedPrice;
+                totalShippedCount += shippedCount;
+                totalShippedPrice += shippedPrice;
+                grandTotalCount += monthTotalCount;
+                grandTotalPrice += monthTotalPrice;
 
                 // Ay adı
                 var monthName = new DateTime(_currentYear, month, 1).ToString("MMMM", new System.Globalization.CultureInfo("tr-TR"));
                 AddDataCellToTable(reportTable, monthName, month, 0, ThemeColors.TextPrimary);
 
-                // Bekleyen
-                AddDataCellToTable(reportTable, notShippedUSD.ToString("N2"), month, 1, ThemeColors.TextPrimary);
+                // Bekleyen Adet
+                AddDataCellToTable(reportTable, notShippedCount.ToString("N0"), month, 1, ThemeColors.TextPrimary);
 
-                // Sevk edilmiş
-                AddDataCellToTable(reportTable, shippedUSD.ToString("N2"), month, 2, ThemeColors.TextPrimary);
+                // Bekleyen Fiyat
+                AddDataCellToTable(reportTable, notShippedPrice.ToString("N2") + " USD", month, 2, ThemeColors.TextPrimary);
 
-                // Toplam
-                AddDataCellToTable(reportTable, monthTotal.ToString("N2"), month, 3, ThemeColors.TextPrimary);
+                // Sevk edilmiş Adet
+                AddDataCellToTable(reportTable, shippedCount.ToString("N0"), month, 3, ThemeColors.TextPrimary);
+
+                // Sevk edilmiş Fiyat
+                AddDataCellToTable(reportTable, shippedPrice.ToString("N2") + " USD", month, 4, ThemeColors.TextPrimary);
+
+                // Toplam Adet
+                AddDataCellToTable(reportTable, monthTotalCount.ToString("N0"), month, 5, ThemeColors.TextPrimary);
+
+                // Toplam Fiyat
+                AddDataCellToTable(reportTable, monthTotalPrice.ToString("N2") + " USD", month, 6, ThemeColors.TextPrimary);
             }
 
             // Toplam satırı - daha belirgin
             AddHeaderCellToTable(reportTable, "TOPLAM", 13, 0, Color.FromArgb(60, 60, 80), Color.White);
-            AddDataCellToTable(reportTable, totalNotShipped.ToString("N2"), 13, 1, Color.FromArgb(60, 60, 80));
-            AddDataCellToTable(reportTable, totalShipped.ToString("N2"), 13, 2, Color.FromArgb(60, 60, 80));
-            AddDataCellToTable(reportTable, grandTotal.ToString("N2"), 13, 3, Color.FromArgb(60, 60, 80));
+            AddDataCellToTable(reportTable, totalNotShippedCount.ToString("N0"), 13, 1, Color.FromArgb(60, 60, 80));
+            AddDataCellToTable(reportTable, totalNotShippedPrice.ToString("N2") + " USD", 13, 2, Color.FromArgb(60, 60, 80));
+            AddDataCellToTable(reportTable, totalShippedCount.ToString("N0"), 13, 3, Color.FromArgb(60, 60, 80));
+            AddDataCellToTable(reportTable, totalShippedPrice.ToString("N2") + " USD", 13, 4, Color.FromArgb(60, 60, 80));
+            AddDataCellToTable(reportTable, grandTotalCount.ToString("N0"), 13, 5, Color.FromArgb(60, 60, 80));
+            AddDataCellToTable(reportTable, grandTotalPrice.ToString("N2") + " USD", 13, 6, Color.FromArgb(60, 60, 80));
 
             panel.Controls.Add(companyTitle);
             panel.Controls.Add(reportTable);

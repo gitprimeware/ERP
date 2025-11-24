@@ -106,6 +106,10 @@ namespace ERP.UI.Forms
                 // Alt menü item'ları ProductionListForm'u açsın
                 _contentManager.ShowForm("Production");
             }
+            else if (formTag == "Consumption")
+            {
+                _contentManager.ShowForm("Consumption");
+            }
             else
             {
                 _contentManager.ShowForm(formTag);
