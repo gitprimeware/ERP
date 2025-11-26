@@ -101,10 +101,14 @@ namespace ERP.UI.Forms
             {
                 _contentManager.ShowForm("Accounting");
             }
-            else if (formTag == "ProductionFormul" || formTag == "ProductionReport")
+            else if (formTag == "Production" || formTag == "ProductionFormul" || formTag == "ProductionReport")
             {
-                // Alt menü item'ları ProductionListForm'u açsın
+                // Üretim menüsü ProductionListForm'u açsın
                 _contentManager.ShowForm("Production");
+            }
+            else if (formTag == "RuloStokTakip")
+            {
+                _contentManager.ShowForm("RuloStokTakip");
             }
             else if (formTag == "Consumption")
             {

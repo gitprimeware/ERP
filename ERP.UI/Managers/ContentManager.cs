@@ -14,6 +14,7 @@ namespace ERP.UI.Managers
     {
         private readonly Panel _contentPanel;
         private readonly FormResolverService _formResolver;
+        private Forms.RuloStokTakipForm _currentRuloStokTakipForm;
 
         public ContentManager(Panel contentPanel, FormResolverService formResolver)
         {
@@ -101,6 +102,18 @@ namespace ERP.UI.Managers
                         ShowForm("Accounting");
                     };
                     accountingEntryForm.OrderSendToShipmentRequested += (s, id) => HandleSendToShipment(id);
+                }
+
+                // RuloStokTakipForm için event'leri bağla
+                if (control is Forms.RuloStokTakipForm ruloStokTakipForm)
+                {
+                    // Mevcut instance'ı sakla (yenileme için)
+                    _currentRuloStokTakipForm = ruloStokTakipForm;
+                }
+                else
+                {
+                    // Başka bir form gösterildiğinde referansı temizle
+                    _currentRuloStokTakipForm = null;
                 }
             }
         }
@@ -585,10 +598,20 @@ namespace ERP.UI.Managers
         public void ShowWelcomePanel()
         {
             _contentPanel.Controls.Clear();
+            _currentRuloStokTakipForm = null;
             var welcomePanel = new Components.WelcomePanel();
             welcomePanel.Dock = DockStyle.Fill;
             _contentPanel.Controls.Add(welcomePanel);
             welcomePanel.BringToFront();
+        }
+
+        public void RefreshRuloStokTakip()
+        {
+            // Rulo Stok Takip sayfası açıksa yenile
+            if (_currentRuloStokTakipForm != null)
+            {
+                _currentRuloStokTakipForm.RefreshData();
+            }
         }
     }
 }

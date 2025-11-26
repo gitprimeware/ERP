@@ -19,6 +19,8 @@ namespace ERP.UI.Forms
         private TextBox _txtMaterialSize;
         private ComboBox _cmbSupplier;
         private Button _btnAddSupplier;
+        private ComboBox _cmbSerialNo;
+        private Button _btnAddSerialNo;
         private TextBox _txtInvoiceNo;
         private TextBox _txtTrexPurchaseNo;
         private DateTimePicker _dtpEntryDate;
@@ -26,6 +28,7 @@ namespace ERP.UI.Forms
         private Button _btnSave;
         private Button _btnCancel;
         private SupplierRepository _supplierRepository;
+        private SerialNoRepository _serialNoRepository;
         private MaterialEntry _materialEntry;
         private bool _isEditMode;
 
@@ -34,6 +37,7 @@ namespace ERP.UI.Forms
         public MaterialEntryDialog(SupplierRepository supplierRepository, MaterialEntry entry = null)
         {
             _supplierRepository = supplierRepository;
+            _serialNoRepository = new SerialNoRepository();
             _materialEntry = entry;
             _isEditMode = entry != null;
             InitializeComponent();
@@ -43,7 +47,7 @@ namespace ERP.UI.Forms
         {
             this.Text = _isEditMode ? "Malzeme Giriş Düzenle" : "Yeni Malzeme Giriş";
             this.Width = 600;
-            this.Height = 500;
+            this.Height = 540;
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -213,6 +217,48 @@ namespace ERP.UI.Forms
             supplierPanel.Controls.Add(_btnAddSupplier);
             this.Controls.Add(lblSupplier);
             this.Controls.Add(supplierPanel);
+            yPos += spacing;
+
+            // Seri No
+            var lblSerialNo = new Label
+            {
+                Text = "Seri No:",
+                Location = new Point(20, yPos),
+                Width = labelWidth,
+                Font = new Font("Segoe UI", 10F)
+            };
+            var serialNoPanel = new Panel
+            {
+                Location = new Point(180, yPos - 3),
+                Width = controlWidth,
+                Height = 30
+            };
+            _cmbSerialNo = new ComboBox
+            {
+                Dock = DockStyle.Left,
+                Width = controlWidth - 120,
+                Height = 30,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 10F)
+            };
+            _btnAddSerialNo = new Button
+            {
+                Text = "+ Ekle",
+                Dock = DockStyle.Right,
+                Width = 110,
+                Height = 30,
+                BackColor = ThemeColors.Secondary,
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 9F),
+                Cursor = Cursors.Hand
+            };
+            UIHelper.ApplyRoundedButton(_btnAddSerialNo, 4);
+            _btnAddSerialNo.Click += BtnAddSerialNo_Click;
+            LoadSerialNos();
+            serialNoPanel.Controls.Add(_cmbSerialNo);
+            serialNoPanel.Controls.Add(_btnAddSerialNo);
+            this.Controls.Add(lblSerialNo);
+            this.Controls.Add(serialNoPanel);
             yPos += spacing;
 
             // Fatura No
@@ -388,6 +434,103 @@ namespace ERP.UI.Forms
             }
         }
 
+        private void LoadSerialNos()
+        {
+            try
+            {
+                _cmbSerialNo.Items.Clear();
+                var serialNos = _serialNoRepository.GetAll();
+                
+                foreach (var serialNo in serialNos)
+                {
+                    _cmbSerialNo.Items.Add(new { Id = serialNo.Id, SerialNumber = serialNo.SerialNumber });
+                }
+                
+                _cmbSerialNo.DisplayMember = "SerialNumber";
+                _cmbSerialNo.ValueMember = "Id";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Seri numaraları yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BtnAddSerialNo_Click(object sender, EventArgs e)
+        {
+            using (var dialog = new Form
+            {
+                Text = "Yeni Seri No Ekle",
+                Width = 400,
+                Height = 150,
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false
+            })
+            {
+                var lblSerialNumber = new Label
+                {
+                    Text = "Seri No:",
+                    Location = new Point(20, 30),
+                    AutoSize = true
+                };
+
+                var txtSerialNumber = new TextBox
+                {
+                    Location = new Point(120, 27),
+                    Width = 250,
+                    Height = 25
+                };
+
+                var btnOk = new Button
+                {
+                    Text = "Kaydet",
+                    DialogResult = DialogResult.OK,
+                    Location = new Point(200, 70),
+                    Width = 80
+                };
+
+                var btnCancel = new Button
+                {
+                    Text = "İptal",
+                    DialogResult = DialogResult.Cancel,
+                    Location = new Point(290, 70),
+                    Width = 80
+                };
+
+                dialog.Controls.AddRange(new Control[] { lblSerialNumber, txtSerialNumber, btnOk, btnCancel });
+                dialog.AcceptButton = btnOk;
+                dialog.CancelButton = btnCancel;
+
+                if (dialog.ShowDialog() == DialogResult.OK && !string.IsNullOrWhiteSpace(txtSerialNumber.Text))
+                {
+                    try
+                    {
+                        var newSerialNo = new SerialNo { SerialNumber = txtSerialNumber.Text };
+                        var serialNoId = _serialNoRepository.Insert(newSerialNo);
+                        
+                        LoadSerialNos();
+                        
+                        foreach (var item in _cmbSerialNo.Items)
+                        {
+                            var idProperty = item.GetType().GetProperty("Id");
+                            if (idProperty != null && idProperty.GetValue(item).Equals(serialNoId))
+                            {
+                                _cmbSerialNo.SelectedItem = item;
+                                break;
+                            }
+                        }
+                        
+                        MessageBox.Show("Seri no başarıyla eklendi!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Seri no eklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
+        }
+
         private void BtnAddSupplier_Click(object sender, EventArgs e)
         {
             using (var dialog = new Form
@@ -507,6 +650,20 @@ namespace ERP.UI.Forms
                 
                 _txtInvoiceNo.Text = _materialEntry.InvoiceNo ?? "";
                 _txtTrexPurchaseNo.Text = _materialEntry.TrexPurchaseNo ?? "";
+                
+                if (_materialEntry.SerialNoId.HasValue)
+                {
+                    foreach (var item in _cmbSerialNo.Items)
+                    {
+                        var idProperty = item.GetType().GetProperty("Id");
+                        if (idProperty != null && idProperty.GetValue(item).Equals(_materialEntry.SerialNoId.Value))
+                        {
+                            _cmbSerialNo.SelectedItem = item;
+                            break;
+                        }
+                    }
+                }
+                
                 _dtpEntryDate.Value = _materialEntry.EntryDate;
                 _txtQuantity.Text = _materialEntry.Quantity.ToString("F3", CultureInfo.InvariantCulture);
             }
@@ -531,6 +688,12 @@ namespace ERP.UI.Forms
                 {
                     var idProperty = _cmbSupplier.SelectedItem.GetType().GetProperty("Id");
                     entry.SupplierId = (Guid)idProperty.GetValue(_cmbSupplier.SelectedItem);
+                }
+                
+                if (_cmbSerialNo.SelectedItem != null)
+                {
+                    var idProperty = _cmbSerialNo.SelectedItem.GetType().GetProperty("Id");
+                    entry.SerialNoId = (Guid)idProperty.GetValue(_cmbSerialNo.SelectedItem);
                 }
                 
                 entry.InvoiceNo = _txtInvoiceNo.Text;

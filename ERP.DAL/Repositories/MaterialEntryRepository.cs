@@ -17,11 +17,13 @@ namespace ERP.DAL.Repositories
             {
                 connection.Open();
                 var query = @"SELECT me.Id, me.TransactionType, me.MaterialType, me.MaterialSize, me.Size, me.Thickness,
-                             me.SupplierId, me.InvoiceNo, me.TrexPurchaseNo, me.EntryDate, me.Quantity,
+                             me.SupplierId, me.SerialNoId, me.InvoiceNo, me.TrexPurchaseNo, me.EntryDate, me.Quantity,
                              me.CreatedDate, me.ModifiedDate, me.IsActive,
-                             s.Name as SupplierName
+                             s.Name as SupplierName,
+                             sn.SerialNumber as SerialNumber
                              FROM MaterialEntries me
                              LEFT JOIN Suppliers s ON me.SupplierId = s.Id
+                             LEFT JOIN SerialNos sn ON me.SerialNoId = sn.Id
                              WHERE me.IsActive = 1
                              ORDER BY me.EntryDate DESC";
                 
@@ -46,11 +48,13 @@ namespace ERP.DAL.Repositories
             {
                 connection.Open();
                 var query = @"SELECT me.Id, me.TransactionType, me.MaterialType, me.MaterialSize, me.Size, me.Thickness,
-                             me.SupplierId, me.InvoiceNo, me.TrexPurchaseNo, me.EntryDate, me.Quantity,
+                             me.SupplierId, me.SerialNoId, me.InvoiceNo, me.TrexPurchaseNo, me.EntryDate, me.Quantity,
                              me.CreatedDate, me.ModifiedDate, me.IsActive,
-                             s.Name as SupplierName
+                             s.Name as SupplierName,
+                             sn.SerialNumber as SerialNumber
                              FROM MaterialEntries me
                              LEFT JOIN Suppliers s ON me.SupplierId = s.Id
+                             LEFT JOIN SerialNos sn ON me.SerialNoId = sn.Id
                              WHERE me.Id = @Id AND me.IsActive = 1";
                 
                 using (var command = new SqlCommand(query, connection))
@@ -84,9 +88,9 @@ namespace ERP.DAL.Repositories
             {
                 connection.Open();
                 var query = @"INSERT INTO MaterialEntries (Id, TransactionType, MaterialType, MaterialSize, Size, Thickness,
-                             SupplierId, InvoiceNo, TrexPurchaseNo, EntryDate, Quantity, CreatedDate, IsActive) 
+                             SupplierId, SerialNoId, InvoiceNo, TrexPurchaseNo, EntryDate, Quantity, CreatedDate, IsActive) 
                              VALUES (@Id, @TransactionType, @MaterialType, @MaterialSize, @Size, @Thickness,
-                             @SupplierId, @InvoiceNo, @TrexPurchaseNo, @EntryDate, @Quantity, @CreatedDate, @IsActive)";
+                             @SupplierId, @SerialNoId, @InvoiceNo, @TrexPurchaseNo, @EntryDate, @Quantity, @CreatedDate, @IsActive)";
                 
                 using (var command = new SqlCommand(query, connection))
                 {
@@ -112,6 +116,7 @@ namespace ERP.DAL.Repositories
                              Size = @Size,
                              Thickness = @Thickness,
                              SupplierId = @SupplierId,
+                             SerialNoId = @SerialNoId,
                              InvoiceNo = @InvoiceNo,
                              TrexPurchaseNo = @TrexPurchaseNo,
                              EntryDate = @EntryDate,
@@ -166,18 +171,33 @@ namespace ERP.DAL.Repositories
             if (!reader.IsDBNull("SupplierId"))
             {
                 entry.SupplierId = reader.GetGuid("SupplierId");
-                if (!reader.IsDBNull("SupplierName"))
+                entry.Supplier = new Supplier
                 {
-                    entry.Supplier = new Supplier
+                    Id = entry.SupplierId.Value,
+                    Name = reader.IsDBNull("SupplierName") ? "" : reader.GetString("SupplierName")
+                };
+            }
+            else
+            {
+                entry.SupplierId = null;
+                entry.Supplier = null;
+            }
+
+            if (!reader.IsDBNull("SerialNoId"))
+            {
+                entry.SerialNoId = reader.GetGuid("SerialNoId");
+                if (!reader.IsDBNull("SerialNumber"))
+                {
+                    entry.SerialNo = new SerialNo
                     {
-                        Id = entry.SupplierId.Value,
-                        Name = reader.GetString("SupplierName")
+                        Id = entry.SerialNoId.Value,
+                        SerialNumber = reader.GetString("SerialNumber")
                     };
                 }
             }
             else
             {
-                entry.SupplierId = null;
+                entry.SerialNoId = null;
             }
 
             return entry;
@@ -192,6 +212,7 @@ namespace ERP.DAL.Repositories
             command.Parameters.AddWithValue("@Size", entry.Size);
             command.Parameters.AddWithValue("@Thickness", entry.Thickness);
             command.Parameters.AddWithValue("@SupplierId", entry.SupplierId.HasValue ? (object)entry.SupplierId.Value : DBNull.Value);
+            command.Parameters.AddWithValue("@SerialNoId", entry.SerialNoId.HasValue ? (object)entry.SerialNoId.Value : DBNull.Value);
             command.Parameters.AddWithValue("@InvoiceNo", (object)entry.InvoiceNo ?? DBNull.Value);
             command.Parameters.AddWithValue("@TrexPurchaseNo", (object)entry.TrexPurchaseNo ?? DBNull.Value);
             command.Parameters.AddWithValue("@EntryDate", entry.EntryDate);

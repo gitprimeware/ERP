@@ -64,6 +64,10 @@ namespace ERP.UI.Forms
 
         private Guid _orderId = Guid.Empty;
         private OrderRepository _orderRepository;
+        private CuttingRepository _cuttingRepository;
+        private MachineRepository _machineRepository;
+        private SerialNoRepository _serialNoRepository;
+        private EmployeeRepository _employeeRepository;
         private Order _order;
 
         public event EventHandler BackRequested;
@@ -74,6 +78,10 @@ namespace ERP.UI.Forms
         {
             _orderId = orderId;
             _orderRepository = new OrderRepository();
+            _cuttingRepository = new CuttingRepository();
+            _machineRepository = new MachineRepository();
+            _serialNoRepository = new SerialNoRepository();
+            _employeeRepository = new EmployeeRepository();
             InitializeCustomComponents();
         }
 
@@ -120,6 +128,13 @@ namespace ERP.UI.Forms
             tabRapor.BackColor = ThemeColors.Background;
             CreateRaporTab(tabRapor);
             tabControl.TabPages.Add(tabRapor);
+
+            // Üçüncü tab: Üretim Ayrıntı
+            var tabUretimAyrinti = new TabPage("⚙️ Üretim Ayrıntı");
+            tabUretimAyrinti.Padding = new Padding(20);
+            tabUretimAyrinti.BackColor = ThemeColors.Background;
+            CreateUretimAyrintiTab(tabUretimAyrinti);
+            tabControl.TabPages.Add(tabUretimAyrinti);
 
             // Geri butonu - sağ üste
             btnBack = ButtonFactory.CreateActionButton("⬅️ Geri", ThemeColors.Secondary, Color.White, 120, 40);
@@ -943,6 +958,266 @@ namespace ERP.UI.Forms
                 txtAluminyumKalinligi.Text = "";
             }
         }
+
+        private void CreateUretimAyrintiTab(TabPage tab)
+        {
+            // Başlık
+            var lblUretimAyrintiTitle = new Label
+            {
+                Text = "Üretim Ayrıntı",
+                Font = new Font("Segoe UI", 18F, FontStyle.Bold),
+                ForeColor = ThemeColors.Primary,
+                AutoSize = true,
+                Location = new Point(10, 10)
+            };
+
+            // İçerik paneli (alt sekmeler buraya eklenecek)
+            var contentPanel = new Panel
+            {
+                Location = new Point(10, 50),
+                Width = tab.Width - 40,
+                Height = tab.Height - 100,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
+                BackColor = ThemeColors.Background
+            };
+
+            tab.Controls.Add(lblUretimAyrintiTitle);
+            tab.Controls.Add(contentPanel);
+
+            // Tab boyutu değiştiğinde contentPanel'i güncelle
+            tab.Resize += (s, e) =>
+            {
+                if (contentPanel != null)
+                {
+                    contentPanel.Width = tab.Width - 40;
+                    contentPanel.Height = tab.Height - 100;
+                }
+            };
+
+            // Alt sekmeler: Kesim
+            var cuttingTabControl = new TabControl
+            {
+                Dock = DockStyle.Fill,
+                Font = new Font("Segoe UI", 10F),
+                Padding = new Point(10, 5)
+            };
+
+            var tabKesim = new TabPage("✂️ Kesim");
+            tabKesim.Padding = new Padding(20);
+            tabKesim.BackColor = ThemeColors.Background;
+            CreateKesimTab(tabKesim);
+            cuttingTabControl.TabPages.Add(tabKesim);
+
+            contentPanel.Controls.Add(cuttingTabControl);
+        }
+
+        private void CreateKesimTab(TabPage tab)
+        {
+            // Ana panel
+            var mainPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(20),
+                BackColor = ThemeColors.Background
+            };
+
+            // Buton paneli - Üstte
+            var buttonPanel = new Panel
+            {
+                Height = 50,
+                Dock = DockStyle.Top,
+                Padding = new Padding(0, 10, 20, 10),
+                BackColor = ThemeColors.Background
+            };
+
+            // Ekle butonu
+            var btnEkle = ButtonFactory.CreateActionButton("➕ Ekle", ThemeColors.Primary, Color.White, 120, 35);
+            btnEkle.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            buttonPanel.Controls.Add(btnEkle);
+
+            // DataGridView paneli
+            var gridPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(0, 10, 0, 0),
+                BackColor = ThemeColors.Background
+            };
+
+            // DataGridView
+            var dataGridView = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                ReadOnly = true,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                MultiSelect = false,
+                BackgroundColor = ThemeColors.Surface,
+                BorderStyle = BorderStyle.FixedSingle,
+                AutoGenerateColumns = false,
+                ColumnHeadersVisible = true,
+                RowHeadersVisible = false,
+                GridColor = Color.LightGray
+            };
+
+            // Kolonları ekle
+            AddKesimColumn(dataGridView, "Hatve", "Hatve", 80);
+            AddKesimColumn(dataGridView, "Size", "Ölçü", 80);
+            AddKesimColumn(dataGridView, "MachineName", "Makina No", 100);
+            AddKesimColumn(dataGridView, "SerialNumber", "Rulo Seri No", 120);
+            AddKesimColumn(dataGridView, "TotalKg", "Toplam Kg", 100);
+            AddKesimColumn(dataGridView, "CutKg", "Kesilen Kg", 100);
+            AddKesimColumn(dataGridView, "CuttingCount", "Kesim Adedi", 100);
+            AddKesimColumn(dataGridView, "WasteKg", "Hurda Kg", 100);
+            AddKesimColumn(dataGridView, "RemainingKg", "Kalan Kg", 100);
+            AddKesimColumn(dataGridView, "EmployeeName", "Operatör", 150);
+
+            // Stil ayarları - ÖNCE bu ayarları yap
+            dataGridView.ColumnHeadersVisible = true;
+            dataGridView.RowHeadersVisible = false;
+            dataGridView.EnableHeadersVisualStyles = false;
+            dataGridView.ColumnHeadersHeight = 40;
+            dataGridView.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            
+            dataGridView.ColumnHeadersDefaultCellStyle.BackColor = ThemeColors.Primary;
+            dataGridView.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            dataGridView.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            dataGridView.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dataGridView.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.False;
+
+            dataGridView.DefaultCellStyle.BackColor = ThemeColors.Surface;
+            dataGridView.DefaultCellStyle.ForeColor = ThemeColors.TextPrimary;
+            dataGridView.DefaultCellStyle.SelectionBackColor = ThemeColors.Primary;
+            dataGridView.DefaultCellStyle.SelectionForeColor = Color.White;
+            dataGridView.DefaultCellStyle.Font = new Font("Segoe UI", 9F);
+
+            gridPanel.Controls.Add(dataGridView);
+            mainPanel.Controls.Add(buttonPanel);
+            mainPanel.Controls.Add(gridPanel);
+            tab.Controls.Add(mainPanel);
+
+            // Event handler
+            btnEkle.Click += (s, e) => BtnKesimEkle_Click(dataGridView);
+
+            // Verileri yükle - Kolonlar zaten eklendi
+            LoadKesimData(dataGridView);
+        }
+
+        private void AddKesimColumn(DataGridView dgv, string dataPropertyName, string headerText, int width)
+        {
+            var column = new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = dataPropertyName,
+                HeaderText = headerText,
+                Name = dataPropertyName,
+                Width = width,
+                Visible = true,
+                ReadOnly = true
+            };
+            dgv.Columns.Add(column);
+        }
+
+        private void LoadKesimData(DataGridView dataGridView)
+        {
+            try
+            {
+                var cuttings = _cuttingRepository.GetByOrderId(_orderId);
+                var data = cuttings.Select(c => new
+                {
+                    c.Id,
+                    Hatve = c.Hatve.ToString("F2", CultureInfo.InvariantCulture),
+                    Size = c.Size.ToString("F2", CultureInfo.InvariantCulture),
+                    MachineName = c.Machine?.Name ?? "",
+                    SerialNumber = c.SerialNo?.SerialNumber ?? "",
+                    TotalKg = c.TotalKg.ToString("F3", CultureInfo.InvariantCulture),
+                    CutKg = c.CutKg.ToString("F3", CultureInfo.InvariantCulture),
+                    CuttingCount = c.CuttingCount.ToString(),
+                    WasteKg = c.WasteKg.ToString("F3", CultureInfo.InvariantCulture),
+                    RemainingKg = c.RemainingKg.ToString("F3", CultureInfo.InvariantCulture),
+                    EmployeeName = c.Employee != null ? $"{c.Employee.FirstName} {c.Employee.LastName}" : ""
+                }).ToList();
+
+                // DataSource'u null yap (kolonlar kaybolmasın diye)
+                dataGridView.DataSource = null;
+                
+                // Kolonların var olduğundan emin ol
+                if (dataGridView.Columns.Count == 0)
+                {
+                    AddKesimColumn(dataGridView, "Hatve", "Hatve", 80);
+                    AddKesimColumn(dataGridView, "Size", "Ölçü", 80);
+                    AddKesimColumn(dataGridView, "MachineName", "Makina No", 100);
+                    AddKesimColumn(dataGridView, "SerialNumber", "Rulo Seri No", 120);
+                    AddKesimColumn(dataGridView, "TotalKg", "Toplam Kg", 100);
+                    AddKesimColumn(dataGridView, "CutKg", "Kesilen Kg", 100);
+                    AddKesimColumn(dataGridView, "CuttingCount", "Kesim Adedi", 100);
+                    AddKesimColumn(dataGridView, "WasteKg", "Hurda Kg", 100);
+                    AddKesimColumn(dataGridView, "RemainingKg", "Kalan Kg", 100);
+                    AddKesimColumn(dataGridView, "EmployeeName", "Operatör", 150);
+                }
+
+                // Kolon başlıklarını kesinlikle göster
+                dataGridView.ColumnHeadersVisible = true;
+                dataGridView.RowHeadersVisible = false;
+                dataGridView.ColumnHeadersHeight = 40;
+                
+                // Veri kaynağını ayarla
+                dataGridView.DataSource = data;
+                
+                // DataSource ayarlandıktan SONRA HeaderText'leri tekrar ayarla
+                foreach (DataGridViewColumn column in dataGridView.Columns)
+                {
+                    column.Visible = true;
+                    column.ReadOnly = true;
+                    // HeaderText'i tekrar ayarla
+                    switch (column.Name)
+                    {
+                        case "Hatve": column.HeaderText = "Hatve"; break;
+                        case "Size": column.HeaderText = "Ölçü"; break;
+                        case "MachineName": column.HeaderText = "Makina No"; break;
+                        case "SerialNumber": column.HeaderText = "Rulo Seri No"; break;
+                        case "TotalKg": column.HeaderText = "Toplam Kg"; break;
+                        case "CutKg": column.HeaderText = "Kesilen Kg"; break;
+                        case "CuttingCount": column.HeaderText = "Kesim Adedi"; break;
+                        case "WasteKg": column.HeaderText = "Hurda Kg"; break;
+                        case "RemainingKg": column.HeaderText = "Kalan Kg"; break;
+                        case "EmployeeName": column.HeaderText = "Operatör"; break;
+                    }
+                }
+                
+                // Yeniden çiz
+                dataGridView.Invalidate();
+                dataGridView.Update();
+                dataGridView.Refresh();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Kesim verileri yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BtnKesimEkle_Click(DataGridView dataGridView)
+        {
+            try
+            {
+                using (var dialog = new CuttingDialog(_machineRepository, _serialNoRepository, _employeeRepository, _orderId))
+                {
+                    if (dialog.ShowDialog() == DialogResult.OK)
+                    {
+                        // Verileri yeniden yükle
+                        LoadKesimData(dataGridView);
+                        
+                        // Rulo Stok Takip sayfasını yenile
+                        RuloStokTakipForm.NotifyCuttingSaved();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Kesim eklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
     }
 }
 

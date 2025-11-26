@@ -13,6 +13,9 @@ namespace ERP.Core.Models
         public Guid? SupplierId { get; set; } // Tedarikçi
         public Supplier? Supplier { get; set; }
         
+        public Guid? SerialNoId { get; set; } // Seri No
+        public SerialNo? SerialNo { get; set; }
+        
         public string InvoiceNo { get; set; } // Fatura No
         public string TrexPurchaseNo { get; set; } // Trex Satın Alma No
         public DateTime EntryDate { get; set; } // Giriş tarihi (otomatik)
