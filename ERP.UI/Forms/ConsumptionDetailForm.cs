@@ -157,7 +157,7 @@ namespace ERP.UI.Forms
 
             // Hatve
             AddTableRow("Hatve:", CreateReadOnlyTextBox(txtHatve = new TextBox()),
-                       "Üretim Plaka Ölçüsü:", CreateReadOnlyTextBox(txtUretimPlakaOlcusu = new TextBox()), row++);
+                       "Üretim Plaka Ölçüsü (mm):", CreateReadOnlyTextBox(txtUretimPlakaOlcusu = new TextBox()), row++);
 
             // Plaka Adedi
             AddTableRow("Plaka Adedi:", CreateReadOnlyTextBox(txtPlakaAdedi = new TextBox()),
@@ -259,8 +259,10 @@ namespace ERP.UI.Forms
                 {
                     decimal aluminyumKalinligi = _order.LamelThickness.Value;
                     txtPlakaKalinligi.Text = aluminyumKalinligi.ToString("0.000", CultureInfo.InvariantCulture);
-                    if (TryParseDecimalInvariant(txtUretimPlakaOlcusu.Text, out decimal plakaOlcusuCM))
+                    // txtUretimPlakaOlcusu.Text artık mm olarak gösteriliyor, cm'ye çevir
+                    if (int.TryParse(txtUretimPlakaOlcusu.Text, out int plakaOlcusuMM))
                     {
+                        decimal plakaOlcusuCM = plakaOlcusuMM / 10.0m;
                         _plakaAgirligi = CalculatePlakaAgirligi(plakaOlcusuCM, aluminyumKalinligi);
                         if (_plakaAgirligi > 0)
                         {
@@ -270,8 +272,10 @@ namespace ERP.UI.Forms
                 }
 
                 // Galvaniz Kapak Ağırlığı hesapla
-                if (TryParseDecimalInvariant(txtUretimPlakaOlcusu.Text, out decimal plakaOlcusuCM2))
+                // txtUretimPlakaOlcusu.Text artık mm olarak gösteriliyor, cm'ye çevir
+                if (int.TryParse(txtUretimPlakaOlcusu.Text, out int plakaOlcusuMM2))
                 {
+                    decimal plakaOlcusuCM2 = plakaOlcusuMM2 / 10.0m;
                     _galvanizKapakAgirligi = CalculateGalvanizKapakAgirligi(plakaOlcusuCM2);
                     if (_galvanizKapakAgirligi > 0)
                     {
@@ -297,9 +301,10 @@ namespace ERP.UI.Forms
                 }
 
                 // Hesaplamaları yap
+                UpdateConsumptionPlakaAdedi();
                 CalculateConsumption();
 
-                UpdateConsumptionPlakaAdedi();
+
             }
             catch (Exception ex)
             {
@@ -346,9 +351,8 @@ namespace ERP.UI.Forms
                     // Plaka Ölçüsü com (mm): 1422 <= 1150 ise 1422, > 1150 ise 1422/2
                     int plakaOlcusuComMM = plakaOlcusuMM <= 1150 ? plakaOlcusuMM : plakaOlcusuMM / 2;
 
-                    // Plaka Ölçüsü (cm): Plaka ölçüsü com / 10
-                    decimal plakaOlcusuCM = plakaOlcusuComMM / 10.0m;
-                    txtUretimPlakaOlcusu.Text = plakaOlcusuCM.ToString("F1", CultureInfo.InvariantCulture);
+                    // Plaka Ölçüsü (mm): Plaka ölçüsü com (mm) olarak göster
+                    txtUretimPlakaOlcusu.Text = plakaOlcusuComMM.ToString();
 
                     // Plaka Adet: Plaka ölçüsü <= 1150 ise 1, > 1150 ise 4
                     _plakaAdet = plakaOlcusuMM <= 1150 ? 1 : 4;
@@ -375,9 +379,8 @@ namespace ERP.UI.Forms
                     // Kapak boyu parse edilebilirse
                     if (int.TryParse(parts[5], out int kapakBoyu))
                     {
-                        // Kapak adedi hesaplama mantığı buraya eklenecek
-                        // Şimdilik sipariş adedi kullanıyoruz
-                        _kapakAdedi = _order.Quantity*2;
+                        // Kapak adedi: Sipariş adedi * 2
+                        _kapakAdedi = _order.Quantity * 2;
                         txtKapakAdedi.Text = _kapakAdedi.ToString();
                     }
                 }
@@ -393,10 +396,6 @@ namespace ERP.UI.Forms
             // Toplam Alüminyum Ağırlığı = Plaka Ağırlığı * Plaka Adedi
             if (_plakaAgirligi > 0 && _plakaAdet > 0)
             {
-                decimal onCmDilimi = _yukseklikMM / 100m; // mm -> cm -> 10cm dilim
-                decimal hesaplananPlakaAdedi = onCmDilimi * _order.Quantity * _plakaAdedi10cm;
-                _plakaAdet = (Int32)Math.Round(hesaplananPlakaAdedi, 0, MidpointRounding.AwayFromZero);
-                    
                 decimal toplamAluminyumAgirligi = _plakaAgirligi * _plakaAdet;
                 txtToplamAluminyumAgirligi.Text = toplamAluminyumAgirligi.ToString("F3", CultureInfo.InvariantCulture);
             }
@@ -428,7 +427,37 @@ namespace ERP.UI.Forms
 
             if (_yukseklikMM > 0 && _order != null && _order.Quantity > 0 && _plakaAdedi10cm > 0)
             {
-                decimal onCmDilimi = _yukseklikMM / 100m; // mm -> cm -> 10cm dilim
+                // Kapaksız yükseklik: Yükseklik (mm) - Kapak değeri (mm)
+                int kapaksizYukseklikMM = _yukseklikMM;
+                
+                // Ürün kodundan kapak değerini çıkar
+                if (!string.IsNullOrEmpty(_order.ProductCode))
+                {
+                    var productCodeParts = _order.ProductCode.Split('-');
+                    if (productCodeParts.Length > 5)
+                    {
+                        string kapakDegeriStr = productCodeParts[5]; // "030", "002", "016"
+                        int cikarilacakDeger = 0;
+                        
+                        // Ürün kodunda DisplayText formatı kullanılıyor: 030, 002, 016
+                        if (kapakDegeriStr == "030")
+                            cikarilacakDeger = 30;
+                        else if (kapakDegeriStr == "002")
+                            cikarilacakDeger = 2;
+                        else if (kapakDegeriStr == "016")
+                            cikarilacakDeger = 16;
+                        else if (int.TryParse(kapakDegeriStr, out int parsedKapak))
+                        {
+                            // Eğer direkt sayı olarak parse edilebiliyorsa (eski format için)
+                            cikarilacakDeger = parsedKapak;
+                        }
+                        
+                        kapaksizYukseklikMM = _yukseklikMM - cikarilacakDeger;
+                    }
+                }
+                
+                // Kapaksız yükseklik (mm) / 100 = 10cm dilimi
+                decimal onCmDilimi = kapaksizYukseklikMM / 100m;
                 decimal hesaplananPlakaAdedi = onCmDilimi * _order.Quantity * _plakaAdedi10cm;
                 txtPlakaAdedi.Text = Math.Round(hesaplananPlakaAdedi, 0, MidpointRounding.AwayFromZero)
                     .ToString(CultureInfo.InvariantCulture);
@@ -596,7 +625,7 @@ namespace ERP.UI.Forms
             if (normalizedSize >= 68 && normalizedSize <= 74)
                 return 3.764m;
             if (normalizedSize >= 78 && normalizedSize <= 84)
-                return 5.5685m;
+                return 5.685m;
             if (normalizedSize >= 98 && normalizedSize <= 104)
                 return 8.672m;
 

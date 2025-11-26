@@ -21,6 +21,9 @@ namespace ERP.UI.Forms
         // Malzeme listesi (kullanıcının verdiği liste)
         private readonly List<MaterialInfo> _materials = new List<MaterialInfo>
         {
+            // Profiller
+            new MaterialInfo { MaterialType = "Profil", ProfileType = "S", DisplayName = "Standart Profil" },
+            new MaterialInfo { MaterialType = "Profil", ProfileType = "G", DisplayName = "Geniş Profil" },
             // Alüminyum
             new MaterialInfo { MaterialType = "Alüminyum", Size = 214, Thickness = 0.120m },
             new MaterialInfo { MaterialType = "Alüminyum", Size = 213, Thickness = 0.165m },
@@ -234,34 +237,125 @@ namespace ERP.UI.Forms
 
         private StockRowData CalculateStockForMaterial(MaterialInfo material, List<MaterialEntry> entries, List<MaterialExit> exits, List<Order> orders)
         {
-            string materialDisplay = $"{material.MaterialType.Substring(0, 3)}. {material.Size}X{material.Thickness.ToString("F3", CultureInfo.InvariantCulture).Replace(".", ",")}";
+            string materialDisplay;
+            if (material.MaterialType == "Profil")
+            {
+                materialDisplay = material.DisplayName;
+            }
+            else if (material.MaterialType == "Alüminyum")
+            {
+                materialDisplay = $"Alü. {material.Size}X{material.Thickness.ToString("F3", CultureInfo.InvariantCulture).Replace(".", ",")}";
+            }
+            else // Galvaniz
+            {
+                materialDisplay = $"Gal. {material.Size}X{material.Thickness.ToString("F2", CultureInfo.InvariantCulture).Replace(".", ",")}";
+            }
 
             // Giriş: Malzeme girişlerinden toplam
-            decimal giris = entries
-                .Where(e => e.MaterialType == material.MaterialType && e.Size == material.Size && e.Thickness == material.Thickness)
-                .Sum(e => e.Quantity);
+            decimal giris = 0;
+            if (material.MaterialType == "Profil")
+            {
+                // Profil için giriş hesaplama (şimdilik 0, gerekirse eklenebilir)
+                giris = 0;
+            }
+            else
+            {
+                giris = entries
+                    .Where(e => e.MaterialType == material.MaterialType && e.Size == material.Size && e.Thickness == material.Thickness)
+                    .Sum(e => e.Quantity);
+            }
 
             // Hurda Çıkış: Malzeme çıkışlardan toplam (TransactionType = "Hurda Çıkış")
-            decimal hurdaCikis = exits
-                .Where(e => e.MaterialType == material.MaterialType && e.Size == material.Size && e.Thickness == material.Thickness && e.TransactionType == "Hurda Çıkış")
-                .Sum(e => e.Quantity);
+            decimal hurdaCikis = 0;
+            if (material.MaterialType != "Profil")
+            {
+                hurdaCikis = exits
+                    .Where(e => e.MaterialType == material.MaterialType && e.Size == material.Size && e.Thickness == material.Thickness && e.TransactionType == "Hurda Çıkış")
+                    .Sum(e => e.Quantity);
+            }
 
             // Düzenleme Çıkış: Malzeme çıkışlardan toplam (TransactionType = "Düzenleme Çıkış")
-            decimal duzenlemeCikis = exits
-                .Where(e => e.MaterialType == material.MaterialType && e.Size == material.Size && e.Thickness == material.Thickness && e.TransactionType == "Düzenleme Çıkış")
-                .Sum(e => e.Quantity);
+            decimal duzenlemeCikis = 0;
+            if (material.MaterialType != "Profil")
+            {
+                duzenlemeCikis = exits
+                    .Where(e => e.MaterialType == material.MaterialType && e.Size == material.Size && e.Thickness == material.Thickness && e.TransactionType == "Düzenleme Çıkış")
+                    .Sum(e => e.Quantity);
+            }
 
-            // Toplam Sipariş Kullanım: Sarfiyattaki toplam alüminyum ağırlığından hesaplanan
-            // Üretim plaka ölçüsü x plaka kalınlığı toplamları
+            // Toplam Sipariş Kullanım: Sarfiyattaki hesaplamalara göre
             decimal toplamSiparisKullanim = 0;
             decimal sevkEdilmisKullanim = 0;
 
-            if (material.MaterialType == "Alüminyum")
+            if (material.MaterialType == "Profil")
             {
-                // Siparişlerden hesapla
-                foreach (var order in orders.Where(o => o.Status != "İptal" && !string.IsNullOrEmpty(o.ProductCode)))
+                // Profil için: Profil Ağırlığı = Profil Mode Ağırlığı * 4 * Toplam Adet * (Yükseklik (mm) + Bypass / 1000)
+                foreach (var order in orders.Where(o => o.Status != "İptal" && !string.IsNullOrEmpty(o.ProductCode) && o.LamelThickness.HasValue))
                 {
-                    // Ürün kodundan plaka ölçüsü ve kalınlığı çıkar
+                    var productCodeParts = order.ProductCode.Split('-');
+                    if (productCodeParts.Length >= 3)
+                    {
+                        string modelProfile = productCodeParts[2]; // LG veya HS
+                        if (modelProfile.Length >= 2)
+                        {
+                            char profileLetter = modelProfile[1]; // G veya S
+                            
+                            // Profil tipi eşleşiyor mu?
+                            if ((material.ProfileType == "S" && (profileLetter == 'S' || profileLetter == 's')) ||
+                                (material.ProfileType == "G" && (profileLetter == 'G' || profileLetter == 'g')))
+                            {
+                                // Profil Mode Ağırlığı: G=0.5, S=0.3
+                                decimal profilModeAgirligi = profileLetter == 'G' || profileLetter == 'g' ? 0.5m : 0.3m;
+                                
+                                // Yükseklik (mm)
+                                int yukseklikMM = 0;
+                                if (productCodeParts.Length >= 5 && int.TryParse(productCodeParts[4], out int yukseklik))
+                                {
+                                    yukseklikMM = yukseklik;
+                                }
+                                
+                                // Bypass ölçüsü
+                                decimal bypassOlcusu = 0;
+                                if (!string.IsNullOrEmpty(order.BypassSize))
+                                {
+                                    decimal.TryParse(order.BypassSize.Replace(",", "."), NumberStyles.Any, CultureInfo.InvariantCulture, out bypassOlcusu);
+                                }
+                                
+                                // Plaka ölçüsü (mm)
+                                int plakaOlcusuMM = 0;
+                                if (productCodeParts.Length >= 4 && int.TryParse(productCodeParts[3], out int plakaOlcusu))
+                                {
+                                    plakaOlcusuMM = plakaOlcusu;
+                                }
+                                
+                                // Plaka Adet: Plaka ölçüsü <= 1150 ise 1, > 1150 ise 4
+                                int plakaAdet = plakaOlcusuMM <= 1150 ? 1 : 4;
+                                
+                                // Boy Adet: Yükseklik <= 1800 ise 1, > 1800 ise 2
+                                int boyAdet = yukseklikMM <= 1800 ? 1 : 2;
+                                
+                                // Toplam Adet: Sipariş adedi * Boy adet * Plaka adet
+                                int toplamAdet = order.Quantity * boyAdet * plakaAdet;
+                                
+                                // Profil Ağırlığı = Profil Mode Ağırlığı * 4 * Toplam Adet * (Yükseklik (mm) + Bypass / 1000)
+                                decimal profilAgirligi = profilModeAgirligi * 4 * toplamAdet * ((yukseklikMM + bypassOlcusu) / 1000m);
+                                
+                                toplamSiparisKullanim += profilAgirligi;
+                                
+                                if (order.Status == "Sevkiyata Hazır" || order.Status == "Sevk Edildi")
+                                {
+                                    sevkEdilmisKullanim += profilAgirligi;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            else if (material.MaterialType == "Alüminyum")
+            {
+                // Alüminyum için: Toplam Alüminyum Ağırlığı = Plaka Ağırlığı * Plaka Adedi (hesaplanan)
+                foreach (var order in orders.Where(o => o.Status != "İptal" && !string.IsNullOrEmpty(o.ProductCode) && o.LamelThickness.HasValue))
+                {
                     var productCodeParts = order.ProductCode.Split('-');
                     if (productCodeParts.Length >= 4)
                     {
@@ -270,41 +364,75 @@ namespace ERP.UI.Forms
                         {
                             int plakaOlcusuComMM = plakaOlcusuMM <= 1150 ? plakaOlcusuMM : plakaOlcusuMM / 2;
                             decimal plakaOlcusuCM = plakaOlcusuComMM / 10.0m;
-
+                            
                             // Lamel kalınlığı (plaka kalınlığı)
-                            if (order.LamelThickness.HasValue)
+                            decimal lamelKalinligi = order.LamelThickness.Value;
+                            
+                            // Alüminyum malzeme eşleştirmesi: Üretim Plaka Ölçüsü (cm) -> Alü koduna
+                            // Örnek: 60 cm -> 613 veya 614'e denk geliyor
+                            // X'den sonraki değer: Plaka Kalınlığı -> kalınlığa eşleştir
+                            int materialSize = material.Size;
+                            int materialSizeFirst = materialSize / 100; // 613 -> 6
+                            int materialSizeLast = materialSize % 10; // 613 -> 3, 614 -> 4
+                            
+                            // Plaka ölçüsü cm'den malzeme koduna eşleştir
+                            int plakaOlcusuInt = (int)Math.Round(plakaOlcusuCM);
+                            int plakaOlcusuFirst = plakaOlcusuInt / 10; // 60 -> 6
+                            int plakaOlcusuLast = plakaOlcusuInt % 10; // 60 -> 0, 61 -> 1
+                            
+                            // Eşleşme kontrolü: 60 cm -> 613 veya 614'e denk geliyor
+                            bool sizeMatches = false;
+                            if (plakaOlcusuFirst == materialSizeFirst)
                             {
-                                decimal lamelKalinligi = order.LamelThickness.Value;
-
-                                // Bu malzeme ile eşleşiyor mu?
-                                if (Math.Abs(plakaOlcusuCM - (material.Size / 10.0m)) < 0.1m && 
-                                    Math.Abs(lamelKalinligi - material.Thickness) < 0.001m)
+                                // Son rakam kontrolü: 60 -> 3 veya 4, 61 -> 3 veya 4
+                                if (plakaOlcusuLast == 0 && (materialSizeLast == 3 || materialSizeLast == 4))
+                                    sizeMatches = true;
+                                else if (plakaOlcusuLast == 1 && (materialSizeLast == 3 || materialSizeLast == 4))
+                                    sizeMatches = true;
+                            }
+                            
+                            // Kalınlık eşleşmesi
+                            bool thicknessMatches = Math.Abs(lamelKalinligi - material.Thickness) < 0.001m;
+                            
+                            if (sizeMatches && thicknessMatches)
+                            {
+                                // Plaka ağırlığı hesapla
+                                decimal plakaAgirligi = CalculatePlakaAgirligi(plakaOlcusuCM, lamelKalinligi);
+                                
+                                if (plakaAgirligi > 0)
                                 {
-                                    // Plaka adedi hesapla
-                                    int plakaAdet = plakaOlcusuMM <= 1150 ? 1 : 4;
-                                    
-                                    // Yükseklikten boy adet hesapla
-                                    int boyAdet = 1;
-                                    if (productCodeParts.Length >= 5 && int.TryParse(productCodeParts[4], out int yukseklikMM))
+                                    // Model harfi (H, D, M, L)
+                                    char modelLetter = 'H';
+                                    if (productCodeParts.Length >= 3)
                                     {
-                                        boyAdet = yukseklikMM <= 1800 ? 1 : 2;
-                                    }
-
-                                    // Toplam adet
-                                    int toplamAdet = order.Quantity * boyAdet * plakaAdet;
-
-                                    // Plaka ağırlığı hesapla
-                                    decimal plakaAgirligi = CalculatePlakaAgirligi(plakaOlcusuCM, lamelKalinligi);
-                                    if (plakaAgirligi > 0)
-                                    {
-                                        decimal kullanim = plakaAgirligi * plakaAdet * toplamAdet;
-                                        toplamSiparisKullanim += kullanim;
-
-                                        // Sevk edilmiş kullanım
-                                        if (order.Status == "Sevkiyata Hazır" || order.Status == "Sevk Edildi")
+                                        string modelProfile = productCodeParts[2];
+                                        if (modelProfile.Length > 0)
                                         {
-                                            sevkEdilmisKullanim += kullanim;
+                                            modelLetter = modelProfile[0];
                                         }
+                                    }
+                                    
+                                    // 10cm Plaka Adedi: H=32, D=24, M=17, L=12
+                                    int plakaAdedi10cm = GetPlakaAdedi10cm(modelLetter);
+                                    
+                                    // Yükseklik (mm)
+                                    int yukseklikMM = 0;
+                                    if (productCodeParts.Length >= 5 && int.TryParse(productCodeParts[4], out int yukseklik))
+                                    {
+                                        yukseklikMM = yukseklik;
+                                    }
+                                    
+                                    // Plaka Adedi: Yükseklik (mm) / 100 * Sipariş Adedi * 10cm Plaka Adedi
+                                    decimal plakaAdedi = (decimal)yukseklikMM / 100m * order.Quantity * plakaAdedi10cm;
+                                    
+                                    // Toplam Alüminyum Ağırlığı = Plaka Ağırlığı * Plaka Adedi
+                                    decimal toplamAluminyumAgirligi = plakaAgirligi * Math.Ceiling(plakaAdedi);
+                                    
+                                    toplamSiparisKullanim += toplamAluminyumAgirligi;
+                                    
+                                    if (order.Status == "Sevkiyata Hazır" || order.Status == "Sevk Edildi")
+                                    {
+                                        sevkEdilmisKullanim += toplamAluminyumAgirligi;
                                     }
                                 }
                             }
@@ -314,7 +442,7 @@ namespace ERP.UI.Forms
             }
             else if (material.MaterialType == "Galvaniz")
             {
-                // Galvaniz için siparişlerden hesapla (kapak ağırlığı)
+                // Galvaniz için: Toplam Galvaniz Ağırlığı = Galvaniz Kapak Ağırlığı * Kapak Adedi
                 foreach (var order in orders.Where(o => o.Status != "İptal" && !string.IsNullOrEmpty(o.ProductCode)))
                 {
                     var productCodeParts = order.ProductCode.Split('-');
@@ -324,21 +452,39 @@ namespace ERP.UI.Forms
                         {
                             int plakaOlcusuComMM = plakaOlcusuMM <= 1150 ? plakaOlcusuMM : plakaOlcusuMM / 2;
                             decimal plakaOlcusuCM = plakaOlcusuComMM / 10.0m;
-
-                            // Galvaniz kapak ağırlığı hesapla
-                            decimal galvanizKapakAgirligi = CalculateGalvanizKapakAgirligi(plakaOlcusuCM);
                             
-                            if (galvanizKapakAgirligi > 0)
+                            // Galvaniz malzeme eşleştirmesi: Üretim Plaka Ölçüsü (cm) -> Gal koduna
+                            // Örnek: 50 cm -> 551'e denk geliyor
+                            int materialSize = material.Size;
+                            int materialSizeFirst = materialSize / 100; // 551 -> 5
+                            int materialSizeMiddle = (materialSize / 10) % 10; // 551 -> 5
+                            
+                            // Plaka ölçüsü cm'den malzeme koduna eşleştir
+                            int plakaOlcusuInt = (int)Math.Round(plakaOlcusuCM);
+                            int plakaOlcusuFirst = plakaOlcusuInt / 10; // 50 -> 5
+                            
+                            // Eşleşme kontrolü: 50 cm -> 551'e denk geliyor
+                            bool sizeMatches = (plakaOlcusuFirst == materialSizeFirst && materialSizeMiddle == 5);
+                            
+                            if (sizeMatches)
                             {
-                                // Kapak adedi
-                                int kapakAdedi = order.Quantity;
+                                // Galvaniz kapak ağırlığı hesapla
+                                decimal galvanizKapakAgirligi = CalculateGalvanizKapakAgirligi(plakaOlcusuCM);
                                 
-                                decimal kullanim = galvanizKapakAgirligi * kapakAdedi;
-                                toplamSiparisKullanim += kullanim;
-
-                                if (order.Status == "Sevkiyata Hazır" || order.Status == "Sevk Edildi")
+                                if (galvanizKapakAgirligi > 0)
                                 {
-                                    sevkEdilmisKullanim += kullanim;
+                                    // Kapak adedi: Sipariş adedi
+                                    int kapakAdedi = order.Quantity;
+                                    
+                                    // Toplam Galvaniz Ağırlığı = Galvaniz Kapak Ağırlığı * Kapak Adedi
+                                    decimal toplamGalvanizAgirligi = galvanizKapakAgirligi * kapakAdedi;
+                                    
+                                    toplamSiparisKullanim += toplamGalvanizAgirligi;
+                                    
+                                    if (order.Status == "Sevkiyata Hazır" || order.Status == "Sevk Edildi")
+                                    {
+                                        sevkEdilmisKullanim += toplamGalvanizAgirligi;
+                                    }
                                 }
                             }
                         }
@@ -448,11 +594,25 @@ namespace ERP.UI.Forms
             return 0m;
         }
 
+        private int GetPlakaAdedi10cm(char modelLetter)
+        {
+            switch (char.ToUpper(modelLetter))
+            {
+                case 'H': return 32;
+                case 'D': return 24;
+                case 'M': return 17;
+                case 'L': return 12;
+                default: return 0;
+            }
+        }
+
         private class MaterialInfo
         {
             public string MaterialType { get; set; }
             public int Size { get; set; }
             public decimal Thickness { get; set; }
+            public string ProfileType { get; set; } // S veya G
+            public string DisplayName { get; set; } // Profil için görünen isim
         }
 
         private class StockRowData

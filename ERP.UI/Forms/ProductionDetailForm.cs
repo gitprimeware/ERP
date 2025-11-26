@@ -340,8 +340,8 @@ namespace ERP.UI.Forms
             AddReportTableRow("Trex Sipariş No:", CreateReadOnlyTextBox(txtReportTrexOrderNo = new TextBox()),
                        "Hatve:", CreateReadOnlyTextBox(txtReportHtave = new TextBox()), row++);
 
-            // Plaka Ölçüsü (cm)
-            AddReportTableRow("Plaka Ölçüsü (cm):", CreateReadOnlyTextBox(txtReportPlakaOlcusuCM = new TextBox()),
+            // Plaka Ölçüsü (mm)
+            AddReportTableRow("Plaka Ölçüsü (mm):", CreateReadOnlyTextBox(txtReportPlakaOlcusuCM = new TextBox()),
                        "Yükseklik (mm):", CreateReadOnlyTextBox(txtReportYukseklikCM = new TextBox()), row++);
 
             // Toplam Sipariş Adedi
@@ -511,9 +511,20 @@ namespace ERP.UI.Forms
             if (txtReportHtave != null && txtHtave != null)
                 txtReportHtave.Text = txtHtave.Text;
 
-            // Plaka Ölçüsü (cm) - Formül sayfasındaki plaka ölçüsü cm
+            // Plaka Ölçüsü (mm) - Formül sayfasındaki plaka ölçüsü cm'yi mm'ye çevir
             if (txtReportPlakaOlcusuCM != null && txtPlakaOlcusuCM != null)
-                txtReportPlakaOlcusuCM.Text = txtPlakaOlcusuCM.Text;
+            {
+                if (decimal.TryParse(txtPlakaOlcusuCM.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal plakaOlcusuCM))
+                {
+                    // cm'yi mm'ye çevir (10 ile çarp ve ondalık kısmı kaldır)
+                    int plakaOlcusuMM = (int)Math.Round(plakaOlcusuCM * 10m);
+                    txtReportPlakaOlcusuCM.Text = plakaOlcusuMM.ToString();
+                }
+                else
+                {
+                    txtReportPlakaOlcusuCM.Text = txtPlakaOlcusuCM.Text;
+                }
+            }
 
             // Yükseklik (mm) - Yükseklik (mm) değerinden kapak boyu değerini çıkar
             int raporYukseklikMM = 0;
@@ -587,7 +598,22 @@ namespace ERP.UI.Forms
             // Kapak - Kapak boyu 030 ise "Normal Kapak", 002 ise "Düz Kapak"
             if (txtReportKapak != null && txtKapakBoyuMM != null && int.TryParse(txtKapakBoyuMM.Text, out int kapakBoyu))
             {
-                txtReportKapak.Text = kapakBoyu == 30 ? "Normal Kapak" : kapakBoyu == 2 ? "Düz Kapak" : "";
+                if(kapakBoyu == 30)
+                {
+                    txtReportKapak.Text = "Normal Kapak";
+                }
+                else if(kapakBoyu == 2)
+                {
+                    txtReportKapak.Text = "Düz Kapak";
+                }
+                else if(kapakBoyu == 16)
+                {
+                    txtReportKapak.Text = "Normal ve Düz Kapak";
+                }
+                else
+                {
+                    txtReportKapak.Text = "-";
+                }
             }
 
             // Profil - S ve G ise "Standart", G ise "Geniş Profil"
