@@ -29,6 +29,7 @@ namespace ERP.DAL
                     CreateMaterialEntriesTable(connection);
                     CreateMaterialExitsTable(connection);
                     CreateCuttingsTable(connection);
+                    CreatePressingsTable(connection);
                 }
             }
             catch (Exception ex)
@@ -503,6 +504,39 @@ namespace ERP.DAL
                 {
                     System.Diagnostics.Debug.WriteLine($"Cuttings migration hatası: {ex.Message}");
                 }
+            }
+        }
+
+        private static void CreatePressingsTable(SqlConnection connection)
+        {
+            var query = @"
+                IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Pressings]') AND type in (N'U'))
+                BEGIN
+                    CREATE TABLE [dbo].[Pressings] (
+                        [Id] UNIQUEIDENTIFIER PRIMARY KEY,
+                        [OrderId] UNIQUEIDENTIFIER NULL,
+                        [PlateThickness] DECIMAL(10,3) NOT NULL,
+                        [Hatve] DECIMAL(10,2) NOT NULL,
+                        [Size] DECIMAL(10,2) NOT NULL,
+                        [SerialNoId] UNIQUEIDENTIFIER NULL,
+                        [PressNo] NVARCHAR(50) NULL,
+                        [Pressure] DECIMAL(18,3) NOT NULL,
+                        [PressCount] INT NOT NULL,
+                        [WasteAmount] DECIMAL(18,3) NOT NULL DEFAULT 0,
+                        [EmployeeId] UNIQUEIDENTIFIER NULL,
+                        [PressingDate] DATETIME NOT NULL,
+                        [CreatedDate] DATETIME NOT NULL,
+                        [ModifiedDate] DATETIME NULL,
+                        [IsActive] BIT NOT NULL DEFAULT 1,
+                        FOREIGN KEY ([OrderId]) REFERENCES [Orders]([Id]),
+                        FOREIGN KEY ([SerialNoId]) REFERENCES [SerialNos]([Id]),
+                        FOREIGN KEY ([EmployeeId]) REFERENCES [Employees]([Id])
+                    )
+                END";
+
+            using (var command = new SqlCommand(query, connection))
+            {
+                command.ExecuteNonQuery();
             }
         }
 

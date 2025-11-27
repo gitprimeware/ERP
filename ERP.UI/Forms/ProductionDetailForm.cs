@@ -65,6 +65,7 @@ namespace ERP.UI.Forms
         private Guid _orderId = Guid.Empty;
         private OrderRepository _orderRepository;
         private CuttingRepository _cuttingRepository;
+        private PressingRepository _pressingRepository;
         private MachineRepository _machineRepository;
         private SerialNoRepository _serialNoRepository;
         private EmployeeRepository _employeeRepository;
@@ -79,6 +80,7 @@ namespace ERP.UI.Forms
             _orderId = orderId;
             _orderRepository = new OrderRepository();
             _cuttingRepository = new CuttingRepository();
+            _pressingRepository = new PressingRepository();
             _machineRepository = new MachineRepository();
             _serialNoRepository = new SerialNoRepository();
             _employeeRepository = new EmployeeRepository();
@@ -1008,25 +1010,36 @@ namespace ERP.UI.Forms
             CreateKesimTab(tabKesim);
             cuttingTabControl.TabPages.Add(tabKesim);
 
+            var tabPres = new TabPage("🔧 Pres");
+            tabPres.Padding = new Padding(20);
+            tabPres.BackColor = ThemeColors.Background;
+            CreatePresTab(tabPres);
+            cuttingTabControl.TabPages.Add(tabPres);
+
             contentPanel.Controls.Add(cuttingTabControl);
         }
 
         private void CreateKesimTab(TabPage tab)
         {
-            // Ana panel
-            var mainPanel = new Panel
+            // Ana panel - TableLayoutPanel kullan
+            var mainPanel = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(20),
-                BackColor = ThemeColors.Background
+                ColumnCount = 1,
+                RowCount = 2,
+                BackColor = ThemeColors.Background,
+                Padding = new Padding(20)
             };
+            mainPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            mainPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F)); // Buton paneli için sabit yükseklik
+            mainPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F)); // Grid paneli için kalan alan
 
             // Buton paneli - Üstte
             var buttonPanel = new Panel
             {
+                Dock = DockStyle.Fill,
                 Height = 50,
-                Dock = DockStyle.Top,
-                Padding = new Padding(0, 10, 20, 10),
+                Padding = new Padding(0, 5, 20, 5),
                 BackColor = ThemeColors.Background
             };
 
@@ -1039,7 +1052,7 @@ namespace ERP.UI.Forms
             var gridPanel = new Panel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(0, 10, 0, 0),
+                Padding = new Padding(0),
                 BackColor = ThemeColors.Background
             };
 
@@ -1093,8 +1106,11 @@ namespace ERP.UI.Forms
             dataGridView.DefaultCellStyle.Font = new Font("Segoe UI", 9F);
 
             gridPanel.Controls.Add(dataGridView);
-            mainPanel.Controls.Add(buttonPanel);
-            mainPanel.Controls.Add(gridPanel);
+            
+            // TableLayoutPanel'e ekle
+            mainPanel.Controls.Add(buttonPanel, 0, 0);
+            mainPanel.Controls.Add(gridPanel, 0, 1);
+            
             tab.Controls.Add(mainPanel);
 
             // Event handler
@@ -1215,6 +1231,218 @@ namespace ERP.UI.Forms
             catch (Exception ex)
             {
                 MessageBox.Show("Kesim eklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void CreatePresTab(TabPage tab)
+        {
+            // Ana panel - TableLayoutPanel kullan
+            var mainPanel = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 2,
+                BackColor = ThemeColors.Background,
+                Padding = new Padding(20)
+            };
+            mainPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            mainPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F)); // Buton paneli için sabit yükseklik
+            mainPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F)); // Grid paneli için kalan alan
+
+            // Buton paneli - Üstte
+            var buttonPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Height = 50,
+                Padding = new Padding(0, 5, 20, 5),
+                BackColor = ThemeColors.Background
+            };
+
+            // Ekle butonu
+            var btnEkle = ButtonFactory.CreateActionButton("➕ Ekle", ThemeColors.Primary, Color.White, 120, 35);
+            btnEkle.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            buttonPanel.Controls.Add(btnEkle);
+
+            // DataGridView paneli
+            var gridPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(0),
+                BackColor = ThemeColors.Background
+            };
+
+            // DataGridView
+            var dataGridView = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                ReadOnly = true,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                MultiSelect = false,
+                BackgroundColor = ThemeColors.Surface,
+                BorderStyle = BorderStyle.FixedSingle,
+                AutoGenerateColumns = false,
+                ColumnHeadersVisible = true,
+                RowHeadersVisible = false,
+                GridColor = Color.LightGray
+            };
+
+            // Kolonları ekle
+            AddPresColumn(dataGridView, "Date", "Tarih", 120);
+            AddPresColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 120);
+            AddPresColumn(dataGridView, "Hatve", "Hatve", 80);
+            AddPresColumn(dataGridView, "Size", "Ölçü", 80);
+            AddPresColumn(dataGridView, "SerialNumber", "Rulo Seri No", 120);
+            AddPresColumn(dataGridView, "PressNo", "Pres No", 100);
+            AddPresColumn(dataGridView, "Pressure", "Basınç", 100);
+            AddPresColumn(dataGridView, "PressCount", "Pres Adedi", 100);
+            AddPresColumn(dataGridView, "WasteAmount", "Hurda Miktarı", 120);
+            AddPresColumn(dataGridView, "EmployeeName", "Operatör", 150);
+
+            // Stil ayarları
+            dataGridView.ColumnHeadersVisible = true;
+            dataGridView.RowHeadersVisible = false;
+            dataGridView.EnableHeadersVisualStyles = false;
+            dataGridView.ColumnHeadersHeight = 40;
+            dataGridView.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            
+            dataGridView.ColumnHeadersDefaultCellStyle.BackColor = ThemeColors.Primary;
+            dataGridView.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            dataGridView.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            dataGridView.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dataGridView.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.False;
+
+            dataGridView.DefaultCellStyle.BackColor = ThemeColors.Surface;
+            dataGridView.DefaultCellStyle.ForeColor = ThemeColors.TextPrimary;
+            dataGridView.DefaultCellStyle.SelectionBackColor = ThemeColors.Primary;
+            dataGridView.DefaultCellStyle.SelectionForeColor = Color.White;
+            dataGridView.DefaultCellStyle.Font = new Font("Segoe UI", 9F);
+
+            gridPanel.Controls.Add(dataGridView);
+            
+            // TableLayoutPanel'e ekle
+            mainPanel.Controls.Add(buttonPanel, 0, 0);
+            mainPanel.Controls.Add(gridPanel, 0, 1);
+            
+            tab.Controls.Add(mainPanel);
+
+            // Event handler
+            btnEkle.Click += (s, e) => BtnPresEkle_Click(dataGridView);
+
+            // Verileri yükle
+            LoadPresData(dataGridView);
+        }
+
+        private void AddPresColumn(DataGridView dgv, string dataPropertyName, string headerText, int width)
+        {
+            var column = new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = dataPropertyName,
+                HeaderText = headerText,
+                Name = dataPropertyName,
+                Width = width,
+                Visible = true,
+                ReadOnly = true
+            };
+            dgv.Columns.Add(column);
+        }
+
+        private void LoadPresData(DataGridView dataGridView)
+        {
+            try
+            {
+                var pressings = _pressingRepository.GetByOrderId(_orderId);
+                var data = pressings.Select(p => new
+                {
+                    p.Id,
+                    Date = p.PressingDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
+                    PlateThickness = p.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
+                    Hatve = p.Hatve.ToString("F2", CultureInfo.InvariantCulture),
+                    Size = p.Size.ToString("F2", CultureInfo.InvariantCulture),
+                    SerialNumber = p.SerialNo?.SerialNumber ?? "",
+                    PressNo = p.PressNo ?? "",
+                    Pressure = p.Pressure.ToString("F3", CultureInfo.InvariantCulture),
+                    PressCount = p.PressCount.ToString(),
+                    WasteAmount = p.WasteAmount.ToString("F3", CultureInfo.InvariantCulture),
+                    EmployeeName = p.Employee != null ? $"{p.Employee.FirstName} {p.Employee.LastName}" : ""
+                }).ToList();
+
+                // DataSource'u null yap (kolonlar kaybolmasın diye)
+                dataGridView.DataSource = null;
+                
+                // Kolonların var olduğundan emin ol
+                if (dataGridView.Columns.Count == 0)
+                {
+                    AddPresColumn(dataGridView, "Date", "Tarih", 120);
+                    AddPresColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 120);
+                    AddPresColumn(dataGridView, "Hatve", "Hatve", 80);
+                    AddPresColumn(dataGridView, "Size", "Ölçü", 80);
+                    AddPresColumn(dataGridView, "SerialNumber", "Rulo Seri No", 120);
+                    AddPresColumn(dataGridView, "PressNo", "Pres No", 100);
+                    AddPresColumn(dataGridView, "Pressure", "Basınç", 100);
+                    AddPresColumn(dataGridView, "PressCount", "Pres Adedi", 100);
+                    AddPresColumn(dataGridView, "WasteAmount", "Hurda Miktarı", 120);
+                    AddPresColumn(dataGridView, "EmployeeName", "Operatör", 150);
+                }
+
+                // Kolon başlıklarını kesinlikle göster
+                dataGridView.ColumnHeadersVisible = true;
+                dataGridView.RowHeadersVisible = false;
+                dataGridView.ColumnHeadersHeight = 40;
+                
+                // Veri kaynağını ayarla
+                dataGridView.DataSource = data;
+                
+                // DataSource ayarlandıktan SONRA HeaderText'leri tekrar ayarla
+                foreach (DataGridViewColumn column in dataGridView.Columns)
+                {
+                    column.Visible = true;
+                    column.ReadOnly = true;
+                    // HeaderText'i tekrar ayarla
+                    switch (column.Name)
+                    {
+                        case "Date": column.HeaderText = "Tarih"; break;
+                        case "PlateThickness": column.HeaderText = "Plaka Kalınlığı"; break;
+                        case "Hatve": column.HeaderText = "Hatve"; break;
+                        case "Size": column.HeaderText = "Ölçü"; break;
+                        case "SerialNumber": column.HeaderText = "Rulo Seri No"; break;
+                        case "PressNo": column.HeaderText = "Pres No"; break;
+                        case "Pressure": column.HeaderText = "Basınç"; break;
+                        case "PressCount": column.HeaderText = "Pres Adedi"; break;
+                        case "WasteAmount": column.HeaderText = "Hurda Miktarı"; break;
+                        case "EmployeeName": column.HeaderText = "Operatör"; break;
+                    }
+                }
+                
+                // Yeniden çiz
+                dataGridView.Invalidate();
+                dataGridView.Update();
+                dataGridView.Refresh();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Pres verileri yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BtnPresEkle_Click(DataGridView dataGridView)
+        {
+            try
+            {
+                using (var dialog = new PressingDialog(_serialNoRepository, _employeeRepository, _orderId))
+                {
+                    if (dialog.ShowDialog() == DialogResult.OK)
+                    {
+                        // Verileri yeniden yükle
+                        LoadPresData(dataGridView);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Pres eklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
