@@ -126,6 +126,12 @@ namespace ERP.UI.Forms
             _dataGridView.CellPainting += DataGridView_CellPainting;
             _dataGridView.CellMouseEnter += DataGridView_CellMouseEnter;
             _dataGridView.CellMouseLeave += DataGridView_CellMouseLeave;
+            _dataGridView.Scroll += DataGridView_Scroll;
+            
+            // DoubleBuffered özelliğini aç - scroll sırasında üst üste binmeyi önler
+            typeof(DataGridView).InvokeMember("DoubleBuffered",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.SetProperty,
+                null, _dataGridView, new object[] { true });
 
             _mainPanel.Resize += (s, e) =>
             {
@@ -1144,6 +1150,16 @@ namespace ERP.UI.Forms
             }
         }
 
+        private void DataGridView_Scroll(object sender, ScrollEventArgs e)
+        {
+            // Scroll sırasında tüm görünür satırları yeniden çiz
+            if (e.ScrollOrientation == ScrollOrientation.VerticalScroll)
+            {
+                _dataGridView.Invalidate();
+                _dataGridView.Update();
+            }
+        }
+
         private void DataGridView_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
         {
             // Header satırlarını atla
@@ -1153,6 +1169,9 @@ namespace ERP.UI.Forms
             {
                 var row = _dataGridView.Rows[e.RowIndex];
                 bool isActionsColumn = _dataGridView.Columns[e.ColumnIndex].Name == "Actions";
+                
+                // Önce hücreyi tamamen temizle (üst üste binmeyi önlemek için)
+                e.Graphics.FillRectangle(new SolidBrush(_dataGridView.BackgroundColor), e.CellBounds);
 
                 // Tag'dan Order listesini al
                 List<Order> orders = null;
@@ -1271,11 +1290,17 @@ namespace ERP.UI.Forms
                 {
                     if (rowBgColor != Color.White)
                     {
-                        using (SolidBrush bgBrush = new SolidBrush(rowBgColor))
-                        {
-                            e.Graphics.FillRectangle(bgBrush, e.CellBounds);
-                        }
+                        // Önce arka planı tamamen temizle ve yeni rengi uygula
+                        e.Graphics.FillRectangle(new SolidBrush(rowBgColor), e.CellBounds);
+                        // İçeriği ve border'ı çiz
                         e.Paint(e.CellBounds, DataGridViewPaintParts.ContentForeground | DataGridViewPaintParts.Border);
+                        e.Handled = true;
+                    }
+                    else
+                    {
+                        // Beyaz arka plan için de temizle
+                        e.Graphics.FillRectangle(new SolidBrush(Color.White), e.CellBounds);
+                        e.Paint(e.CellBounds, DataGridViewPaintParts.All);
                         e.Handled = true;
                     }
                 }
