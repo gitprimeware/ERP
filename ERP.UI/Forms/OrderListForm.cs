@@ -24,6 +24,8 @@ namespace ERP.UI.Forms
         private CompanyRepository _companyRepository;
         private bool _isTableView = true; // Default tablo görünümü
         private ComboBox _cmbSortBy;
+        private ToolTip _actionToolTip;
+        private string _currentToolTipText = "";
 
         public event EventHandler<Guid> OrderSelected;
         public event EventHandler<Guid> OrderUpdateRequested;
@@ -37,6 +39,9 @@ namespace ERP.UI.Forms
             InitializeComponent();
             _orderRepository = new OrderRepository();
             _companyRepository = new CompanyRepository();
+            _actionToolTip = new ToolTip();
+            _actionToolTip.IsBalloon = false;
+            _actionToolTip.ShowAlways = false;
             InitializeCustomComponents();
         }
 
@@ -55,11 +60,10 @@ namespace ERP.UI.Forms
             _mainPanel = new Panel
             {
                 Dock = DockStyle.Fill,
-                BackColor = ThemeColors.Surface,
-                Padding = new Padding(30)
+                BackColor = Color.White,
+                Padding = new Padding(30),
+                AutoScroll = false // Ana panel kaymasın, sadece tablo kayacak
             };
-
-            UIHelper.ApplyCardStyle(_mainPanel, 12);
 
             // Başlık
             var titleLabel = new Label
@@ -87,12 +91,28 @@ namespace ERP.UI.Forms
             };
             _chkTableView.CheckedChanged += ChkTableView_CheckedChanged;
 
+            // Toplu iş emri butonu - Checkbox ile aynı hizada
+            var btnBulkWorkOrder = new Button
+            {
+                Text = "📄 Toplu İş Emri Al",
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = ThemeColors.Success,
+                Size = new Size(180, 35),
+                Location = new Point(_mainPanel.Width - 210, 135),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Cursor = Cursors.Hand,
+                FlatStyle = FlatStyle.Flat
+            };
+            btnBulkWorkOrder.FlatAppearance.BorderSize = 0;
+            btnBulkWorkOrder.Click += BtnBulkWorkOrder_Click;
+
             // Cards panel
             _cardsPanel = new FlowLayoutPanel
             {
-                Location = new Point(30, 170),
+                Location = new Point(30, 180),
                 Width = _mainPanel.Width - 60,
-                Height = _mainPanel.Height - 210,
+                Height = _mainPanel.Height - 220,
                 AutoScroll = true,
                 FlowDirection = FlowDirection.LeftToRight,
                 WrapContents = true,
@@ -103,9 +123,9 @@ namespace ERP.UI.Forms
             // DataGridView
             _dataGridView = new DataGridView
             {
-                Location = new Point(30, 170),
+                Location = new Point(30, 180),
                 Width = _mainPanel.Width - 60,
-                Height = _mainPanel.Height - 210,
+                Height = _mainPanel.Height - 220,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
                 AllowUserToAddRows = false,
@@ -113,40 +133,30 @@ namespace ERP.UI.Forms
                 ReadOnly = false, // Checkbox'ların çalışması için false olmalı
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 MultiSelect = true, // Çoklu seçim için true yapıldı
-                BackgroundColor = ThemeColors.Background,
+                BackgroundColor = Color.White,
                 BorderStyle = BorderStyle.None,
+                RowTemplate = { Height = 40 }, // Satır yüksekliği
+                ScrollBars = ScrollBars.Vertical, // Sadece dikey scroll
                 Visible = _isTableView
             };
             _dataGridView.CellClick += DataGridView_CellClick;
             _dataGridView.CellDoubleClick += DataGridView_CellDoubleClick;
             _dataGridView.CellValueChanged += DataGridView_CellValueChanged;
             _dataGridView.CurrentCellDirtyStateChanged += DataGridView_CurrentCellDirtyStateChanged;
+            _dataGridView.RowPrePaint += DataGridView_RowPrePaint;
+            _dataGridView.CellPainting += DataGridView_CellPainting;
+            _dataGridView.CellMouseEnter += DataGridView_CellMouseEnter;
+            _dataGridView.CellMouseLeave += DataGridView_CellMouseLeave;
 
             _mainPanel.Resize += (s, e) =>
             {
                 searchPanel.Width = _mainPanel.Width - 60;
                 _cardsPanel.Width = _mainPanel.Width - 60;
-                _cardsPanel.Height = _mainPanel.Height - 210;
+                _cardsPanel.Height = _mainPanel.Height - 220;
                 _dataGridView.Width = _mainPanel.Width - 60;
-                _dataGridView.Height = _mainPanel.Height - 210;
+                _dataGridView.Height = _mainPanel.Height - 220;
             };
 
-            // Toplu iş emri butonu
-            var btnBulkWorkOrder = new Button
-            {
-                Text = "📄 Toplu İş Emri Al",
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                ForeColor = Color.White,
-                BackColor = ThemeColors.Success,
-                Size = new Size(180, 35),
-                Location = new Point(_mainPanel.Width - 210, 140),
-                Anchor = AnchorStyles.Top | AnchorStyles.Right,
-                Cursor = Cursors.Hand,
-                FlatStyle = FlatStyle.Flat
-            };
-            btnBulkWorkOrder.FlatAppearance.BorderSize = 0;
-            btnBulkWorkOrder.Click += BtnBulkWorkOrder_Click;
-            
             _mainPanel.Controls.Add(titleLabel);
             _mainPanel.Controls.Add(searchPanel);
             _mainPanel.Controls.Add(_chkTableView);
@@ -324,18 +334,18 @@ namespace ERP.UI.Forms
             }
 
             _dataGridView.AutoGenerateColumns = false;
-            
+
             // Checkbox kolonu (seçim için)
             var checkboxColumn = new DataGridViewCheckBoxColumn
             {
                 HeaderText = "Seç",
                 Name = "IsSelected",
                 DataPropertyName = "IsSelected", // DataSource'daki property ile bağla
-                Width = 50,
+                Width = 35,
                 ReadOnly = false
             };
             _dataGridView.Columns.Add(checkboxColumn);
-            
+
             // Kolonları ekle
             _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
             {
@@ -407,7 +417,7 @@ namespace ERP.UI.Forms
             {
                 HeaderText = "İşlemler",
                 Name = "Actions",
-                Width = 180,
+                Width = 220,
                 Text = "",
                 UseColumnTextForButtonValue = false
             };
@@ -437,7 +447,7 @@ namespace ERP.UI.Forms
             _dataGridView.DataBindingComplete += (s, e) =>
             {
                 UpdateActionButtons();
-                
+
                 // Checkbox kolonu dışındaki tüm kolonları ReadOnly yap
                 foreach (DataGridViewColumn column in _dataGridView.Columns)
                 {
@@ -446,24 +456,62 @@ namespace ERP.UI.Forms
                         column.ReadOnly = true;
                     }
                 }
+
+                // Satır renklendirmesi - ilk yüklemede - DataBindingComplete'ten SONRA
+                foreach (DataGridViewRow row in _dataGridView.Rows)
+                {
+                    if (row.DataBoundItem != null)
+                    {
+                        ApplyRowColorToRow(row);
+                    }
+                }
+
+                // İlk yükleme için butonları güncelle
+                UpdateActionButtons();
+                
+                // Tüm satırları yeniden çiz (renklendirmenin görünmesi için)
+                _dataGridView.Invalidate();
+                
+                // Refresh'i de çağır (hemen görünmesi için)
+                _dataGridView.Refresh();
             };
 
-            // İlk yükleme için butonları güncelle
-            UpdateActionButtons();
+            // Satırlar eklendiğinde renklendirmeyi uygula
+            _dataGridView.RowsAdded += (s, e) =>
+            {
+                for (int i = e.RowIndex; i < e.RowIndex + e.RowCount; i++)
+                {
+                    if (i >= 0 && i < _dataGridView.Rows.Count)
+                    {
+                        ApplyRowColorToRow(_dataGridView.Rows[i]);
+                    }
+                }
+                _dataGridView.Invalidate(); // Tüm satırları yeniden çiz
+            };
 
-            // Stil ayarları
-            _dataGridView.DefaultCellStyle.BackColor = ThemeColors.Surface;
-            _dataGridView.DefaultCellStyle.ForeColor = ThemeColors.TextPrimary;
-            _dataGridView.DefaultCellStyle.SelectionBackColor = ThemeColors.Primary;
-            _dataGridView.DefaultCellStyle.SelectionForeColor = Color.White;
+            // Stil ayarları - ÖNCE stil ayarları yapılsın
+            _dataGridView.BackgroundColor = Color.White;
+            // DefaultCellStyle.BackColor'u burada ayarlamayalım - satır renklendirmesi override edecek
+            _dataGridView.DefaultCellStyle.SelectionBackColor = Color.FromArgb(220, ThemeColors.Primary.R, ThemeColors.Primary.G, ThemeColors.Primary.B);
+            _dataGridView.GridColor = Color.FromArgb(230, 230, 230); // Açık gri border
+            _dataGridView.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal; // Sadece yatay çizgiler
             _dataGridView.ColumnHeadersDefaultCellStyle.BackColor = ThemeColors.Primary;
             _dataGridView.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
             _dataGridView.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             _dataGridView.EnableHeadersVisualStyles = false;
+            _dataGridView.RowHeadersVisible = false; // Sol taraftaki row header'ı kaldır
+            _dataGridView.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None; // Header border yok
+            _dataGridView.BorderStyle = BorderStyle.None; // Dış border yok
 
-            // Buton kolonu stil
-            _dataGridView.Columns["Actions"].DefaultCellStyle.Font = new Font("Segoe UI", 14F);
+            // Buton kolonu stil - tooltip'i kapat
+            _dataGridView.Columns["Actions"].DefaultCellStyle.Font = new Font("Segoe UI", 10F);
             _dataGridView.Columns["Actions"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            _dataGridView.Columns["Actions"].DefaultCellStyle.Padding = new Padding(2, 2, 2, 2);
+
+            // Actions kolonundaki default tooltip'leri kapat (biz kendi tooltip'imizi gösteriyoruz)
+            _dataGridView.ShowCellToolTips = false;
+
+            // İlk yükleme için butonları güncelle - DataBindingComplete'ten SONRA
         }
 
         private void UpdateActionButtons()
@@ -472,6 +520,12 @@ namespace ERP.UI.Forms
 
             foreach (DataGridViewRow row in _dataGridView.Rows)
             {
+                // Actions kolonundaki tooltip'i boşalt
+                if (row.Cells["Actions"] != null)
+                {
+                    row.Cells["Actions"].ToolTipText = "";
+                }
+
                 if (row.DataBoundItem != null && _dataGridView.Tag is List<Order> orders)
                 {
                     var dataItem = row.DataBoundItem;
@@ -483,19 +537,23 @@ namespace ERP.UI.Forms
                         if (order != null)
                         {
                             bool isReadyForShipment = order.Status == "Sevkiyata Hazır";
+                            bool isNew = order.Status == "Yeni";
                             var btnCell = row.Cells["Actions"] as DataGridViewButtonCell;
                             if (btnCell != null)
                             {
-                                // Sadece emoji'ler - Detay, Sil, Üretime Gönder, İş Emri Al
+                                // Sadece emoji'ler - Soldan sağa: Ayrıntılar, İş Emri, Üretim, Silme
                                 if (isReadyForShipment)
                                 {
-                                    btnCell.Value = "📋 🗑️ 📄"; // Detay, Sil, İş Emri Al (Üretime gönder disabled)
-                                    btnCell.Style.ForeColor = Color.Gray;
+                                    btnCell.Value = "📋 📄 🗑️"; // Detay, İş Emri, Sil (Üretime gönder yok)
+                                }
+                                else if (isNew)
+                                {
+                                    btnCell.Value = "📋 📄 🏭 🗑️"; // Detay, İş Emri, Üretim, Sil
                                 }
                                 else
                                 {
-                                    btnCell.Value = "📋 🗑️ 🏭 📄"; // Detay, Sil, Üretime Gönder, İş Emri Al
-                                    btnCell.Style.ForeColor = ThemeColors.Info;
+                                    // Üretimde, Sevk Edildi vs. durumlarında Üretime Gönder yok
+                                    btnCell.Value = "📋 📄 🗑️"; // Detay, İş Emri, Sil
                                 }
                             }
                         }
@@ -520,6 +578,10 @@ namespace ERP.UI.Forms
             {
                 var order = orders[e.RowIndex];
                 bool isReadyForShipment = order.Status == "Sevkiyata Hazır";
+                bool isNew = order.Status == "Yeni";
+                
+                // Emoji sayısını belirle - sadece "Yeni" durumunda Üretime Gönder butonu var
+                int emojiCount = (isReadyForShipment || !isNew) ? 3 : 4;
 
                 // İşlemler kolonuna tıklandı
                 if (_dataGridView.Columns[e.ColumnIndex].Name == "Actions")
@@ -527,19 +589,33 @@ namespace ERP.UI.Forms
                     var cell = _dataGridView.Rows[e.RowIndex].Cells[e.ColumnIndex];
                     var cellRect = _dataGridView.GetCellDisplayRectangle(e.ColumnIndex, e.RowIndex, false);
                     var clickX = _dataGridView.PointToClient(Control.MousePosition).X - cellRect.X;
-                    var emojiWidth = cellRect.Width / (isReadyForShipment ? 3 : 4); // Emoji sayısına göre böl
+                    var emojiWidth = cellRect.Width / emojiCount; // Emoji sayısına göre böl
 
                     int emojiIndex = (int)(clickX / emojiWidth);
 
-                    if (isReadyForShipment)
+                    if (isNew)
                     {
-                        // 📋 🗑️ 📄
+                        // 📋 📄 🏭 🗑️ - Sadece "Yeni" durumunda 4 buton
                         switch (emojiIndex)
                         {
                             case 0: // 📋 Detay
                                 OrderUpdateRequested?.Invoke(this, order.Id);
                                 break;
-                            case 1: // 🗑️ Sil
+                            case 1: // 📄 İş Emri Al
+                                OrderGetWorkOrderRequested?.Invoke(this, order.Id);
+                                break;
+                            case 2: // 🏭 Üretime Gönder
+                                var resultProduction = MessageBox.Show(
+                                    $"Sipariş {order.TrexOrderNo} üretime gönderilecek. Emin misiniz?",
+                                    "Üretime Gönder",
+                                    MessageBoxButtons.YesNo,
+                                    MessageBoxIcon.Question);
+                                if (resultProduction == DialogResult.Yes)
+                                {
+                                    OrderSendToProductionRequested?.Invoke(this, order.Id);
+                                }
+                                break;
+                            case 3: // 🗑️ Sil
                                 var resultDelete = MessageBox.Show(
                                     $"Sipariş {order.TrexOrderNo} silinecek. Emin misiniz?",
                                     "Sipariş Sil",
@@ -550,45 +626,31 @@ namespace ERP.UI.Forms
                                     OrderDeleteRequested?.Invoke(this, order.Id);
                                 }
                                 break;
-                            case 2: // 📄 İş Emri Al
-                                OrderGetWorkOrderRequested?.Invoke(this, order.Id);
-                                break;
                         }
                     }
                     else
                     {
-                    // 📋 🗑️ 🏭 📄
-                    switch (emojiIndex)
-                    {
-                        case 0: // 📋 Detay
-                            OrderUpdateRequested?.Invoke(this, order.Id);
-                            break;
-                        case 1: // 🗑️ Sil
-                            var resultDelete = MessageBox.Show(
-                                $"Sipariş {order.TrexOrderNo} silinecek. Emin misiniz?",
-                                "Sipariş Sil",
-                                MessageBoxButtons.YesNo,
-                                MessageBoxIcon.Question);
-                            if (resultDelete == DialogResult.Yes)
-                            {
-                                OrderDeleteRequested?.Invoke(this, order.Id);
-                            }
-                            break;
-                        case 2: // 🏭 Üretime Gönder
-                            var resultProduction = MessageBox.Show(
-                                $"Sipariş {order.TrexOrderNo} üretime gönderilecek. Emin misiniz?",
-                                "Üretime Gönder",
-                                MessageBoxButtons.YesNo,
-                                MessageBoxIcon.Question);
-                            if (resultProduction == DialogResult.Yes)
-                            {
-                                OrderSendToProductionRequested?.Invoke(this, order.Id);
-                            }
-                            break;
-                        case 3: // 📄 İş Emri Al
-                            OrderGetWorkOrderRequested?.Invoke(this, order.Id);
-                            break;
-                    }
+                        // 📋 📄 🗑️ - Diğer durumlarda 3 buton (Üretime Gönder yok)
+                        switch (emojiIndex)
+                        {
+                            case 0: // 📋 Detay
+                                OrderUpdateRequested?.Invoke(this, order.Id);
+                                break;
+                            case 1: // 📄 İş Emri Al
+                                OrderGetWorkOrderRequested?.Invoke(this, order.Id);
+                                break;
+                            case 2: // 🗑️ Sil
+                                var resultDelete = MessageBox.Show(
+                                    $"Sipariş {order.TrexOrderNo} silinecek. Emin misiniz?",
+                                    "Sipariş Sil",
+                                    MessageBoxButtons.YesNo,
+                                    MessageBoxIcon.Question);
+                                if (resultDelete == DialogResult.Yes)
+                                {
+                                    OrderDeleteRequested?.Invoke(this, order.Id);
+                                }
+                                break;
+                        }
                     }
                 }
             }
@@ -598,7 +660,7 @@ namespace ERP.UI.Forms
         {
             // Header'a tıklanmışsa işlem yapma
             if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
-            
+
             if (_dataGridView.Tag is List<Order> orders && e.RowIndex < orders.Count)
             {
                 var order = orders[e.RowIndex];
@@ -720,37 +782,23 @@ namespace ERP.UI.Forms
             card.Controls.Add(lblStatus);
             yPos += 35;
 
-            // Butonlar - İlk satır
-            var btnDetail = ButtonFactory.CreateActionButton("📋 Detay", ThemeColors.Info, Color.White, 105, 30);
+            // Butonlar - Tek satır halinde (soldan sağa: Ayrıntılar, İş Emri, Üretim, Silme)
+            var btnDetail = ButtonFactory.CreateActionButton("📋", ThemeColors.Info, Color.White, 70, 30);
             btnDetail.Location = new Point(15, yPos);
             btnDetail.Click += (s, e) => OrderUpdateRequested?.Invoke(this, order.Id);
 
-            var btnDelete = ButtonFactory.CreateActionButton("🗑️ Sil", ThemeColors.Error, Color.White, 105, 30);
-            btnDelete.Location = new Point(125, yPos);
-            btnDelete.Click += (s, e) =>
-            {
-                var result = MessageBox.Show(
-                    $"Sipariş {order.TrexOrderNo} silinecek. Emin misiniz?",
-                    "Sipariş Sil",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Question);
+            var btnGetWorkOrder = ButtonFactory.CreateActionButton("📄", ThemeColors.Primary, Color.White, 70, 30);
+            btnGetWorkOrder.Location = new Point(90, yPos);
+            btnGetWorkOrder.Click += (s, e) => OrderGetWorkOrderRequested?.Invoke(this, order.Id);
 
-                if (result == DialogResult.Yes)
-                {
-                    OrderDeleteRequested?.Invoke(this, order.Id);
-                }
-            };
-
-            var btnSendToProduction = ButtonFactory.CreateActionButton("🏭 Üretime Gönder", ThemeColors.Warning, Color.White, 120, 30);
-            btnSendToProduction.Location = new Point(235, yPos);
-            
-            // Sevkiyata Hazır durumunda butonları disable et
-            bool isReadyForShipment = order.Status == "Sevkiyata Hazır";
-            if (isReadyForShipment)
+            // Sadece "Yeni" durumunda Üretime Gönder butonu göster
+            bool isNew = order.Status == "Yeni";
+            var btnSendToProduction = ButtonFactory.CreateActionButton("🏭", ThemeColors.Warning, Color.White, 70, 30);
+            btnSendToProduction.Location = new Point(165, yPos);
+            if (!isNew)
             {
-                btnSendToProduction.Enabled = false;
-                btnSendToProduction.BackColor = Color.Gray;
-                btnSendToProduction.Cursor = Cursors.No;
+                // "Yeni" değilse butonu gizle
+                btnSendToProduction.Visible = false;
             }
             else
             {
@@ -768,12 +816,23 @@ namespace ERP.UI.Forms
                     }
                 };
             }
-            yPos += 40;
 
-            // Butonlar - İkinci satır
-            var btnGetWorkOrder = ButtonFactory.CreateActionButton("📄 İş Emri Al", ThemeColors.Info, Color.White, 160, 30);
-            btnGetWorkOrder.Location = new Point(15, yPos);
-            btnGetWorkOrder.Click += (s, e) => OrderGetWorkOrderRequested?.Invoke(this, order.Id);
+            var btnDelete = ButtonFactory.CreateActionButton("🗑️", ThemeColors.Error, Color.White, 70, 30);
+            btnDelete.Location = new Point(240, yPos);
+            btnDelete.Click += (s, e) =>
+            {
+                var result = MessageBox.Show(
+                    $"Sipariş {order.TrexOrderNo} silinecek. Emin misiniz?",
+                    "Sipariş Sil",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question);
+
+                if (result == DialogResult.Yes)
+                {
+                    OrderDeleteRequested?.Invoke(this, order.Id);
+                }
+            };
+            yPos += 40;
 
             card.Controls.Add(lblOrderNo);
             card.Controls.Add(lblCustomerOrderNo);
@@ -793,21 +852,21 @@ namespace ERP.UI.Forms
         {
             if (!_isTableView)
             {
-                MessageBox.Show("Toplu iş emri almak için tablo görünümünde olmalısınız.", 
+                MessageBox.Show("Toplu iş emri almak için tablo görünümünde olmalısınız.",
                     "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
             // Seçili satırları al - Checkbox kolonundan oku
             var selectedOrderIds = new List<Guid>();
-            
+
             if (_dataGridView.Columns["IsSelected"] == null)
             {
-                MessageBox.Show("Checkbox kolonu bulunamadı. Lütfen sayfayı yenileyin.", 
+                MessageBox.Show("Checkbox kolonu bulunamadı. Lütfen sayfayı yenileyin.",
                     "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
-            
+
             foreach (DataGridViewRow row in _dataGridView.Rows)
             {
                 if (row.DataBoundItem is OrderRowData rowData && rowData.IsSelected)
@@ -818,7 +877,7 @@ namespace ERP.UI.Forms
 
             if (selectedOrderIds.Count == 0)
             {
-                MessageBox.Show("Lütfen en az bir sipariş seçin.", 
+                MessageBox.Show("Lütfen en az bir sipariş seçin.",
                     "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
@@ -848,7 +907,7 @@ namespace ERP.UI.Forms
         private void DataGridView_CurrentCellDirtyStateChanged(object sender, EventArgs e)
         {
             // Checkbox değiştiğinde commit et
-            if (_dataGridView.IsCurrentCellDirty && 
+            if (_dataGridView.IsCurrentCellDirty &&
                 _dataGridView.CurrentCell is DataGridViewCheckBoxCell)
             {
                 _dataGridView.CommitEdit(DataGridViewDataErrorContexts.Commit);
@@ -858,12 +917,321 @@ namespace ERP.UI.Forms
         private void DataGridView_CellValueChanged(object sender, DataGridViewCellEventArgs e)
         {
             // Checkbox kolonu değiştiğinde
-            if (e.RowIndex >= 0 && e.ColumnIndex >= 0 && 
+            if (e.RowIndex >= 0 && e.ColumnIndex >= 0 &&
                 _dataGridView.Columns[e.ColumnIndex].Name == "IsSelected")
             {
                 // Görsel güncelleme için refresh
                 _dataGridView.InvalidateRow(e.RowIndex);
             }
+        }
+
+        private void ApplyRowColorToRow(DataGridViewRow row)
+        {
+            if (row == null) return;
+
+            string status = "";
+
+            // Status'u al - önce DataBoundItem'dan
+            if (row.DataBoundItem != null)
+            {
+                var rowData = row.DataBoundItem;
+                var statusProperty = rowData.GetType().GetProperty("Status");
+                if (statusProperty != null)
+                {
+                    status = statusProperty.GetValue(rowData)?.ToString() ?? "";
+                }
+
+                // Tag'dan da deneyelim (Order listesi)
+                if (string.IsNullOrEmpty(status) && _dataGridView.Tag is List<Order> orders)
+                {
+                    var idProperty = rowData.GetType().GetProperty("Id");
+                    if (idProperty != null)
+                    {
+                        var orderId = (Guid)idProperty.GetValue(rowData);
+                        var order = orders.FirstOrDefault(o => o.Id == orderId);
+                        if (order != null)
+                        {
+                            status = order.Status ?? "";
+                        }
+                    }
+                }
+            }
+
+            Color rowColor = Color.White;
+
+            // Durum renklendirmesi (daha belirgin - Alpha değeri 120)
+            if (status == "Yeni")
+            {
+                rowColor = Color.FromArgb(120, 33, 150, 243); // Mavi, hafif saydam
+            }
+            else if (status == "Sevkiyata Hazır")
+            {
+                rowColor = Color.FromArgb(120, 255, 193, 7); // Sarı, hafif saydam
+            }
+            else if (status == "Sevk Edildi")
+            {
+                rowColor = Color.FromArgb(120, 76, 175, 80); // Yeşil, hafif saydam
+            }
+
+            // Satır seviyesinde arka plan rengi uygula
+            row.DefaultCellStyle.BackColor = rowColor;
+            row.DefaultCellStyle.ForeColor = ThemeColors.TextPrimary;
+
+            // Her hücreye ayrı ayrı uygula (Actions kolonu dahil - arka plan için)
+            foreach (DataGridViewCell cell in row.Cells)
+            {
+                if (cell.OwningColumn != null)
+                {
+                    if (cell.OwningColumn.Name != "Actions")
+                    {
+                        cell.Style.BackColor = rowColor;
+                        cell.Style.ForeColor = ThemeColors.TextPrimary;
+                        cell.Style.Padding = new Padding(0); // Padding'i kaldır
+                    }
+                    else
+                    {
+                        // Actions kolonu için de arka plan rengini ayarla (emoji'ler üzerine çizilecek)
+                        cell.Style.BackColor = rowColor;
+                    }
+                }
+            }
+
+            // Seçildiğinde de aynı rengi kullan - renk değişimi yok
+            row.DefaultCellStyle.SelectionBackColor = rowColor;
+            row.DefaultCellStyle.SelectionForeColor = ThemeColors.TextPrimary;
+
+            // Her hücreye de uygula
+            foreach (DataGridViewCell cell in row.Cells)
+            {
+                if (cell.OwningColumn != null && cell.OwningColumn.Name != "Actions")
+                {
+                    cell.Style.SelectionBackColor = rowColor;
+                    cell.Style.SelectionForeColor = ThemeColors.TextPrimary;
+                }
+            }
+        }
+
+        private void DataGridView_RowPrePaint(object sender, DataGridViewRowPrePaintEventArgs e)
+        {
+            // Satır renklendirmesi - sadece stilleri uygula, custom painting yapma
+            if (e.RowIndex >= 0 && e.RowIndex < _dataGridView.Rows.Count)
+            {
+                var row = _dataGridView.Rows[e.RowIndex];
+                ApplyRowColorToRow(row);
+            }
+        }
+
+        private void DataGridView_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
+        {
+            // Header satırlarını atla
+            if (e.RowIndex < 0) return;
+
+            if (e.ColumnIndex >= 0 && e.RowIndex < _dataGridView.Rows.Count)
+            {
+                var row = _dataGridView.Rows[e.RowIndex];
+                bool isActionsColumn = _dataGridView.Columns[e.ColumnIndex].Name == "Actions";
+
+                // Status'u al - önce DataBoundItem'dan, sonra Tag'dan
+                string status = "";
+                if (row.DataBoundItem != null)
+                {
+                    var rowData = row.DataBoundItem;
+                    var statusProperty = rowData.GetType().GetProperty("Status");
+                    if (statusProperty != null)
+                    {
+                        status = statusProperty.GetValue(rowData)?.ToString() ?? "";
+                    }
+                }
+                
+                // Tag'dan Order listesini al
+                List<Order> orders = null;
+                if (_dataGridView.Tag is List<Order> tagOrders)
+                {
+                    orders = tagOrders;
+                }
+                
+                // Tag'dan da deneyelim (Order listesi) - eğer status boşsa
+                if (string.IsNullOrEmpty(status) && orders != null && e.RowIndex < orders.Count)
+                {
+                    status = orders[e.RowIndex].Status ?? "";
+                }
+
+                // Satır rengini status'tan belirle
+                Color rowBgColor = Color.White;
+                if (status == "Yeni")
+                {
+                    rowBgColor = Color.FromArgb(120, 33, 150, 243);
+                }
+                else if (status == "Sevkiyata Hazır")
+                {
+                    rowBgColor = Color.FromArgb(120, 255, 193, 7);
+                }
+                else if (status == "Sevk Edildi")
+                {
+                    rowBgColor = Color.FromArgb(120, 76, 175, 80);
+                }
+
+                // Seçili durumda da aynı rengi kullan (renk değişimi yok)
+
+                // Actions kolonu için özel işlem
+                if (isActionsColumn && row.DataBoundItem != null)
+                {
+                    // Actions kolonu için satır arka planını çiz
+                    using (SolidBrush bgBrush = new SolidBrush(rowBgColor))
+                    {
+                        e.Graphics.FillRectangle(bgBrush, e.CellBounds);
+                    }
+
+                    // Border'ı çiz
+                    e.Paint(e.CellBounds, DataGridViewPaintParts.Border);
+
+                    if (orders != null && e.RowIndex < orders.Count)
+                    {
+                        var order = orders[e.RowIndex];
+                        bool isReadyForShipment = order.Status == "Sevkiyata Hazır";
+                        bool isNew = order.Status == "Yeni";
+
+                        string[] emojis;
+                        Color[] colors;
+
+                        if (isReadyForShipment)
+                        {
+                            emojis = new[] { "📋", "📄", "🗑️" };
+                            colors = new[] { ThemeColors.Info, ThemeColors.Primary, ThemeColors.Error };
+                        }
+                        else if (isNew)
+                        {
+                            emojis = new[] { "📋", "📄", "🏭", "🗑️" };
+                            colors = new[] { ThemeColors.Info, ThemeColors.Primary, ThemeColors.Warning, ThemeColors.Error };
+                        }
+                        else
+                        {
+                            // Üretimde, Sevk Edildi vs. durumlarında Üretime Gönder yok
+                            emojis = new[] { "📋", "📄", "🗑️" };
+                            colors = new[] { ThemeColors.Info, ThemeColors.Primary, ThemeColors.Error };
+                        }
+
+                        int emojiWidth = e.CellBounds.Width / emojis.Length;
+                        Font emojiFont = new Font("Segoe UI Emoji", 12F);
+                        int circleSize = 20;
+                        int emojiSize = 14;
+
+                        for (int i = 0; i < emojis.Length; i++)
+                        {
+                            // Her emoji için merkez noktası
+                            int xCenter = e.CellBounds.X + (i * emojiWidth) + (emojiWidth / 2);
+                            // Emoji'leri hücrenin ortasına dikey olarak hizala
+                            int yCenter = e.CellBounds.Y + (e.CellBounds.Height / 2);
+
+                            // Renkli arka plan çemberi (tam yuvarlak)
+                            int circleX = xCenter - (circleSize / 2);
+                            int circleY = yCenter - (circleSize / 2);
+
+                            // Renkli arka plan çemberi - daha belirgin renkler (Alpha değeri 70)
+                            using (SolidBrush bgBrush = new SolidBrush(Color.FromArgb(70, colors[i])))
+                            {
+                                e.Graphics.FillEllipse(bgBrush, circleX, circleY, circleSize, circleSize);
+                            }
+
+                            // Renkli kenarlık da ekle
+                            using (Pen borderPen = new Pen(colors[i], 1.5f))
+                            {
+                                e.Graphics.DrawEllipse(borderPen, circleX, circleY, circleSize, circleSize);
+                            }
+
+                            // Emoji'yi çemberin tam ortasına çiz
+                            RectangleF emojiRect = new RectangleF(
+                                xCenter - (emojiSize / 2f),
+                                yCenter - (emojiSize / 2f),
+                                emojiSize,
+                                emojiSize
+                            );
+
+                            // Emoji'yi çiz - düzgün hizalı ve ortalanmış
+                            using (StringFormat sf = new StringFormat())
+                            {
+                                sf.Alignment = StringAlignment.Center;
+                                sf.LineAlignment = StringAlignment.Center;
+                                sf.FormatFlags = StringFormatFlags.NoWrap;
+                                e.Graphics.DrawString(emojis[i], emojiFont, Brushes.Black, emojiRect, sf);
+                            }
+                        }
+
+                        emojiFont.Dispose();
+                        e.Handled = true;
+                        return;
+                    }
+                }
+                // Actions kolonu değilse - arka planı çiz
+                else if (!isActionsColumn)
+                {
+                    if (rowBgColor != Color.White)
+                    {
+                        // Arka planı çiz
+                        using (SolidBrush bgBrush = new SolidBrush(rowBgColor))
+                        {
+                            e.Graphics.FillRectangle(bgBrush, e.CellBounds);
+                        }
+                        // İçeriği ve border'ı çiz
+                        e.Paint(e.CellBounds, DataGridViewPaintParts.ContentForeground | DataGridViewPaintParts.Border);
+                        e.Handled = true;
+                    }
+                }
+            }
+        }
+    
+
+        private void DataGridView_CellMouseEnter(object sender, DataGridViewCellEventArgs e)
+        {
+            // Actions kolonundaki emoji'lerin üzerine gelindiğinde tooltip göster
+            if (e.ColumnIndex >= 0 && e.RowIndex >= 0 && 
+                _dataGridView.Columns[e.ColumnIndex].Name == "Actions" &&
+                _dataGridView.Rows[e.RowIndex].DataBoundItem != null)
+            {
+                if (_dataGridView.Tag is List<Order> orders && e.RowIndex < orders.Count)
+                {
+                    var order = orders[e.RowIndex];
+                    bool isReadyForShipment = order.Status == "Sevkiyata Hazır";
+                    bool isNew = order.Status == "Yeni";
+                    
+                    string[] tooltips;
+                    if (isNew)
+                    {
+                        // Sadece "Yeni" durumunda Üretime Gönder butonu var
+                        tooltips = new[] { "Ayrıntılar", "İş Emri Al", "Üretime Gönder", "Sil" };
+                    }
+                    else
+                    {
+                        // Diğer durumlarda Üretime Gönder butonu yok
+                        tooltips = new[] { "Ayrıntılar", "İş Emri Al", "Sil" };
+                    }
+                    
+                    // Mouse pozisyonunu kontrol et
+                    var cellRect = _dataGridView.GetCellDisplayRectangle(e.ColumnIndex, e.RowIndex, false);
+                    var mousePos = _dataGridView.PointToClient(Control.MousePosition);
+                    var clickX = mousePos.X - cellRect.X;
+                    var emojiWidth = cellRect.Width / tooltips.Length;
+                    
+                    if (emojiWidth > 0)
+                    {
+                        int emojiIndex = Math.Max(0, Math.Min(tooltips.Length - 1, (int)(clickX / emojiWidth)));
+                        
+                        if (emojiIndex >= 0 && emojiIndex < tooltips.Length)
+                        {
+                            _currentToolTipText = tooltips[emojiIndex];
+                            _actionToolTip.Show(tooltips[emojiIndex], _dataGridView, 
+                                mousePos.X + 10, mousePos.Y + 20, 3000);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void DataGridView_CellMouseLeave(object sender, DataGridViewCellEventArgs e)
+        {
+            // Tooltip'i gizle
+            _actionToolTip.Hide(_dataGridView);
+            _currentToolTipText = "";
         }
     }
 

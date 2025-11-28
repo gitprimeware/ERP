@@ -72,7 +72,7 @@ namespace ERP.UI.Forms
 
         private void InitializeCustomComponents()
         {
-            this.BackColor = ThemeColors.Background;
+            this.BackColor = Color.White;
             this.Dock = DockStyle.Fill;
             this.Padding = new Padding(20);
 
@@ -86,12 +86,10 @@ namespace ERP.UI.Forms
             mainPanel = new Panel
             {
                 Dock = DockStyle.Fill,
-                BackColor = ThemeColors.Surface,
+                BackColor = Color.White,
                 Padding = new Padding(30),
                 AutoScroll = true
             };
-
-            UIHelper.ApplyCardStyle(mainPanel, 12);
 
             // Başlık
             lblTitle = new Label
@@ -221,7 +219,7 @@ namespace ERP.UI.Forms
             var lbl1 = new Label
             {
                 Text = label1Text,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 10F),
                 ForeColor = ThemeColors.TextPrimary,
                 AutoSize = false,
                 Dock = DockStyle.Fill,
@@ -232,7 +230,7 @@ namespace ERP.UI.Forms
             var lbl2 = new Label
             {
                 Text = label2Text,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 10F),
                 ForeColor = ThemeColors.TextPrimary,
                 AutoSize = false,
                 Dock = DockStyle.Fill,
@@ -257,7 +255,8 @@ namespace ERP.UI.Forms
             {
                 Height = 30,
                 Font = new Font("Segoe UI", 10F),
-                DropDownStyle = ComboBoxStyle.DropDownList
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                BackColor = Color.White
             };
             LoadCompanies();
             return cmbCompany;
@@ -281,34 +280,40 @@ namespace ERP.UI.Forms
 
         private Control CreateProductCodeControl()
         {
-            var panel = new Panel();
+            var panel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(0),
+                Margin = new Padding(0)
+            };
+            
             txtProductCode = new TextBox
             {
-                Height = 30,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 10F),
                 BorderStyle = BorderStyle.FixedSingle,
                 ReadOnly = true,
                 BackColor = ThemeColors.SurfaceDark,
-                Dock = DockStyle.Left,
-                Width = 300
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 0, 75, 0)
             };
 
             btnProductCode = new Button
             {
                 Text = "Seç",
-                Width = 80,
-                Height = 30,
-                Font = new Font("Segoe UI", 9F),
+                Width = 70,
+                Font = new Font("Segoe UI", 10F),
                 BackColor = ThemeColors.Info,
                 ForeColor = Color.White,
                 Cursor = Cursors.Hand,
-                Dock = DockStyle.Left
+                Dock = DockStyle.Right,
+                Margin = new Padding(0)
             };
             UIHelper.ApplyRoundedButton(btnProductCode, 4);
             btnProductCode.Click += BtnProductCode_Click;
 
             panel.Controls.Add(txtProductCode);
             panel.Controls.Add(btnProductCode);
+            
             return panel;
         }
 
@@ -318,7 +323,8 @@ namespace ERP.UI.Forms
             {
                 Height = 30,
                 Font = new Font("Segoe UI", 10F),
-                DropDownStyle = ComboBoxStyle.DropDownList
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                BackColor = Color.White
             };
             cmbLamelThickness.Items.AddRange(new[] { "0.10", "0.12", "0.15", "0.165" });
             return cmbLamelThickness;
@@ -330,7 +336,8 @@ namespace ERP.UI.Forms
             {
                 Height = 30,
                 Font = new Font("Segoe UI", 10F),
-                DropDownStyle = ComboBoxStyle.DropDownList
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                BackColor = Color.White
             };
             cmbProductType.Items.AddRange(new[] { "Normal", "Epoksi Boyalı" });
             return cmbProductType;
@@ -355,6 +362,7 @@ namespace ERP.UI.Forms
             textBox.Height = 30;
             textBox.Font = new Font("Segoe UI", 10F);
             textBox.BorderStyle = BorderStyle.FixedSingle;
+            textBox.BackColor = Color.White;
             return textBox;
         }
 
@@ -373,6 +381,7 @@ namespace ERP.UI.Forms
             dateTimePicker.Height = 30;
             dateTimePicker.Font = new Font("Segoe UI", 10F);
             dateTimePicker.Format = DateTimePickerFormat.Short;
+            dateTimePicker.CalendarMonthBackground = Color.White;
             return dateTimePicker;
         }
 
@@ -1067,7 +1076,11 @@ namespace ERP.UI.Forms
             if (isReadyForShipment)
             {
                 // Tüm alanları readonly yap
-                if (cmbCompany != null) cmbCompany.Enabled = false;
+                if (cmbCompany != null)
+                {
+                    cmbCompany.Enabled = false;
+                    cmbCompany.BackColor = ThemeColors.SurfaceDark;
+                }
                 if (btnAddCompany != null) btnAddCompany.Enabled = false;
                 if (txtCustomerOrderNo != null) txtCustomerOrderNo.ReadOnly = true;
                 // txtTrexOrderNo readonly olmasın - düzeltilebilsin
@@ -1078,8 +1091,16 @@ namespace ERP.UI.Forms
                 if (txtProductCode != null) txtProductCode.ReadOnly = true;
                 if (txtBypassSize != null) txtBypassSize.ReadOnly = true;
                 if (txtBypassType != null) txtBypassType.ReadOnly = true;
-                if (cmbLamelThickness != null) cmbLamelThickness.Enabled = false;
-                if (cmbProductType != null) cmbProductType.Enabled = false;
+                if (cmbLamelThickness != null)
+                {
+                    cmbLamelThickness.Enabled = false;
+                    cmbLamelThickness.BackColor = ThemeColors.SurfaceDark;
+                }
+                if (cmbProductType != null)
+                {
+                    cmbProductType.Enabled = false;
+                    cmbProductType.BackColor = ThemeColors.SurfaceDark;
+                }
                 if (nudQuantity != null) nudQuantity.Enabled = false;
                 if (txtSalesPriceUSD != null) txtSalesPriceUSD.ReadOnly = true;
                 
@@ -1100,7 +1121,11 @@ namespace ERP.UI.Forms
             }
             
             // Normal readonly modu (Üretimde veya Muhasebede)
-            if (cmbCompany != null) cmbCompany.Enabled = !readOnly;
+            if (cmbCompany != null)
+            {
+                cmbCompany.Enabled = !readOnly;
+                cmbCompany.BackColor = readOnly ? ThemeColors.SurfaceDark : Color.White;
+            }
             if (btnAddCompany != null) btnAddCompany.Enabled = !readOnly;
             if (txtCustomerOrderNo != null) txtCustomerOrderNo.ReadOnly = readOnly;
             if (txtDeviceName != null) txtDeviceName.ReadOnly = readOnly;
@@ -1110,8 +1135,16 @@ namespace ERP.UI.Forms
             if (txtProductCode != null) txtProductCode.ReadOnly = readOnly;
             if (txtBypassSize != null) txtBypassSize.ReadOnly = readOnly;
             if (txtBypassType != null) txtBypassType.ReadOnly = readOnly;
-            if (cmbLamelThickness != null) cmbLamelThickness.Enabled = !readOnly;
-            if (cmbProductType != null) cmbProductType.Enabled = !readOnly;
+            if (cmbLamelThickness != null)
+            {
+                cmbLamelThickness.Enabled = !readOnly;
+                cmbLamelThickness.BackColor = readOnly ? ThemeColors.SurfaceDark : Color.White;
+            }
+            if (cmbProductType != null)
+            {
+                cmbProductType.Enabled = !readOnly;
+                cmbProductType.BackColor = readOnly ? ThemeColors.SurfaceDark : Color.White;
+            }
             if (nudQuantity != null) nudQuantity.Enabled = !readOnly;
             if (txtSalesPriceUSD != null) txtSalesPriceUSD.ReadOnly = readOnly;
             if (dtpShipmentDate != null) dtpShipmentDate.Enabled = !readOnly;

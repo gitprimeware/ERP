@@ -53,7 +53,7 @@ namespace ERP.UI.Forms
             {
                 Dock = DockStyle.Fill,
                 Padding = new Padding(20),
-                BackColor = ThemeColors.Surface
+                BackColor = Color.White
             };
 
             var tableLayout = new TableLayoutPanel
@@ -150,7 +150,8 @@ namespace ERP.UI.Forms
             {
                 Height = 30,
                 Font = new Font("Segoe UI", 10F),
-                DropDownStyle = ComboBoxStyle.DropDownList
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                BackColor = Color.White
             };
             cmbType.Items.AddRange(new[] { "CR", "CN" });
             cmbType.SelectedIndex = 0;
@@ -164,7 +165,8 @@ namespace ERP.UI.Forms
             {
                 Height = 30,
                 Font = new Font("Segoe UI", 10F),
-                DropDownStyle = ComboBoxStyle.DropDownList
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                BackColor = Color.White
             };
             cmbPlateRange.Items.AddRange(new[] { "3.1(H)", "4.3(D)", "6.3(M)", "8.7(L)" });
             cmbPlateRange.SelectedIndex = 0;
@@ -178,7 +180,8 @@ namespace ERP.UI.Forms
             {
                 Height = 30,
                 Font = new Font("Segoe UI", 10F),
-                DropDownStyle = ComboBoxStyle.DropDownList
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                BackColor = Color.White
             };
             cmbProfile.Items.AddRange(new[] { "Standart(S)", "Geniş(G)" });
             cmbProfile.SelectedIndex = 0;
@@ -192,7 +195,8 @@ namespace ERP.UI.Forms
             {
                 Height = 30,
                 Font = new Font("Segoe UI", 10F),
-                DropDownStyle = ComboBoxStyle.DropDownList
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                BackColor = Color.White
             };
             UpdateModelSizeOptions();
             cmbModelSize.SelectedIndexChanged += (s, e) => GenerateProductCode();
@@ -252,12 +256,12 @@ namespace ERP.UI.Forms
                 Font = new Font("Segoe UI", 10F),
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 DisplayMember = "DisplayText",
-                ValueMember = "Value"
+                ValueMember = "Value",
+                BackColor = Color.White
             };
-            // 3 seçenek: "030" (value: "30"), "002" (value: "2"), "016" (value: "16")
+            // 2 seçenek: "030" (value: "30"), "002" (value: "2")
             cmbCoverSize.Items.Add(new CoverSizeItem { DisplayText = "030", Value = "30" });
             cmbCoverSize.Items.Add(new CoverSizeItem { DisplayText = "002", Value = "2" });
-            cmbCoverSize.Items.Add(new CoverSizeItem { DisplayText = "016", Value = "16" });
             cmbCoverSize.SelectedIndex = 0;
             cmbCoverSize.SelectedIndexChanged += (s, e) => GenerateProductCode();
             return cmbCoverSize;
