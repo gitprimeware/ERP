@@ -298,10 +298,11 @@ namespace ERP.UI.Forms
                         if (order != null)
                         {
                             bool isInProduction = order.Status == "Üretimde";
+                            bool isStockOrder = order.IsStockOrder;
                             var btnCell = row.Cells["Actions"] as DataGridViewButtonCell;
                             if (btnCell != null)
                             {
-                                if (isInProduction)
+                                if (isInProduction && !isStockOrder)
                                 {
                                     btnCell.Value = "💰 📋"; // Muhasebeye Gönder, Detay
                                     btnCell.Style.ForeColor = ThemeColors.Success;
@@ -334,6 +335,7 @@ namespace ERP.UI.Forms
             {
                 var order = orders[e.RowIndex];
                 bool isInProduction = order.Status == "Üretimde";
+                bool isStockOrder = order.IsStockOrder;
 
                 // İşlemler kolonuna tıklandı
                 if (_dataGridView.Columns[e.ColumnIndex].Name == "Actions")
@@ -341,11 +343,12 @@ namespace ERP.UI.Forms
                     var cell = _dataGridView.Rows[e.RowIndex].Cells[e.ColumnIndex];
                     var cellRect = _dataGridView.GetCellDisplayRectangle(e.ColumnIndex, e.RowIndex, false);
                     var clickX = _dataGridView.PointToClient(Control.MousePosition).X - cellRect.X;
-                    var emojiWidth = cellRect.Width / (isInProduction ? 2 : 1); // Emoji sayısına göre böl
+                    var showAccountingButton = isInProduction && !isStockOrder;
+                    var emojiWidth = cellRect.Width / (showAccountingButton ? 2 : 1); // Emoji sayısına göre böl
 
                     int emojiIndex = (int)(clickX / emojiWidth);
 
-                    if (isInProduction)
+                    if (showAccountingButton)
                     {
                         // 💰 📋
                         switch (emojiIndex)
@@ -555,8 +558,8 @@ namespace ERP.UI.Forms
             };
             yPos += 35;
 
-            // Butonlar - Sadece üretimdeyse muhasebeye gönder
-            if (isInProduction)
+            // Butonlar - Sadece üretimdeyse ve stok siparişi değilse muhasebeye gönder
+            if (isInProduction && !order.IsStockOrder)
             {
                 // Muhasebeye Gönder butonu
                 var btnSendToAccounting = ButtonFactory.CreateActionButton("💰 Muhasebeye Gönder", ThemeColors.Success, Color.White, 180, 35);

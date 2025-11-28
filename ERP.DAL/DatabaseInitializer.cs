@@ -118,6 +118,7 @@ namespace ERP.DAL
                         [ShipmentDate] DATETIME NULL,
                         [CurrencyRate] DECIMAL(18,4) NULL,
                         [Status] NVARCHAR(50) NULL DEFAULT 'Yeni',
+                        [IsStockOrder] BIT NOT NULL DEFAULT 0,
                         [CreatedDate] DATETIME NOT NULL,
                         [ModifiedDate] DATETIME NULL,
                         [IsActive] BIT NOT NULL DEFAULT 1,
@@ -166,6 +167,37 @@ namespace ERP.DAL
                 {
                     // Migration hatası olursa devam et (tablo zaten doğru formatta olabilir)
                     System.Diagnostics.Debug.WriteLine($"Migration hatası: {ex.Message}");
+                }
+            }
+
+            // Mevcut tablolar için migration: IsStockOrder kolonunu ekle
+            var isStockOrderMigrationQuery = @"
+                IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Orders]') AND type in (N'U'))
+                BEGIN
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Orders]') AND name = 'IsStockOrder')
+                    BEGIN
+                        BEGIN TRY
+                            ALTER TABLE [dbo].[Orders]
+                            ADD [IsStockOrder] BIT NOT NULL DEFAULT 0
+                            PRINT 'IsStockOrder kolonu eklendi.'
+                        END TRY
+                        BEGIN CATCH
+                            PRINT 'IsStockOrder kolonu eklenirken hata oluştu: ' + ERROR_MESSAGE()
+                        END CATCH
+                    END
+                END";
+
+            using (var isStockOrderMigrationCommand = new SqlCommand(isStockOrderMigrationQuery, connection))
+            {
+                try
+                {
+                    isStockOrderMigrationCommand.ExecuteNonQuery();
+                    System.Diagnostics.Debug.WriteLine("Orders migration başarılı: IsStockOrder kolonu kontrol edildi.");
+                }
+                catch (Exception ex)
+                {
+                    // Migration hatası olursa devam et
+                    System.Diagnostics.Debug.WriteLine($"IsStockOrder migration hatası: {ex.Message}");
                 }
             }
         }
@@ -492,6 +524,18 @@ namespace ERP.DAL
                             ADD CONSTRAINT FK_Cuttings_Employees FOREIGN KEY ([EmployeeId]) REFERENCES [Employees]([Id])
                         END
                     END
+                    
+                    -- PlakaAdedi kolonu ekle
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Cuttings]') AND name = 'PlakaAdedi')
+                    BEGIN
+                        BEGIN TRY
+                            ALTER TABLE [dbo].[Cuttings] ADD [PlakaAdedi] INT NOT NULL DEFAULT 0
+                            PRINT 'Cuttings tablosuna PlakaAdedi kolonu eklendi.'
+                        END TRY
+                        BEGIN CATCH
+                            PRINT 'Cuttings tablosuna PlakaAdedi kolonu eklenirken hata oluştu: ' + ERROR_MESSAGE()
+                        END CATCH
+                    END
                 END";
 
             using (var migrationCommand = new SqlCommand(migrationQuery, connection))
@@ -499,10 +543,12 @@ namespace ERP.DAL
                 try
                 {
                     migrationCommand.ExecuteNonQuery();
+                    System.Diagnostics.Debug.WriteLine("Cuttings migration başarılı: PlakaAdedi kolonu kontrol edildi.");
                 }
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"Cuttings migration hatası: {ex.Message}");
+                    // Hata durumunda da devam et, çünkü kolon zaten var olabilir
                 }
             }
         }
@@ -519,6 +565,7 @@ namespace ERP.DAL
                         [Hatve] DECIMAL(10,2) NOT NULL,
                         [Size] DECIMAL(10,2) NOT NULL,
                         [SerialNoId] UNIQUEIDENTIFIER NULL,
+                        [CuttingId] UNIQUEIDENTIFIER NULL,
                         [PressNo] NVARCHAR(50) NULL,
                         [Pressure] DECIMAL(18,3) NOT NULL,
                         [PressCount] INT NOT NULL,
@@ -530,13 +577,56 @@ namespace ERP.DAL
                         [IsActive] BIT NOT NULL DEFAULT 1,
                         FOREIGN KEY ([OrderId]) REFERENCES [Orders]([Id]),
                         FOREIGN KEY ([SerialNoId]) REFERENCES [SerialNos]([Id]),
-                        FOREIGN KEY ([EmployeeId]) REFERENCES [Employees]([Id])
+                        FOREIGN KEY ([EmployeeId]) REFERENCES [Employees]([Id]),
+                        FOREIGN KEY ([CuttingId]) REFERENCES [Cuttings]([Id])
                     )
                 END";
 
             using (var command = new SqlCommand(query, connection))
             {
                 command.ExecuteNonQuery();
+            }
+
+            // Mevcut tablolar için migration: CuttingId kolonunu ekle
+            var pressingMigrationQuery = @"
+                IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Pressings]') AND type in (N'U'))
+                BEGIN
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Pressings]') AND name = 'CuttingId')
+                    BEGIN
+                        BEGIN TRY
+                            ALTER TABLE [dbo].[Pressings]
+                            ADD [CuttingId] UNIQUEIDENTIFIER NULL
+                            
+                            -- Foreign key ekle
+                            IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Cuttings]') AND type in (N'U'))
+                            BEGIN
+                                IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID(N'[dbo].[Pressings]') AND name = 'FK_Pressings_Cuttings')
+                                BEGIN
+                                    ALTER TABLE [dbo].[Pressings]
+                                    ADD CONSTRAINT FK_Pressings_Cuttings FOREIGN KEY ([CuttingId]) REFERENCES [Cuttings]([Id])
+                                END
+                            END
+                            
+                            PRINT 'Pressings tablosuna CuttingId kolonu eklendi.'
+                        END TRY
+                        BEGIN CATCH
+                            PRINT 'Pressings tablosuna CuttingId kolonu eklenirken hata oluştu: ' + ERROR_MESSAGE()
+                        END CATCH
+                    END
+                END";
+
+            using (var pressingMigrationCommand = new SqlCommand(pressingMigrationQuery, connection))
+            {
+                try
+                {
+                    pressingMigrationCommand.ExecuteNonQuery();
+                    System.Diagnostics.Debug.WriteLine("Pressings migration başarılı: CuttingId kolonu kontrol edildi.");
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Pressings migration hatası: {ex.Message}");
+                    // Hata durumunda da devam et, çünkü kolon zaten var olabilir
+                }
             }
         }
 

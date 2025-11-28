@@ -19,6 +19,7 @@ namespace ERP.Core.Models
         public decimal TotalKg { get; set; } // Toplam kg (otomatik)
         public decimal CutKg { get; set; } // Kesilen kg
         public int CuttingCount { get; set; } // Kesim adedi
+        public int PlakaAdedi { get; set; } // Oluşan plaka adedi (otomatik hesaplanır)
         public decimal WasteKg { get; set; } // Hurda kg
         public decimal RemainingKg { get; set; } // Kalan kg (otomatik hesaplanır)
         

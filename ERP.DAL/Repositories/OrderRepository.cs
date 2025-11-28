@@ -19,7 +19,7 @@ namespace ERP.DAL.Repositories
                 var query = @"SELECT o.Id, o.CompanyId, o.CustomerOrderNo, o.TrexOrderNo, o.DeviceName, 
                              o.OrderDate, o.TermDate, o.ProductCode, o.BypassSize, o.BypassType, 
                              o.LamelThickness, o.ProductType, o.Quantity, o.SalesPrice, o.TotalPrice, 
-                             o.ShipmentDate, o.CurrencyRate, o.Status, o.CreatedDate, o.ModifiedDate, o.IsActive,
+                             o.ShipmentDate, o.CurrencyRate, o.Status, o.IsStockOrder, o.CreatedDate, o.ModifiedDate, o.IsActive,
                              c.Name as CompanyName
                              FROM Orders o
                              LEFT JOIN Companies c ON o.CompanyId = c.Id
@@ -69,7 +69,7 @@ namespace ERP.DAL.Repositories
                 var query = @"SELECT o.Id, o.CompanyId, o.CustomerOrderNo, o.TrexOrderNo, o.DeviceName, 
                              o.OrderDate, o.TermDate, o.ProductCode, o.BypassSize, o.BypassType, 
                              o.LamelThickness, o.ProductType, o.Quantity, o.SalesPrice, o.TotalPrice, 
-                             o.ShipmentDate, o.CurrencyRate, o.Status, o.CreatedDate, o.ModifiedDate, o.IsActive,
+                             o.ShipmentDate, o.CurrencyRate, o.Status, o.IsStockOrder, o.CreatedDate, o.ModifiedDate, o.IsActive,
                              c.Name as CompanyName
                              FROM Orders o
                              LEFT JOIN Companies c ON o.CompanyId = c.Id
@@ -104,11 +104,11 @@ namespace ERP.DAL.Repositories
                 var query = @"INSERT INTO Orders (Id, CompanyId, CustomerOrderNo, TrexOrderNo, DeviceName, 
                              OrderDate, TermDate, ProductCode, BypassSize, BypassType, LamelThickness, 
                              ProductType, Quantity, SalesPrice, TotalPrice, ShipmentDate, CurrencyRate, 
-                             Status, CreatedDate, IsActive) 
+                             Status, IsStockOrder, CreatedDate, IsActive) 
                              VALUES (@Id, @CompanyId, @CustomerOrderNo, @TrexOrderNo, @DeviceName, 
                              @OrderDate, @TermDate, @ProductCode, @BypassSize, @BypassType, @LamelThickness, 
                              @ProductType, @Quantity, @SalesPrice, @TotalPrice, @ShipmentDate, @CurrencyRate, 
-                             @Status, @CreatedDate, @IsActive)";
+                             @Status, @IsStockOrder, @CreatedDate, @IsActive)";
                 
                 using (var command = new SqlCommand(query, connection))
                 {
@@ -133,7 +133,7 @@ namespace ERP.DAL.Repositories
                              BypassType = @BypassType, LamelThickness = @LamelThickness, ProductType = @ProductType, 
                              Quantity = @Quantity, SalesPrice = @SalesPrice, TotalPrice = @TotalPrice, 
                              ShipmentDate = @ShipmentDate, CurrencyRate = @CurrencyRate, Status = @Status, 
-                             ModifiedDate = @ModifiedDate 
+                             IsStockOrder = @IsStockOrder, ModifiedDate = @ModifiedDate 
                              WHERE Id = @Id";
                 
                 using (var command = new SqlCommand(query, connection))
@@ -238,6 +238,7 @@ namespace ERP.DAL.Repositories
             
             command.Parameters.AddWithValue("@CurrencyRate", (object)order.CurrencyRate ?? DBNull.Value);
             command.Parameters.AddWithValue("@Status", (object)order.Status ?? DBNull.Value);
+            command.Parameters.AddWithValue("@IsStockOrder", order.IsStockOrder);
             
             // CreatedDate kontrolü
             if (order.CreatedDate < sqlMinDate || order.CreatedDate > sqlMaxDate)
@@ -274,6 +275,7 @@ namespace ERP.DAL.Repositories
                 ShipmentDate = reader.IsDBNull("ShipmentDate") ? null : (DateTime?)reader.GetDateTime("ShipmentDate"),
                 CurrencyRate = reader.IsDBNull("CurrencyRate") ? null : (decimal?)reader.GetDecimal("CurrencyRate"),
                 Status = reader.IsDBNull("Status") ? "Yeni" : reader.GetString("Status"),
+                IsStockOrder = !reader.IsDBNull("IsStockOrder") && reader.GetBoolean("IsStockOrder"),
                 CreatedDate = reader.GetDateTime("CreatedDate"),
                 ModifiedDate = reader.IsDBNull("ModifiedDate") ? null : (DateTime?)reader.GetDateTime("ModifiedDate"),
                 IsActive = reader.GetBoolean("IsActive"),

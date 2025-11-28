@@ -16,7 +16,13 @@ namespace ERP.DAL.Repositories
             using (var connection = DatabaseHelper.GetConnection())
             {
                 connection.Open();
-                var query = @"SELECT p.Id, p.OrderId, p.PlateThickness, p.Hatve, p.Size, p.SerialNoId,
+                
+                // CuttingId kolonunun varlığını kontrol et
+                bool hasCuttingIdColumn = ColumnExists(connection, "Pressings", "CuttingId");
+                
+                string cuttingIdColumn = hasCuttingIdColumn ? "p.CuttingId," : "";
+                
+                var query = $@"SELECT p.Id, p.OrderId, p.PlateThickness, p.Hatve, p.Size, p.SerialNoId, {cuttingIdColumn}
                              p.PressNo, p.Pressure, p.PressCount, p.WasteAmount, p.EmployeeId, p.PressingDate,
                              p.CreatedDate, p.ModifiedDate, p.IsActive,
                              sn.SerialNumber as SerialNumber,
@@ -33,13 +39,32 @@ namespace ERP.DAL.Repositories
                     {
                         while (reader.Read())
                         {
-                            pressings.Add(MapToPressing(reader));
+                            pressings.Add(MapToPressing(reader, hasCuttingIdColumn));
                         }
                     }
                 }
             }
             
             return pressings;
+        }
+        
+        private bool ColumnExists(SqlConnection connection, string tableName, string columnName)
+        {
+            try
+            {
+                var query = @"SELECT COUNT(*) FROM sys.columns 
+                             WHERE object_id = OBJECT_ID(@TableName) AND name = @ColumnName";
+                using (var command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@TableName", $"[dbo].[{tableName}]");
+                    command.Parameters.AddWithValue("@ColumnName", columnName);
+                    return (int)command.ExecuteScalar() > 0;
+                }
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public List<Pressing> GetByOrderId(Guid orderId)
@@ -49,7 +74,13 @@ namespace ERP.DAL.Repositories
             using (var connection = DatabaseHelper.GetConnection())
             {
                 connection.Open();
-                var query = @"SELECT p.Id, p.OrderId, p.PlateThickness, p.Hatve, p.Size, p.SerialNoId,
+                
+                // CuttingId kolonunun varlığını kontrol et
+                bool hasCuttingIdColumn = ColumnExists(connection, "Pressings", "CuttingId");
+                
+                string cuttingIdColumn = hasCuttingIdColumn ? "p.CuttingId," : "";
+                
+                var query = $@"SELECT p.Id, p.OrderId, p.PlateThickness, p.Hatve, p.Size, p.SerialNoId, {cuttingIdColumn}
                              p.PressNo, p.Pressure, p.PressCount, p.WasteAmount, p.EmployeeId, p.PressingDate,
                              p.CreatedDate, p.ModifiedDate, p.IsActive,
                              sn.SerialNumber as SerialNumber,
@@ -68,7 +99,7 @@ namespace ERP.DAL.Repositories
                     {
                         while (reader.Read())
                         {
-                            pressings.Add(MapToPressing(reader));
+                            pressings.Add(MapToPressing(reader, hasCuttingIdColumn));
                         }
                     }
                 }
@@ -86,14 +117,21 @@ namespace ERP.DAL.Repositories
             using (var connection = DatabaseHelper.GetConnection())
             {
                 connection.Open();
-                var query = @"INSERT INTO Pressings (Id, OrderId, PlateThickness, Hatve, Size, SerialNoId,
+                
+                // CuttingId kolonunun varlığını kontrol et
+                bool hasCuttingIdColumn = ColumnExists(connection, "Pressings", "CuttingId");
+                
+                string cuttingIdInsert = hasCuttingIdColumn ? "CuttingId," : "";
+                string cuttingIdValue = hasCuttingIdColumn ? "@CuttingId," : "";
+                
+                var query = $@"INSERT INTO Pressings (Id, OrderId, PlateThickness, Hatve, Size, SerialNoId, {cuttingIdInsert}
                              PressNo, Pressure, PressCount, WasteAmount, EmployeeId, PressingDate, CreatedDate, IsActive) 
-                             VALUES (@Id, @OrderId, @PlateThickness, @Hatve, @Size, @SerialNoId,
+                             VALUES (@Id, @OrderId, @PlateThickness, @Hatve, @Size, @SerialNoId, {cuttingIdValue}
                              @PressNo, @Pressure, @PressCount, @WasteAmount, @EmployeeId, @PressingDate, @CreatedDate, @IsActive)";
                 
                 using (var command = new SqlCommand(query, connection))
                 {
-                    AddPressingParameters(command, pressing);
+                    AddPressingParameters(command, pressing, hasCuttingIdColumn);
                     command.ExecuteNonQuery();
                 }
             }
@@ -108,12 +146,19 @@ namespace ERP.DAL.Repositories
             using (var connection = DatabaseHelper.GetConnection())
             {
                 connection.Open();
-                var query = @"UPDATE Pressings SET 
+                
+                // CuttingId kolonunun varlığını kontrol et
+                bool hasCuttingIdColumn = ColumnExists(connection, "Pressings", "CuttingId");
+                
+                string cuttingIdUpdate = hasCuttingIdColumn ? "CuttingId = @CuttingId," : "";
+                
+                var query = $@"UPDATE Pressings SET 
                              OrderId = @OrderId,
                              PlateThickness = @PlateThickness,
                              Hatve = @Hatve,
                              Size = @Size,
                              SerialNoId = @SerialNoId,
+                             {cuttingIdUpdate}
                              PressNo = @PressNo,
                              Pressure = @Pressure,
                              PressCount = @PressCount,
@@ -125,7 +170,7 @@ namespace ERP.DAL.Repositories
                 
                 using (var command = new SqlCommand(query, connection))
                 {
-                    AddPressingParameters(command, pressing);
+                    AddPressingParameters(command, pressing, hasCuttingIdColumn);
                     command.Parameters.AddWithValue("@ModifiedDate", pressing.ModifiedDate);
                     command.ExecuteNonQuery();
                 }
@@ -148,7 +193,7 @@ namespace ERP.DAL.Repositories
             }
         }
 
-        private Pressing MapToPressing(SqlDataReader reader)
+        private Pressing MapToPressing(SqlDataReader reader, bool hasCuttingIdColumn = true)
         {
             var pressing = new Pressing
             {
@@ -184,6 +229,12 @@ namespace ERP.DAL.Repositories
                 }
             }
 
+            // CuttingId kolonu varsa oku
+            if (hasCuttingIdColumn && !reader.IsDBNull("CuttingId"))
+            {
+                pressing.CuttingId = reader.GetGuid("CuttingId");
+            }
+
             if (!reader.IsDBNull("EmployeeId"))
             {
                 pressing.EmployeeId = reader.GetGuid("EmployeeId");
@@ -201,7 +252,7 @@ namespace ERP.DAL.Repositories
             return pressing;
         }
 
-        private void AddPressingParameters(SqlCommand command, Pressing pressing)
+        private void AddPressingParameters(SqlCommand command, Pressing pressing, bool includeCuttingId = true)
         {
             command.Parameters.AddWithValue("@Id", pressing.Id);
             command.Parameters.AddWithValue("@OrderId", pressing.OrderId.HasValue ? (object)pressing.OrderId.Value : DBNull.Value);
@@ -209,6 +260,12 @@ namespace ERP.DAL.Repositories
             command.Parameters.AddWithValue("@Hatve", pressing.Hatve);
             command.Parameters.AddWithValue("@Size", pressing.Size);
             command.Parameters.AddWithValue("@SerialNoId", pressing.SerialNoId.HasValue ? (object)pressing.SerialNoId.Value : DBNull.Value);
+            
+            if (includeCuttingId)
+            {
+                command.Parameters.AddWithValue("@CuttingId", pressing.CuttingId.HasValue ? (object)pressing.CuttingId.Value : DBNull.Value);
+            }
+            
             command.Parameters.AddWithValue("@PressNo", (object)pressing.PressNo ?? DBNull.Value);
             command.Parameters.AddWithValue("@Pressure", pressing.Pressure);
             command.Parameters.AddWithValue("@PressCount", pressing.PressCount);

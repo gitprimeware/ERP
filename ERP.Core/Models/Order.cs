@@ -32,6 +32,8 @@ namespace ERP.Core.Models
         
         public string Status { get; set; } = "Yeni"; // Sipariş durumu (Yeni, Onaylandı, Üretimde, Tamamlandı, İptal)
         
+        public bool IsStockOrder { get; set; } = false; // Stok siparişi mi? (Stok siparişleri sadece kesim ve press işlemlerine kadar ilerler)
+        
         public List<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
     }
 }

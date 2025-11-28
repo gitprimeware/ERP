@@ -15,6 +15,7 @@ namespace ERP.UI.Forms
         private TextBox _txtHatve;
         private TextBox _txtSize;
         private ComboBox _cmbSerialNo;
+        private ComboBox _cmbCutting;
         private TextBox _txtPressNo;
         private TextBox _txtPressure;
         private TextBox _txtPressCount;
@@ -28,6 +29,7 @@ namespace ERP.UI.Forms
         private EmployeeRepository _employeeRepository;
         private PressingRepository _pressingRepository;
         private OrderRepository _orderRepository;
+        private CuttingRepository _cuttingRepository;
         private Guid _orderId;
 
         public PressingDialog(SerialNoRepository serialNoRepository, EmployeeRepository employeeRepository, Guid orderId)
@@ -36,6 +38,7 @@ namespace ERP.UI.Forms
             _employeeRepository = employeeRepository;
             _pressingRepository = new PressingRepository();
             _orderRepository = new OrderRepository();
+            _cuttingRepository = new CuttingRepository();
             _orderId = orderId;
             InitializeComponent();
         }
@@ -44,7 +47,7 @@ namespace ERP.UI.Forms
         {
             this.Text = "Pres Yap";
             this.Width = 500;
-            this.Height = 550;
+            this.Height = 600;
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -119,7 +122,28 @@ namespace ERP.UI.Forms
             this.Controls.Add(_txtSize);
             yPos += spacing;
 
-            // Rulo Seri No
+            // Kesilmiş Plaka Seçimi
+            var lblCutting = new Label
+            {
+                Text = "Kesilmiş Plaka:",
+                Location = new Point(20, yPos),
+                Width = labelWidth,
+                Font = new Font("Segoe UI", 10F)
+            };
+            _cmbCutting = new ComboBox
+            {
+                Location = new Point(180, yPos - 3),
+                Width = controlWidth,
+                Height = 30,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 10F)
+            };
+            _cmbCutting.SelectedIndexChanged += CmbCutting_SelectedIndexChanged;
+            this.Controls.Add(lblCutting);
+            this.Controls.Add(_cmbCutting);
+            yPos += spacing;
+
+            // Rulo Seri No (Readonly - kesilmiş plakadan otomatik doldurulur)
             var lblSerialNo = new Label
             {
                 Text = "Rulo Seri No:",
@@ -133,7 +157,8 @@ namespace ERP.UI.Forms
                 Width = controlWidth,
                 Height = 30,
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 10F)
+                Font = new Font("Segoe UI", 10F),
+                Enabled = false
             };
             this.Controls.Add(lblSerialNo);
             this.Controls.Add(_cmbSerialNo);
@@ -295,7 +320,32 @@ namespace ERP.UI.Forms
         {
             try
             {
-                // Seri No'ları yükle
+                // Kesilmiş plakaları yükle (bu sipariş için)
+                _cmbCutting.Items.Clear();
+                var cuttings = _cuttingRepository.GetByOrderId(_orderId);
+                foreach (var cutting in cuttings.Where(c => c.PlakaAdedi > 0))
+                {
+                    // Daha önce preslenmiş plaka adedini hesapla
+                    var usedPlakaAdedi = _pressingRepository.GetAll()
+                        .Where(p => p.CuttingId == cutting.Id && p.IsActive)
+                        .Sum(p => p.PressCount);
+                    
+                    var availablePlakaAdedi = cutting.PlakaAdedi - usedPlakaAdedi;
+                    
+                    if (availablePlakaAdedi > 0)
+                    {
+                        _cmbCutting.Items.Add(new 
+                        { 
+                            Id = cutting.Id, 
+                            DisplayText = $"Kesim #{cutting.CuttingDate:dd.MM.yyyy} - {cutting.PlakaAdedi} plaka (Kalan: {availablePlakaAdedi})",
+                            Cutting = cutting
+                        });
+                    }
+                }
+                _cmbCutting.DisplayMember = "DisplayText";
+                _cmbCutting.ValueMember = "Id";
+
+                // Seri No'ları yükle (readonly için)
                 _cmbSerialNo.Items.Clear();
                 var serialNos = _serialNoRepository.GetAll();
                 foreach (var serialNo in serialNos)
@@ -308,7 +358,7 @@ namespace ERP.UI.Forms
                 // Operatörleri yükle
                 LoadEmployees();
 
-                // Siparişten hatve bilgisini al
+                // Siparişten hatve bilgisini al (varsayılan)
                 var order = _orderRepository.GetById(_orderId);
                 if (order != null && !string.IsNullOrEmpty(order.ProductCode))
                 {
@@ -328,6 +378,47 @@ namespace ERP.UI.Forms
             catch (Exception ex)
             {
                 MessageBox.Show("Veriler yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void CmbCutting_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (_cmbCutting.SelectedItem == null)
+                return;
+
+            try
+            {
+                var idProperty = _cmbCutting.SelectedItem.GetType().GetProperty("Id");
+                if (idProperty == null)
+                    return;
+
+                var cuttingId = (Guid)idProperty.GetValue(_cmbCutting.SelectedItem);
+                var cutting = _cuttingRepository.GetAll().FirstOrDefault(c => c.Id == cuttingId);
+
+                if (cutting != null)
+                {
+                    // Kesim bilgilerini otomatik doldur
+                    _txtHatve.Text = cutting.Hatve.ToString("F2", CultureInfo.InvariantCulture);
+                    _txtSize.Text = cutting.Size.ToString("F2", CultureInfo.InvariantCulture);
+
+                    // Rulo Seri No'yu doldur
+                    if (cutting.SerialNoId.HasValue)
+                    {
+                        foreach (var item in _cmbSerialNo.Items)
+                        {
+                            var itemIdProperty = item.GetType().GetProperty("Id");
+                            if (itemIdProperty != null && itemIdProperty.GetValue(item).Equals(cutting.SerialNoId.Value))
+                            {
+                                _cmbSerialNo.SelectedItem = item;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Kesim bilgileri yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -463,6 +554,8 @@ namespace ERP.UI.Forms
 
             try
             {
+                var cuttingId = _cmbCutting.SelectedItem != null ? GetSelectedId(_cmbCutting) : (Guid?)null;
+
                 var pressing = new Pressing
                 {
                     OrderId = _orderId,
@@ -470,6 +563,7 @@ namespace ERP.UI.Forms
                     Hatve = decimal.Parse(_txtHatve.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
                     Size = decimal.Parse(_txtSize.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
                     SerialNoId = _cmbSerialNo.SelectedItem != null ? GetSelectedId(_cmbSerialNo) : (Guid?)null,
+                    CuttingId = cuttingId,
                     PressNo = _txtPressNo.Text,
                     Pressure = decimal.Parse(_txtPressure.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
                     PressCount = int.Parse(_txtPressCount.Text),
@@ -508,9 +602,9 @@ namespace ERP.UI.Forms
                 return false;
             }
 
-            if (_cmbSerialNo.SelectedItem == null)
+            if (_cmbCutting.SelectedItem == null)
             {
-                MessageBox.Show("Lütfen rulo seri no seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Lütfen kesilmiş plaka seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
 
@@ -530,6 +624,24 @@ namespace ERP.UI.Forms
             {
                 MessageBox.Show("Lütfen geçerli bir pres adedi giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
+            }
+
+            // Pres adedi kontrolü - kesilmiş plakadan fazla olamaz
+            var cuttingId = GetSelectedId(_cmbCutting);
+            var cutting = _cuttingRepository.GetAll().FirstOrDefault(c => c.Id == cuttingId);
+            if (cutting != null)
+            {
+                var usedPlakaAdedi = _pressingRepository.GetAll()
+                    .Where(p => p.CuttingId == cuttingId && p.IsActive)
+                    .Sum(p => p.PressCount);
+                
+                var availablePlakaAdedi = cutting.PlakaAdedi - usedPlakaAdedi;
+                
+                if (pressCount > availablePlakaAdedi)
+                {
+                    MessageBox.Show($"Pres adedi kalan plaka adedinden ({availablePlakaAdedi}) fazla olamaz!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return false;
+                }
             }
 
             if (!decimal.TryParse(_txtWasteAmount.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal wasteAmount))

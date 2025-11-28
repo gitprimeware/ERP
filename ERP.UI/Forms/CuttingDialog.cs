@@ -19,6 +19,7 @@ namespace ERP.UI.Forms
         private TextBox _txtTotalKg;
         private TextBox _txtCutKg;
         private TextBox _txtCuttingCount;
+        private TextBox _txtPlakaAdedi;
         private TextBox _txtWasteKg;
         private TextBox _txtRemainingKg;
         private ComboBox _cmbEmployee;
@@ -50,7 +51,7 @@ namespace ERP.UI.Forms
         {
             this.Text = "Kesim Yap";
             this.Width = 500;
-            this.Height = 600;
+            this.Height = 650;
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -228,8 +229,30 @@ namespace ERP.UI.Forms
                 Height = 30,
                 Font = new Font("Segoe UI", 10F)
             };
+            _txtCuttingCount.TextChanged += (s, e) => CalculatePlakaAdedi();
             this.Controls.Add(lblCuttingCount);
             this.Controls.Add(_txtCuttingCount);
+            yPos += spacing;
+
+            // Plaka Adedi (Readonly - otomatik hesaplanır)
+            var lblPlakaAdedi = new Label
+            {
+                Text = "Oluşan Plaka Adedi:",
+                Location = new Point(20, yPos),
+                Width = labelWidth,
+                Font = new Font("Segoe UI", 10F)
+            };
+            _txtPlakaAdedi = new TextBox
+            {
+                Location = new Point(180, yPos - 3),
+                Width = controlWidth,
+                Height = 30,
+                ReadOnly = true,
+                BackColor = ThemeColors.SurfaceDark,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold)
+            };
+            this.Controls.Add(lblPlakaAdedi);
+            this.Controls.Add(_txtPlakaAdedi);
             yPos += spacing;
 
             // Hurda Kg
@@ -399,6 +422,9 @@ namespace ERP.UI.Forms
                         }
                     }
                 }
+
+                // İlk plaka adedi hesaplaması
+                CalculatePlakaAdedi();
             }
             catch (Exception ex)
             {
@@ -460,6 +486,96 @@ namespace ERP.UI.Forms
             {
                 MessageBox.Show("Toplam kg hesaplanırken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 _txtTotalKg.Text = "0";
+            }
+        }
+
+        private void CalculatePlakaAdedi()
+        {
+            try
+            {
+                var order = _orderRepository.GetById(_orderId);
+                if (order == null || string.IsNullOrEmpty(order.ProductCode))
+                {
+                    _txtPlakaAdedi.Text = "0";
+                    return;
+                }
+
+                // Kesim adedi kontrolü
+                if (!int.TryParse(_txtCuttingCount.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out int cuttingCount) || cuttingCount <= 0)
+                {
+                    _txtPlakaAdedi.Text = "0";
+                    return;
+                }
+
+                // Ürün kodundan bilgileri çıkar
+                var parts = order.ProductCode.Split('-');
+                if (parts.Length < 6)
+                {
+                    _txtPlakaAdedi.Text = "0";
+                    return;
+                }
+
+                // Model harfi (H, D, M, L)
+                char modelLetter = 'H';
+                if (parts.Length >= 3)
+                {
+                    string modelProfile = parts[2];
+                    if (modelProfile.Length > 0)
+                    {
+                        modelLetter = modelProfile[0];
+                    }
+                }
+
+                // 10cm Plaka Adedi: H=32, D=24, M=17, L=12
+                int plakaAdedi10cm = GetPlakaAdedi10cm(modelLetter);
+
+                // Yükseklik (mm)
+                int yukseklikMM = 0;
+                if (parts.Length >= 5 && int.TryParse(parts[4], out int yukseklik))
+                {
+                    yukseklikMM = yukseklik;
+                }
+
+                // Kapak değeri (mm)
+                int kapakDegeriMM = 0;
+                if (parts.Length > 5)
+                {
+                    string kapakDegeriStr = parts[5];
+                    if (kapakDegeriStr == "030")
+                        kapakDegeriMM = 30;
+                    else if (kapakDegeriStr == "002")
+                        kapakDegeriMM = 2;
+                    else if (kapakDegeriStr == "016")
+                        kapakDegeriMM = 16;
+                    else if (int.TryParse(kapakDegeriStr, out int parsedKapak))
+                        kapakDegeriMM = parsedKapak;
+                }
+
+                // Kapaksız yükseklik
+                int kapaksizYukseklikMM = yukseklikMM - kapakDegeriMM;
+
+                // Plaka Adedi: (Kapaksız Yükseklik (mm) / 100) * Sipariş Adedi * 10cm Plaka Adedi * Kesim Adedi
+                decimal onCmDilimi = kapaksizYukseklikMM / 100m;
+                decimal hesaplananPlakaAdedi = onCmDilimi * order.Quantity * plakaAdedi10cm * cuttingCount;
+                
+                _txtPlakaAdedi.Text = Math.Round(hesaplananPlakaAdedi, 0, MidpointRounding.AwayFromZero).ToString(CultureInfo.InvariantCulture);
+            }
+            catch (Exception ex)
+            {
+                _txtPlakaAdedi.Text = "0";
+                System.Diagnostics.Debug.WriteLine($"Plaka adedi hesaplanırken hata: {ex.Message}");
+            }
+        }
+
+        private int GetPlakaAdedi10cm(char modelLetter)
+        {
+            switch (char.ToUpper(modelLetter))
+            {
+                case 'H': return 32;
+                case 'D': return 24;
+                case 'M': return 17;
+                case 'L': return 12;
+                default: return 0;
             }
         }
 
@@ -776,6 +892,7 @@ namespace ERP.UI.Forms
                     TotalKg = decimal.Parse(_txtTotalKg.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
                     CutKg = decimal.Parse(_txtCutKg.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
                     CuttingCount = int.Parse(_txtCuttingCount.Text),
+                    PlakaAdedi = int.TryParse(_txtPlakaAdedi.Text, out int plakaAdedi) ? plakaAdedi : 0,
                     WasteKg = decimal.Parse(_txtWasteKg.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
                     RemainingKg = decimal.Parse(_txtRemainingKg.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
                     EmployeeId = _cmbEmployee.SelectedItem != null ? GetSelectedId(_cmbEmployee) : (Guid?)null,

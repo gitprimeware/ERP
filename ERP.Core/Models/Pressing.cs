@@ -11,8 +11,11 @@ namespace ERP.Core.Models
         public decimal Hatve { get; set; } // Hatve
         public decimal Size { get; set; } // Ölçü
         
-        public Guid? SerialNoId { get; set; } // Rulo Seri No
+        public Guid? SerialNoId { get; set; } // Rulo Seri No (eski - geriye dönük uyumluluk için)
         public SerialNo? SerialNo { get; set; }
+        
+        public Guid? CuttingId { get; set; } // Hangi kesim işleminden geldiği
+        public Cutting? Cutting { get; set; }
         
         public string PressNo { get; set; } // Pres No
         public decimal Pressure { get; set; } // Basınç

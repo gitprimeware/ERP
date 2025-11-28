@@ -31,6 +31,7 @@ namespace ERP.UI.Forms
         private TextBox txtCurrencyRate;
         private TextBox txtTotalPriceTL;
         private DateTimePicker dtpShipmentDate;
+        private CheckBox chkIsStockOrder;
         private Button btnSave;
         private Button btnCancel;
         private Button btnDelete;
@@ -161,9 +162,20 @@ namespace ERP.UI.Forms
             AddTableRow("Cihaz Adı:", CreateTextBox(txtDeviceName = new TextBox()),
                        "Sipariş Tarihi:", CreateDateTimePicker(dtpOrderDate = new DateTimePicker()), row++);
 
-            // Termin tarihi
+            // Termin tarihi ve Stok Siparişi
+            var stockOrderPanel = new Panel { Dock = DockStyle.Fill, Margin = new Padding(5, 10, 5, 10) };
+            chkIsStockOrder = new CheckBox
+            {
+                Text = "Stok Siparişi (Sadece kesim ve press işlemlerine kadar ilerler)",
+                Font = new Font("Segoe UI", 9F),
+                ForeColor = ThemeColors.TextPrimary,
+                AutoSize = true,
+                Dock = DockStyle.Left,
+                Padding = new Padding(5, 0, 0, 0)
+            };
+            stockOrderPanel.Controls.Add(chkIsStockOrder);
             AddTableRow("Termin Tarihi:", CreateDateTimePicker(dtpTermDate = new DateTimePicker()),
-                       "", new Panel(), row++);
+                       "Stok Siparişi:", stockOrderPanel, row++);
 
             // Ürün kodu ve Bypass ölçüsü
             AddTableRow("Ürün Kodu:", CreateProductCodeControl(),
@@ -911,6 +923,9 @@ namespace ERP.UI.Forms
                 }
             }
 
+            // IsStockOrder
+            order.IsStockOrder = chkIsStockOrder != null && chkIsStockOrder.Checked;
+
             return order;
         }
 
@@ -933,6 +948,7 @@ namespace ERP.UI.Forms
             txtTotalPriceUSD.Text = "0,00 USD";
             txtCurrencyRate.Text = "0,00";
             txtTotalPriceTL.Text = "0,00";
+            if (chkIsStockOrder != null) chkIsStockOrder.Checked = false;
         }
 
         public void LoadOrderData(Guid orderId)
@@ -1031,6 +1047,12 @@ namespace ERP.UI.Forms
                 if (order.ShipmentDate.HasValue)
                 {
                     dtpShipmentDate.Value = order.ShipmentDate.Value;
+                }
+
+                // IsStockOrder
+                if (chkIsStockOrder != null)
+                {
+                    chkIsStockOrder.Checked = order.IsStockOrder;
                 }
             }
             catch (Exception ex)

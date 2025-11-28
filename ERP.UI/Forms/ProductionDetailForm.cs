@@ -430,6 +430,8 @@ namespace ERP.UI.Forms
 
             // Üretimdeyse sadece Muhasebeye Gönder butonu göster
             bool isInProduction = _order?.Status == "Üretimde";
+            // Stok siparişleri için muhasebeye gönder butonunu gizle
+            bool isStockOrder = _order?.IsStockOrder ?? false;
 
             if (!isInProduction)
             {
@@ -439,8 +441,8 @@ namespace ERP.UI.Forms
                 panel.Controls.Add(btnRapor);
             }
 
-            // Sadece üretimdeyse muhasebeye gönder butonu göster
-            if (isInProduction)
+            // Sadece üretimdeyse ve stok siparişi değilse muhasebeye gönder butonu göster
+            if (isInProduction && !isStockOrder)
             {
                 btnMuhasebeyeGonder = ButtonFactory.CreateActionButton("💰 Muhasebeye Gönder", ThemeColors.Success, Color.White, 180, 40);
                 btnMuhasebeyeGonder.Location = new Point(btnRapor != null ? 160 : 0, 5);
@@ -1082,6 +1084,7 @@ namespace ERP.UI.Forms
             AddKesimColumn(dataGridView, "TotalKg", "Toplam Kg", 100);
             AddKesimColumn(dataGridView, "CutKg", "Kesilen Kg", 100);
             AddKesimColumn(dataGridView, "CuttingCount", "Kesim Adedi", 100);
+            AddKesimColumn(dataGridView, "PlakaAdedi", "Plaka Adedi", 100);
             AddKesimColumn(dataGridView, "WasteKg", "Hurda Kg", 100);
             AddKesimColumn(dataGridView, "RemainingKg", "Kalan Kg", 100);
             AddKesimColumn(dataGridView, "EmployeeName", "Operatör", 150);
@@ -1149,6 +1152,7 @@ namespace ERP.UI.Forms
                     TotalKg = c.TotalKg.ToString("F3", CultureInfo.InvariantCulture),
                     CutKg = c.CutKg.ToString("F3", CultureInfo.InvariantCulture),
                     CuttingCount = c.CuttingCount.ToString(),
+                    PlakaAdedi = c.PlakaAdedi.ToString(),
                     WasteKg = c.WasteKg.ToString("F3", CultureInfo.InvariantCulture),
                     RemainingKg = c.RemainingKg.ToString("F3", CultureInfo.InvariantCulture),
                     EmployeeName = c.Employee != null ? $"{c.Employee.FirstName} {c.Employee.LastName}" : ""
@@ -1167,6 +1171,7 @@ namespace ERP.UI.Forms
                     AddKesimColumn(dataGridView, "TotalKg", "Toplam Kg", 100);
                     AddKesimColumn(dataGridView, "CutKg", "Kesilen Kg", 100);
                     AddKesimColumn(dataGridView, "CuttingCount", "Kesim Adedi", 100);
+                    AddKesimColumn(dataGridView, "PlakaAdedi", "Plaka Adedi", 100);
                     AddKesimColumn(dataGridView, "WasteKg", "Hurda Kg", 100);
                     AddKesimColumn(dataGridView, "RemainingKg", "Kalan Kg", 100);
                     AddKesimColumn(dataGridView, "EmployeeName", "Operatör", 150);
@@ -1195,6 +1200,7 @@ namespace ERP.UI.Forms
                         case "TotalKg": column.HeaderText = "Toplam Kg"; break;
                         case "CutKg": column.HeaderText = "Kesilen Kg"; break;
                         case "CuttingCount": column.HeaderText = "Kesim Adedi"; break;
+                        case "PlakaAdedi": column.HeaderText = "Plaka Adedi"; break;
                         case "WasteKg": column.HeaderText = "Hurda Kg"; break;
                         case "RemainingKg": column.HeaderText = "Kalan Kg"; break;
                         case "EmployeeName": column.HeaderText = "Operatör"; break;

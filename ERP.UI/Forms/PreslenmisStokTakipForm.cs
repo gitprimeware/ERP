@@ -126,23 +126,40 @@ namespace ERP.UI.Forms
                 var pressings = _pressingRepository.GetAll();
                 var stockData = new List<StockRowData>();
 
-                foreach (var modelCode in _modelCodes)
+                // Eğer hiç press verisi yoksa, boş liste göster
+                if (pressings == null || pressings.Count == 0)
                 {
-                    // Model koduna göre pres işlemlerini filtrele
-                    var modelPressings = GetPressingsForModel(pressings, modelCode);
-                    
-                    // Plaka adedi toplamını hesapla
-                    int totalPlakaAdedi = modelPressings.Sum(p => p.PressCount);
-
-                    // Stok ürünler bilgisini oluştur (örnek: "H20 - 50cm x 0.165")
-                    string stokUrunler = GetStokUrunlerInfo(modelPressings, modelCode);
-
-                    stockData.Add(new StockRowData
+                    // Boş durum için tüm modelleri 0 ile göster
+                    foreach (var modelCode in _modelCodes)
                     {
-                        ModelOlcu = modelCode,
-                        StokUrunler = stokUrunler,
-                        PlakaAdedi = totalPlakaAdedi > 0 ? totalPlakaAdedi.ToString() : "0"
-                    });
+                        stockData.Add(new StockRowData
+                        {
+                            ModelOlcu = modelCode,
+                            StokUrunler = "",
+                            PlakaAdedi = "0"
+                        });
+                    }
+                }
+                else
+                {
+                    foreach (var modelCode in _modelCodes)
+                    {
+                        // Model koduna göre pres işlemlerini filtrele
+                        var modelPressings = GetPressingsForModel(pressings, modelCode);
+                        
+                        // Plaka adedi toplamını hesapla
+                        int totalPlakaAdedi = modelPressings.Sum(p => p.PressCount);
+
+                        // Stok ürünler bilgisini oluştur (örnek: "H20 - 50cm x 0.165")
+                        string stokUrunler = GetStokUrunlerInfo(modelPressings, modelCode);
+
+                        stockData.Add(new StockRowData
+                        {
+                            ModelOlcu = modelCode,
+                            StokUrunler = stokUrunler,
+                            PlakaAdedi = totalPlakaAdedi > 0 ? totalPlakaAdedi.ToString() : "0"
+                        });
+                    }
                 }
 
                 _dataGridView.DataSource = stockData;
