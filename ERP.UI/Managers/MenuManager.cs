@@ -15,6 +15,7 @@ namespace ERP.UI.Managers
         private readonly IMenuProvider _menuProvider;
         private Button _currentButton;
         private Dictionary<string, Components.SubMenuPanel> _subMenuPanels;
+        private Dictionary<string, Button> _menuButtons;
 
         public event EventHandler<string> MenuItemClicked;
 
@@ -23,6 +24,7 @@ namespace ERP.UI.Managers
             _menuPanel = menuPanel ?? throw new ArgumentNullException(nameof(menuPanel));
             _menuProvider = menuProvider ?? throw new ArgumentNullException(nameof(menuProvider));
             _subMenuPanels = new Dictionary<string, Components.SubMenuPanel>();
+            _menuButtons = new Dictionary<string, Button>();
             InitializeMenu();
         }
 
@@ -34,13 +36,14 @@ namespace ERP.UI.Managers
             var menuItems = _menuProvider.GetMenuItems().ToList();
             
             // DockStyle.Top kullandığımız için ters sırada ekliyoruz
+            // SubMenuPanel'i butonun altına gelecek şekilde eklemek için, önce SubMenuPanel, sonra buton ekliyoruz
             for (int i = menuItems.Count - 1; i >= 0; i--)
             {
                 var menuItem = menuItems[i];
                 var button = CreateMenuButton(menuItem);
-                _menuPanel.Controls.Add(button);
+                _menuButtons[menuItem.Tag] = button;
 
-                // SubMenu varsa ekle
+                // SubMenu varsa, önce SubMenuPanel'i ekle (butonun altında görünecek)
                 if (menuItem.HasSubMenu)
                 {
                     var subMenuPanel = new Components.SubMenuPanel(menuItem);
@@ -48,6 +51,9 @@ namespace ERP.UI.Managers
                     _subMenuPanels[menuItem.Tag] = subMenuPanel;
                     _menuPanel.Controls.Add(subMenuPanel);
                 }
+
+                // Butonu en son ekle (üstte görünecek)
+                _menuPanel.Controls.Add(button);
             }
         }
 
@@ -98,6 +104,25 @@ namespace ERP.UI.Managers
             if (_subMenuPanels.ContainsKey(parentTag))
             {
                 _subMenuPanels[parentTag].Toggle();
+                UpdateArrowIcon(parentTag);
+            }
+        }
+
+        private void UpdateArrowIcon(string parentTag)
+        {
+            if (_menuButtons.ContainsKey(parentTag) && _subMenuPanels.ContainsKey(parentTag))
+            {
+                var button = _menuButtons[parentTag];
+                var subMenuPanel = _subMenuPanels[parentTag];
+                var menuItem = _menuProvider.GetMenuItems().FirstOrDefault(m => m.Tag == parentTag);
+                
+                if (menuItem != null)
+                {
+                    // SubMenuPanel'in açık/kapalı durumunu kontrol et
+                    bool isExpanded = subMenuPanel.IsExpanded;
+                    string arrow = isExpanded ? " ▲" : " ▼";
+                    button.Text = menuItem.Text + arrow;
+                }
             }
         }
 

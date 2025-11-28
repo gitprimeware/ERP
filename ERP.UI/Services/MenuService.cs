@@ -54,10 +54,6 @@ namespace ERP.UI.Services
                 stockItem,
                 productionItem,
                 consumptionItem,
-                new MenuItem("📊 Satış Yönetimi", "Sales", "📊", 7),
-                new MenuItem("🛒 Satın Alma", "Purchase", "🛒", 8),
-                new MenuItem("👥 Müşteriler", "Customers", "👥", 9),
-                new MenuItem("🏢 Tedarikçiler", "Suppliers", "🏢", 10),
                 reportsItem,
                 new MenuItem("⚙️ Ayarlar", "Settings", "⚙️", 11)
             };

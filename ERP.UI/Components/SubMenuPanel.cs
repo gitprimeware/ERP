@@ -13,6 +13,7 @@ namespace ERP.UI.Components
         private bool _isExpanded = false;
 
         public event EventHandler<string> SubMenuItemClicked;
+        public bool IsExpanded => _isExpanded;
 
         public SubMenuPanel(MenuItem parentItem)
         {
