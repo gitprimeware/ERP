@@ -63,6 +63,7 @@ namespace ERP.UI.Managers
                 {
                     productionListForm.ProductionDetailRequested += (s, id) => ShowProductionDetail(id);
                     productionListForm.ProductionSendToAccountingRequested += (s, id) => HandleSendToAccounting(id);
+                    productionListForm.ProductionReportRequested += (s, id) => HandleProductionReport(id);
                 }
 
                 // ProductionDetailForm için event'leri bağla
