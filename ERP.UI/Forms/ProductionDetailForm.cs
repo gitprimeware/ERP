@@ -89,7 +89,7 @@ namespace ERP.UI.Forms
 
         private void InitializeCustomComponents()
         {
-            this.BackColor = ThemeColors.Background;
+            this.BackColor = Color.White;
             this.Dock = DockStyle.Fill;
             this.Padding = new Padding(20);
 
@@ -102,54 +102,91 @@ namespace ERP.UI.Forms
             mainPanel = new Panel
             {
                 Dock = DockStyle.Fill,
-                BackColor = ThemeColors.Surface,
+                BackColor = Color.White,
                 Padding = new Padding(30),
                 AutoScroll = true
             };
-
-            UIHelper.ApplyCardStyle(mainPanel, 12);
 
             // TabControl oluştur
             tabControl = new TabControl
             {
                 Dock = DockStyle.Fill,
                 Font = new Font("Segoe UI", 10F),
-                Padding = new Point(10, 5)
+                Padding = new Point(10, 5),
+                BackColor = Color.White,
+                Appearance = TabAppearance.FlatButtons
+            };
+            tabControl.DrawMode = TabDrawMode.OwnerDrawFixed;
+            tabControl.DrawItem += (s, e) =>
+            {
+                var tabPage = tabControl.TabPages[e.Index];
+                var tabRect = tabControl.GetTabRect(e.Index);
+                
+                // Arka planı tamamen beyaz yap
+                e.Graphics.FillRectangle(new SolidBrush(Color.White), tabRect);
+                tabControl.BackColor = Color.White;
+                
+                Color textColor;
+                if ((e.State & DrawItemState.Selected) == DrawItemState.Selected)
+                {
+                    // Seçili tab için altında mavi çizgi
+                    e.Graphics.FillRectangle(new SolidBrush(ThemeColors.Primary), new Rectangle(tabRect.X, tabRect.Y + tabRect.Height - 3, tabRect.Width, 3));
+                    textColor = ThemeColors.Primary;
+                }
+                else
+                {
+                    // Seçili olmayan tab - tamamen beyaz arka plan
+                    textColor = Color.FromArgb(150, 150, 150);
+                }
+                
+                // Emoji'leri doğru şekilde render et - Segoe UI Emoji fontu kullan
+                using (var emojiFont = new Font("Segoe UI Emoji", 10F))
+                {
+                    TextRenderer.DrawText(e.Graphics, tabPage.Text, emojiFont, 
+                        tabRect, textColor, 
+                        TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                }
+                
+                e.DrawFocusRectangle();
             };
 
             // İlk tab: Formül
             var tabFormul = new TabPage("📐 Formül");
             tabFormul.Padding = new Padding(20);
-            tabFormul.BackColor = ThemeColors.Background;
+            tabFormul.BackColor = Color.White;
+            tabFormul.UseVisualStyleBackColor = false;
             CreateFormulTab(tabFormul);
             tabControl.TabPages.Add(tabFormul);
 
             // İkinci tab: Rapor
             var tabRapor = new TabPage("📄 Rapor");
             tabRapor.Padding = new Padding(20);
-            tabRapor.BackColor = ThemeColors.Background;
+            tabRapor.BackColor = Color.White;
+            tabRapor.UseVisualStyleBackColor = false;
             CreateRaporTab(tabRapor);
             tabControl.TabPages.Add(tabRapor);
 
             // Üçüncü tab: Üretim Ayrıntı
             var tabUretimAyrinti = new TabPage("⚙️ Üretim Ayrıntı");
             tabUretimAyrinti.Padding = new Padding(20);
-            tabUretimAyrinti.BackColor = ThemeColors.Background;
+            tabUretimAyrinti.BackColor = Color.White;
+            tabUretimAyrinti.UseVisualStyleBackColor = false;
             CreateUretimAyrintiTab(tabUretimAyrinti);
             tabControl.TabPages.Add(tabUretimAyrinti);
 
-            // Geri butonu - sağ üste
-            btnBack = ButtonFactory.CreateActionButton("⬅️ Geri", ThemeColors.Secondary, Color.White, 120, 40);
+            // Geri butonu - sağ üste, tab'ların yanında
+            btnBack = ButtonFactory.CreateActionButton("⬅️ Geri", ThemeColors.Secondary, Color.White, 90, 32);
             btnBack.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnBack.Location = new Point(mainPanel.Width - btnBack.Width - 30, 10);
+            btnBack.Location = new Point(mainPanel.Width - btnBack.Width - 20, 15);
             btnBack.Click += BtnBack_Click;
+            btnBack.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
 
             // mainPanel resize olduğunda geri tuşunun konumunu güncelle
             mainPanel.Resize += (s, e) =>
             {
                 if (btnBack != null)
                 {
-                    btnBack.Location = new Point(mainPanel.Width - btnBack.Width - 30, 10);
+                    btnBack.Location = new Point(mainPanel.Width - btnBack.Width - 20, 15);
                 }
             };
 
@@ -234,7 +271,8 @@ namespace ERP.UI.Forms
                 AutoSize = true,
                 ColumnCount = 4,
                 RowCount = 0,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                BackColor = Color.White
             };
 
             tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 200));
@@ -330,7 +368,7 @@ namespace ERP.UI.Forms
         private TextBox CreateReadOnlyTextBox(TextBox txt)
         {
             txt.ReadOnly = true;
-            txt.BackColor = ThemeColors.Background;
+            txt.BackColor = Color.White;
             txt.BorderStyle = BorderStyle.FixedSingle;
             txt.Font = new Font("Segoe UI", 9F);
             txt.Padding = new Padding(3);
@@ -545,45 +583,65 @@ namespace ERP.UI.Forms
                 }
             }
 
-            // Yükseklik (mm) - Yükseklik (mm) değerinden kapak boyu değerini çıkar
+            // Yükseklik (mm) - Yükseklik 1800 üzerindeyse 2'ye böl, sonra kapak çıkar
+            // Kapak tipi 30 veya 2 olsa da 16 olarak kabul edilir ((30+2)/2 = 16)
             int raporYukseklikMM = 0;
             if (txtReportYukseklikCM != null && txtYukseklikMM != null && txtKapakBoyuMM != null)
             {
-                if (int.TryParse(txtYukseklikMM.Text, out int yukseklikMM) && int.TryParse(txtKapakBoyuMM.Text, out int kapakBoyuMM))
+                if (int.TryParse(txtYukseklikMM.Text, out int yukseklikMM))
                 {
-                    // Yükseklik (mm) - Kapak Boyu (mm) = Rapor Yükseklik (mm)
-                    raporYukseklikMM = yukseklikMM - kapakBoyuMM;
-                    txtReportYukseklikCM.Text = raporYukseklikMM.ToString();
-                }
-                else if (int.TryParse(txtYukseklikMM.Text, out int yukseklikMMOnly))
-                {
-                    // Kapak boyu parse edilemezse, ürün kodundan kapak değerini çıkar
-                    // Ürün kodundan kapak değeri DisplayText formatında gelir: 030, 002, veya 016
-                    if (_order != null && !string.IsNullOrEmpty(_order.ProductCode))
+                    // Yükseklik 1800 üzerindeyse 2'ye böl
+                    int yukseklikCom = yukseklikMM <= 1800 ? yukseklikMM : yukseklikMM / 2;
+                    
+                    // Kapak değerini belirle - 30 veya 2 olsa da 16 kabul edilir
+                    int cikarilacakKapakDegeri = 16; // Varsayılan olarak 16
+                    
+                    if (int.TryParse(txtKapakBoyuMM.Text, out int kapakBoyuMM))
                     {
+                        // Kapak tipi 30 veya 2 ise 16 kullan, diğer durumlarda direkt değeri kullan
+                        if (kapakBoyuMM == 30 || kapakBoyuMM == 2)
+                        {
+                            cikarilacakKapakDegeri = 16; // (30+2)/2 = 16
+                        }
+                        else
+                        {
+                            cikarilacakKapakDegeri = kapakBoyuMM;
+                        }
+                    }
+                    else if (_order != null && !string.IsNullOrEmpty(_order.ProductCode))
+                    {
+                        // Ürün kodundan kapak değerini çıkar
                         var productCodeParts = _order.ProductCode.Split('-');
                         if (productCodeParts.Length > 5)
                         {
                             string kapakDegeri = productCodeParts[5];
-                            int cikarilacakDeger = 0;
                             
                             // Ürün kodunda DisplayText formatı kullanılıyor: 030, 002, 016
-                            if (kapakDegeri == "030")
-                                cikarilacakDeger = 30;
-                            else if (kapakDegeri == "002")
-                                cikarilacakDeger = 2;
+                            if (kapakDegeri == "030" || kapakDegeri == "002")
+                            {
+                                cikarilacakKapakDegeri = 16; // (30+2)/2 = 16
+                            }
                             else if (kapakDegeri == "016")
-                                cikarilacakDeger = 16;
+                            {
+                                cikarilacakKapakDegeri = 16;
+                            }
                             else if (int.TryParse(kapakDegeri, out int parsedKapak))
                             {
-                                // Eğer direkt sayı olarak parse edilebiliyorsa (eski format için)
-                                cikarilacakDeger = parsedKapak;
+                                if (parsedKapak == 30 || parsedKapak == 2)
+                                {
+                                    cikarilacakKapakDegeri = 16;
+                                }
+                                else
+                                {
+                                    cikarilacakKapakDegeri = parsedKapak;
+                                }
                             }
-
-                            raporYukseklikMM = yukseklikMMOnly - cikarilacakDeger;
-                            txtReportYukseklikCM.Text = raporYukseklikMM.ToString();
                         }
                     }
+                    
+                    // Rapor yükseklik = (Yükseklik com) - Kapak değeri
+                    raporYukseklikMM = yukseklikCom - cikarilacakKapakDegeri;
+                    txtReportYukseklikCM.Text = raporYukseklikMM.ToString();
                 }
             }
 
@@ -591,26 +649,34 @@ namespace ERP.UI.Forms
             if (txtReportToplamSiparisAdedi != null && txtToplamAdet != null)
                 txtReportToplamSiparisAdedi.Text = txtToplamAdet.Text;
 
-            // Plaka Adedi - Yükseklikten 10 cm dilimlerini hesaplayarak sipariş adedi ve 10cm plaka adetini çarp
-            if (txtReportPlakaAdedi != null && txtYukseklikMM != null && txtSiparisAdedi != null && txtPlakaAdedi10cm != null)
+            // Plaka Adedi - Formül: yükseklik mm/100 * 10cm plaka adedi * toplam sipariş adedi
+            if (txtReportPlakaAdedi != null && txtYukseklikMM != null && txtToplamAdet != null && txtPlakaAdedi10cm != null)
             {
-                if (decimal.TryParse(txtYukseklikMM.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal yukseklikMM) &&
-                    int.TryParse(txtSiparisAdedi.Text, out int siparisAdedi) &&
+                // Yükseklik (mm) - Rapor için kapaksız yükseklik kullanılır
+                int yukseklikMM = raporYukseklikMM > 0 ? raporYukseklikMM : 0;
+                
+                // Eğer raporYukseklikMM hesaplanamadıysa, direkt yükseklikMM'den al
+                if (yukseklikMM == 0 && int.TryParse(txtYukseklikMM.Text, out int yukseklikMMFromText))
+                {
+                    yukseklikMM = yukseklikMMFromText;
+                }
+                
+                if (yukseklikMM > 0 &&
+                    int.TryParse(txtToplamAdet.Text, out int toplamSiparisAdedi) &&
                     int.TryParse(txtPlakaAdedi10cm.Text, out int plakaAdedi10cm))
                 {
-                    // Yükseklik (mm) -> cm -> 10 cm dilimi (iki kez 10'a böl)
-                    decimal onCmDilimi = raporYukseklikMM / 100m;
-                    decimal hesaplananPlakaAdedi = onCmDilimi * siparisAdedi * plakaAdedi10cm;
+                    // Formül: plaka adedi = yükseklik mm/100 * 10cm plaka adedi * toplam sipariş adedi
+                    decimal hesaplananPlakaAdedi = (decimal)yukseklikMM / 100m * plakaAdedi10cm * toplamSiparisAdedi;
                     txtReportPlakaAdedi.Text = Math.Round(hesaplananPlakaAdedi, 0, MidpointRounding.AwayFromZero).ToString(CultureInfo.InvariantCulture);
                 }
                 else if (int.TryParse(txtPlakaAdet.Text, out int plakaAdetFallback) && int.TryParse(txtToplamAdet?.Text, out int toplamAdetFallback))
                 {
-                    // Eski mantığa geri dön
+                    // Fallback: Eski mantığa geri dön
                     txtReportPlakaAdedi.Text = (plakaAdetFallback * toplamAdetFallback).ToString();
                 }
                 else
                 {
-                    txtReportPlakaAdedi.Text = txtPlakaAdet?.Text ?? "0";
+                    txtReportPlakaAdedi.Text = "0";
                 }
             }
 
@@ -659,7 +725,7 @@ namespace ERP.UI.Forms
 
             // Lamel Kalınlığı
             if (txtReportLamelKalinligi != null)
-                txtReportLamelKalinligi.Text = _order.LamelThickness?.ToString("F2", CultureInfo.InvariantCulture) ?? "";
+                txtReportLamelKalinligi.Text = _order.LamelThickness?.ToString("F3", CultureInfo.InvariantCulture) ?? "";
 
             // Ürün Türü
             if (txtReportUrunTuru != null)
@@ -851,7 +917,7 @@ namespace ERP.UI.Forms
                 if (Math.Abs(aluminyumKalinligi - 0.165m) < tolerance)
                     return 0.042m;
                 if (Math.Abs(aluminyumKalinligi - 0.15m) < tolerance)
-                    return 0.038m;
+                    return 0.380m; // Excel formülünde 0,38 olarak belirtilmiş
                 if (Math.Abs(aluminyumKalinligi - 0.12m) < tolerance)
                     return 0.031m;
             }
@@ -893,7 +959,31 @@ namespace ERP.UI.Forms
             if (plakaOlcusuCM >= 68 && plakaOlcusuCM <= 74)
             {
                 if (Math.Abs(aluminyumKalinligi - 0.12m) < tolerance)
-                    return 0.168m;
+                    return 0.162m;
+                if (Math.Abs(aluminyumKalinligi - 0.15m) < tolerance)
+                    return 0.203m;
+                if (Math.Abs(aluminyumKalinligi - 0.165m) < tolerance)
+                    return 0.223m;
+            }
+
+            // x 78-84 arası
+            if (plakaOlcusuCM >= 78 && plakaOlcusuCM <= 84)
+            {
+                if (Math.Abs(aluminyumKalinligi - 0.12m) < tolerance)
+                    return 0.212m;
+                if (Math.Abs(aluminyumKalinligi - 0.15m) < tolerance)
+                    return 0.265m;
+                if (Math.Abs(aluminyumKalinligi - 0.165m) < tolerance)
+                    return 0.291m;
+            }
+
+            // x 98-104 arası
+            if (plakaOlcusuCM >= 98 && plakaOlcusuCM <= 104)
+            {
+                if (Math.Abs(aluminyumKalinligi - 0.165m) < tolerance)
+                    return 0.360m;
+                if (Math.Abs(aluminyumKalinligi - 0.18m) < tolerance)
+                    return 0.494m;
             }
 
             // Eşleşme bulunamazsa 0 döndür
@@ -982,7 +1072,7 @@ namespace ERP.UI.Forms
                 Width = tab.Width - 40,
                 Height = tab.Height - 100,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
-                BackColor = ThemeColors.Background
+                BackColor = Color.White
             };
 
             tab.Controls.Add(lblUretimAyrintiTitle);
@@ -1003,18 +1093,59 @@ namespace ERP.UI.Forms
             {
                 Dock = DockStyle.Fill,
                 Font = new Font("Segoe UI", 10F),
-                Padding = new Point(10, 5)
+                Padding = new Point(10, 5),
+                BackColor = Color.White,
+                Appearance = TabAppearance.FlatButtons
+            };
+            cuttingTabControl.DrawMode = TabDrawMode.OwnerDrawFixed;
+            cuttingTabControl.DrawItem += (s, e) =>
+            {
+                var tabPage = cuttingTabControl.TabPages[e.Index];
+                var tabRect = cuttingTabControl.GetTabRect(e.Index);
+                var textRect = new RectangleF(tabRect.X, tabRect.Y, tabRect.Width, tabRect.Height);
+                
+                // Arka planı tamamen beyaz yap
+                e.Graphics.FillRectangle(new SolidBrush(Color.White), tabRect);
+                cuttingTabControl.BackColor = Color.White;
+                
+                if ((e.State & DrawItemState.Selected) == DrawItemState.Selected)
+                {
+                    // Seçili tab için altında mavi çizgi
+                    e.Graphics.FillRectangle(new SolidBrush(ThemeColors.Primary), new Rectangle(tabRect.X, tabRect.Y + tabRect.Height - 3, tabRect.Width, 3));
+                    
+                    // Emoji ve metni çiz - TextRenderer kullan
+                    using (var font = new Font("Segoe UI Emoji", 10F))
+                    {
+                        TextRenderer.DrawText(e.Graphics, tabPage.Text, font, 
+                            tabRect, ThemeColors.Primary, 
+                            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                    }
+                }
+                else
+                {
+                    // Seçili olmayan tab - tamamen beyaz arka plan
+                    using (var font = new Font("Segoe UI Emoji", 10F))
+                    {
+                        TextRenderer.DrawText(e.Graphics, tabPage.Text, font, 
+                            tabRect, Color.FromArgb(150, 150, 150), 
+                            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                    }
+                }
+                
+                e.DrawFocusRectangle();
             };
 
             var tabKesim = new TabPage("✂️ Kesim");
             tabKesim.Padding = new Padding(20);
-            tabKesim.BackColor = ThemeColors.Background;
+            tabKesim.BackColor = Color.White;
+            tabKesim.UseVisualStyleBackColor = false;
             CreateKesimTab(tabKesim);
             cuttingTabControl.TabPages.Add(tabKesim);
 
             var tabPres = new TabPage("🔧 Pres");
             tabPres.Padding = new Padding(20);
-            tabPres.BackColor = ThemeColors.Background;
+            tabPres.BackColor = Color.White;
+            tabPres.UseVisualStyleBackColor = false;
             CreatePresTab(tabPres);
             cuttingTabControl.TabPages.Add(tabPres);
 
@@ -1029,7 +1160,7 @@ namespace ERP.UI.Forms
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
                 RowCount = 2,
-                BackColor = ThemeColors.Background,
+                BackColor = Color.White,
                 Padding = new Padding(20)
             };
             mainPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
@@ -1042,7 +1173,7 @@ namespace ERP.UI.Forms
                 Dock = DockStyle.Fill,
                 Height = 50,
                 Padding = new Padding(0, 5, 20, 5),
-                BackColor = ThemeColors.Background
+                BackColor = Color.White
             };
 
             // Ekle butonu
@@ -1055,7 +1186,7 @@ namespace ERP.UI.Forms
             {
                 Dock = DockStyle.Fill,
                 Padding = new Padding(0),
-                BackColor = ThemeColors.Background
+                BackColor = Color.White
             };
 
             // DataGridView
@@ -1068,12 +1199,13 @@ namespace ERP.UI.Forms
                 ReadOnly = true,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 MultiSelect = false,
-                BackgroundColor = ThemeColors.Surface,
-                BorderStyle = BorderStyle.FixedSingle,
+                BackgroundColor = Color.White,
+                BorderStyle = BorderStyle.None,
                 AutoGenerateColumns = false,
                 ColumnHeadersVisible = true,
                 RowHeadersVisible = false,
-                GridColor = Color.LightGray
+                GridColor = Color.White,
+                CellBorderStyle = DataGridViewCellBorderStyle.None
             };
 
             // Kolonları ekle
@@ -1095,6 +1227,7 @@ namespace ERP.UI.Forms
             dataGridView.EnableHeadersVisualStyles = false;
             dataGridView.ColumnHeadersHeight = 40;
             dataGridView.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            dataGridView.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
             
             dataGridView.ColumnHeadersDefaultCellStyle.BackColor = ThemeColors.Primary;
             dataGridView.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
@@ -1102,7 +1235,8 @@ namespace ERP.UI.Forms
             dataGridView.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             dataGridView.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.False;
 
-            dataGridView.DefaultCellStyle.BackColor = ThemeColors.Surface;
+            dataGridView.DefaultCellStyle.BackColor = Color.White;
+            dataGridView.BackgroundColor = Color.White;
             dataGridView.DefaultCellStyle.ForeColor = ThemeColors.TextPrimary;
             dataGridView.DefaultCellStyle.SelectionBackColor = ThemeColors.Primary;
             dataGridView.DefaultCellStyle.SelectionForeColor = Color.White;
@@ -1248,7 +1382,7 @@ namespace ERP.UI.Forms
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
                 RowCount = 2,
-                BackColor = ThemeColors.Background,
+                BackColor = Color.White,
                 Padding = new Padding(20)
             };
             mainPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
@@ -1261,7 +1395,7 @@ namespace ERP.UI.Forms
                 Dock = DockStyle.Fill,
                 Height = 50,
                 Padding = new Padding(0, 5, 20, 5),
-                BackColor = ThemeColors.Background
+                BackColor = Color.White
             };
 
             // Ekle butonu
@@ -1274,7 +1408,7 @@ namespace ERP.UI.Forms
             {
                 Dock = DockStyle.Fill,
                 Padding = new Padding(0),
-                BackColor = ThemeColors.Background
+                BackColor = Color.White
             };
 
             // DataGridView
@@ -1287,12 +1421,13 @@ namespace ERP.UI.Forms
                 ReadOnly = true,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 MultiSelect = false,
-                BackgroundColor = ThemeColors.Surface,
-                BorderStyle = BorderStyle.FixedSingle,
+                BackgroundColor = Color.White,
+                BorderStyle = BorderStyle.None,
                 AutoGenerateColumns = false,
                 ColumnHeadersVisible = true,
                 RowHeadersVisible = false,
-                GridColor = Color.LightGray
+                GridColor = Color.White,
+                CellBorderStyle = DataGridViewCellBorderStyle.None
             };
 
             // Kolonları ekle
@@ -1313,6 +1448,7 @@ namespace ERP.UI.Forms
             dataGridView.EnableHeadersVisualStyles = false;
             dataGridView.ColumnHeadersHeight = 40;
             dataGridView.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            dataGridView.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
             
             dataGridView.ColumnHeadersDefaultCellStyle.BackColor = ThemeColors.Primary;
             dataGridView.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
@@ -1320,7 +1456,8 @@ namespace ERP.UI.Forms
             dataGridView.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             dataGridView.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.False;
 
-            dataGridView.DefaultCellStyle.BackColor = ThemeColors.Surface;
+            dataGridView.DefaultCellStyle.BackColor = Color.White;
+            dataGridView.BackgroundColor = Color.White;
             dataGridView.DefaultCellStyle.ForeColor = ThemeColors.TextPrimary;
             dataGridView.DefaultCellStyle.SelectionBackColor = ThemeColors.Primary;
             dataGridView.DefaultCellStyle.SelectionForeColor = Color.White;
