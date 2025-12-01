@@ -18,6 +18,10 @@ namespace ERP.UI.Forms
         private Button _btnAdd;
         private MaterialEntryRepository _repository;
         private SupplierRepository _supplierRepository;
+        private TextBox _txtSearch;
+        private ComboBox _cmbSupplierFilter;
+        private Button _btnSearch;
+        private Button _btnRefresh;
 
         public MaterialEntryForm()
         {
@@ -57,15 +61,14 @@ namespace ERP.UI.Forms
                 Location = new Point(30, 30)
             };
 
-            // Ekle butonu
-            _btnAdd = ButtonFactory.CreateActionButton("➕ Ekle", ThemeColors.Success, Color.White, 120, 40);
-            _btnAdd.Location = new Point(30, 80);
-            _btnAdd.Click += BtnAdd_Click;
+            // Arama paneli (içinde Ekle butonu da var)
+            var searchPanel = CreateSearchPanel();
+            searchPanel.Location = new Point(30, 80);
 
             // DataGridView
             _dataGridView = new DataGridView
             {
-                Location = new Point(30, 130),
+                Location = new Point(30, 140),
                 Width = _mainPanel.Width - 60,
                 Height = _mainPanel.Height - 180,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
@@ -82,16 +85,144 @@ namespace ERP.UI.Forms
 
             _mainPanel.Resize += (s, e) =>
             {
+                searchPanel.Width = _mainPanel.Width - 60;
                 _dataGridView.Width = _mainPanel.Width - 60;
                 _dataGridView.Height = _mainPanel.Height - 180;
             };
 
             _mainPanel.Controls.Add(titleLabel);
-            _mainPanel.Controls.Add(_btnAdd);
+            _mainPanel.Controls.Add(searchPanel);
             _mainPanel.Controls.Add(_dataGridView);
 
             this.Controls.Add(_mainPanel);
             _mainPanel.BringToFront();
+        }
+
+        private Panel CreateSearchPanel()
+        {
+            var panel = new Panel
+            {
+                Height = 50,
+                BackColor = Color.Transparent,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+
+            // TableLayoutPanel ile responsive yapı
+            var tableLayout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 8,
+                RowCount = 1,
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+
+            // Kolon genişliklerini yüzdelik olarak ayarla
+            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); // Ara:
+            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F)); // Arama kutusu
+            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); // Tedarikçi:
+            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 12F)); // Tedarikçi combo
+            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); // Ara butonu
+            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); // Yenile butonu
+            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); // Ekle butonu
+            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 5F)); // Sağ boşluk
+
+            // Ara
+            var lblSearch = new Label
+            {
+                Text = "Ara:",
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                ForeColor = ThemeColors.TextPrimary,
+                AutoSize = true,
+                Anchor = AnchorStyles.Left | AnchorStyles.Top,
+                Padding = new Padding(0, 15, 0, 0)
+            };
+            tableLayout.Controls.Add(lblSearch, 0, 0);
+
+            _txtSearch = new TextBox
+            {
+                Height = 30,
+                Font = new Font("Segoe UI", 10F),
+                BorderStyle = BorderStyle.FixedSingle,
+                BackColor = Color.White,
+                Dock = DockStyle.Fill,
+                Margin = new Padding(5, 12, 5, 8)
+            };
+            _txtSearch.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) PerformSearch(); };
+            tableLayout.Controls.Add(_txtSearch, 1, 0);
+
+            // Tedarikçi
+            var lblSupplier = new Label
+            {
+                Text = "Tedarikçi:",
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                ForeColor = ThemeColors.TextPrimary,
+                AutoSize = true,
+                Anchor = AnchorStyles.Left | AnchorStyles.Top,
+                Padding = new Padding(5, 15, 0, 0)
+            };
+            tableLayout.Controls.Add(lblSupplier, 2, 0);
+
+            _cmbSupplierFilter = new ComboBox
+            {
+                Height = 30,
+                Font = new Font("Segoe UI", 10F),
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                BackColor = Color.White,
+                Dock = DockStyle.Fill,
+                Margin = new Padding(5, 12, 5, 8)
+            };
+            LoadSuppliersForFilter();
+            tableLayout.Controls.Add(_cmbSupplierFilter, 3, 0);
+
+            // Ara butonu
+            _btnSearch = ButtonFactory.CreateActionButton("🔍 Ara", ThemeColors.Primary, Color.White, 80, 30);
+            _btnSearch.Click += (s, e) => PerformSearch();
+            tableLayout.Controls.Add(_btnSearch, 4, 0);
+
+            // Yenile butonu
+            _btnRefresh = ButtonFactory.CreateActionButton("🔄 Yenile", ThemeColors.Success, Color.White, 90, 30);
+            _btnRefresh.Click += (s, e) =>
+            {
+                _txtSearch.Text = "";
+                _cmbSupplierFilter.SelectedIndex = 0;
+                PerformSearch();
+            };
+            tableLayout.Controls.Add(_btnRefresh, 5, 0);
+
+            // Ekle butonu
+            _btnAdd = ButtonFactory.CreateActionButton("➕ Ekle", ThemeColors.Success, Color.White, 100, 30);
+            _btnAdd.Click += BtnAdd_Click;
+            tableLayout.Controls.Add(_btnAdd, 6, 0);
+
+            panel.Controls.Add(tableLayout);
+            return panel;
+        }
+
+        private void LoadSuppliersForFilter()
+        {
+            try
+            {
+                _cmbSupplierFilter.Items.Clear();
+                
+                // Tüm Tedarikçiler seçeneği
+                _cmbSupplierFilter.Items.Add(new { Id = (Guid?)null, Name = "Tüm Tedarikçiler" });
+                
+                // Tedarikçileri yükle
+                var suppliers = _supplierRepository.GetAll().OrderBy(s => s.Name).ToList();
+                foreach (var supplier in suppliers)
+                {
+                    _cmbSupplierFilter.Items.Add(new { Id = (Guid?)supplier.Id, Name = supplier.Name });
+                }
+                
+                _cmbSupplierFilter.DisplayMember = "Name";
+                _cmbSupplierFilter.ValueMember = "Id";
+                _cmbSupplierFilter.SelectedIndex = 0;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Tedarikçiler yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void LoadMaterialEntries()
@@ -99,6 +230,40 @@ namespace ERP.UI.Forms
             try
             {
                 var entries = _repository.GetAll();
+                LoadDataGridView(entries);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Malzeme girişleri yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void PerformSearch()
+        {
+            try
+            {
+                string searchTerm = _txtSearch?.Text?.Trim() ?? "";
+                Guid? supplierId = null;
+
+                if (_cmbSupplierFilter?.SelectedItem != null)
+                {
+                    var selected = _cmbSupplierFilter.SelectedItem;
+                    var idProperty = selected.GetType().GetProperty("Id");
+                    if (idProperty != null)
+                    {
+                        var idValue = idProperty.GetValue(selected);
+                        if (idValue != null && idValue != DBNull.Value)
+                        {
+                            supplierId = (Guid?)idValue;
+                        }
+                    }
+                }
+
+                // Filtreleme ile malzeme girişlerini getir
+                var entries = _repository.GetAll(
+                    string.IsNullOrWhiteSpace(searchTerm) ? null : searchTerm,
+                    supplierId
+                );
                 LoadDataGridView(entries);
             }
             catch (Exception ex)
@@ -220,7 +385,7 @@ namespace ERP.UI.Forms
                     {
                         _repository.Insert(dialog.MaterialEntry);
                         MessageBox.Show("Malzeme girişi başarıyla eklendi!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        LoadMaterialEntries();
+                        PerformSearch();
                     }
                     catch (Exception ex)
                     {
@@ -245,7 +410,7 @@ namespace ERP.UI.Forms
                         {
                             _repository.Update(dialog.MaterialEntry);
                             MessageBox.Show("Malzeme girişi başarıyla güncellendi!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                            LoadMaterialEntries();
+                            PerformSearch();
                         }
                         catch (Exception ex)
                         {

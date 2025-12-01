@@ -9,7 +9,7 @@ namespace ERP.DAL.Repositories
 {
     public class MaterialExitRepository
     {
-        public List<MaterialExit> GetAll()
+        public List<MaterialExit> GetAll(string searchTerm = null, Guid? companyId = null)
         {
             var exits = new List<MaterialExit>();
             
@@ -22,11 +22,31 @@ namespace ERP.DAL.Repositories
                              c.Name as CompanyName
                              FROM MaterialExits me
                              LEFT JOIN Companies c ON me.CompanyId = c.Id
-                             WHERE me.IsActive = 1
-                             ORDER BY me.ExitDate DESC";
+                             WHERE me.IsActive = 1";
+                
+                var parameters = new List<SqlParameter>();
+                
+                if (!string.IsNullOrWhiteSpace(searchTerm))
+                {
+                    query += " AND (me.TransactionType LIKE @SearchTerm OR me.MaterialType LIKE @SearchTerm OR me.MaterialSize LIKE @SearchTerm OR me.TrexInvoiceNo LIKE @SearchTerm OR c.Name LIKE @SearchTerm)";
+                    parameters.Add(new SqlParameter("@SearchTerm", $"%{searchTerm}%"));
+                }
+                
+                if (companyId.HasValue)
+                {
+                    query += " AND me.CompanyId = @CompanyId";
+                    parameters.Add(new SqlParameter("@CompanyId", companyId.Value));
+                }
+                
+                query += " ORDER BY me.ExitDate DESC";
                 
                 using (var command = new SqlCommand(query, connection))
                 {
+                    foreach (var param in parameters)
+                    {
+                        command.Parameters.Add(param);
+                    }
+                    
                     using (var reader = command.ExecuteReader())
                     {
                         while (reader.Read())

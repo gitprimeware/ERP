@@ -9,7 +9,7 @@ namespace ERP.DAL.Repositories
 {
     public class MaterialEntryRepository
     {
-        public List<MaterialEntry> GetAll()
+        public List<MaterialEntry> GetAll(string searchTerm = null, Guid? supplierId = null)
         {
             var entries = new List<MaterialEntry>();
             
@@ -24,11 +24,31 @@ namespace ERP.DAL.Repositories
                              FROM MaterialEntries me
                              LEFT JOIN Suppliers s ON me.SupplierId = s.Id
                              LEFT JOIN SerialNos sn ON me.SerialNoId = sn.Id
-                             WHERE me.IsActive = 1
-                             ORDER BY me.EntryDate DESC";
+                             WHERE me.IsActive = 1";
+                
+                var parameters = new List<SqlParameter>();
+                
+                if (!string.IsNullOrWhiteSpace(searchTerm))
+                {
+                    query += " AND (me.TransactionType LIKE @SearchTerm OR me.MaterialType LIKE @SearchTerm OR me.MaterialSize LIKE @SearchTerm OR me.InvoiceNo LIKE @SearchTerm OR me.TrexPurchaseNo LIKE @SearchTerm OR s.Name LIKE @SearchTerm)";
+                    parameters.Add(new SqlParameter("@SearchTerm", $"%{searchTerm}%"));
+                }
+                
+                if (supplierId.HasValue)
+                {
+                    query += " AND me.SupplierId = @SupplierId";
+                    parameters.Add(new SqlParameter("@SupplierId", supplierId.Value));
+                }
+                
+                query += " ORDER BY me.EntryDate DESC";
                 
                 using (var command = new SqlCommand(query, connection))
                 {
+                    foreach (var param in parameters)
+                    {
+                        command.Parameters.Add(param);
+                    }
+                    
                     using (var reader = command.ExecuteReader())
                     {
                         while (reader.Read())
