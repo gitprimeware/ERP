@@ -182,6 +182,46 @@ namespace ERP.DAL.Repositories
             }
         }
 
+        public Cutting GetById(Guid id)
+        {
+            using (var connection = DatabaseHelper.GetConnection())
+            {
+                connection.Open();
+                
+                // PlakaAdedi kolonunun varlığını kontrol et
+                bool hasPlakaAdediColumn = ColumnExists(connection, "Cuttings", "PlakaAdedi");
+                
+                string plakaAdediColumn = hasPlakaAdediColumn ? "c.PlakaAdedi," : "";
+                
+                var query = $@"SELECT c.Id, c.OrderId, c.Hatve, c.Size, c.MachineId, c.SerialNoId,
+                             c.TotalKg, c.CutKg, c.CuttingCount, {plakaAdediColumn} c.WasteKg, c.RemainingKg, c.EmployeeId, c.CuttingDate,
+                             c.CreatedDate, c.ModifiedDate, c.IsActive,
+                             sn.SerialNumber as SerialNumber,
+                             m.Name as MachineName,
+                             e.FirstName as EmployeeFirstName, e.LastName as EmployeeLastName
+                             FROM Cuttings c
+                             LEFT JOIN SerialNos sn ON c.SerialNoId = sn.Id
+                             LEFT JOIN Machines m ON c.MachineId = m.Id
+                             LEFT JOIN Employees e ON c.EmployeeId = e.Id
+                             WHERE c.Id = @Id AND c.IsActive = 1";
+                
+                using (var command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@Id", id);
+                    
+                    using (var reader = command.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            return MapToCutting(reader, hasPlakaAdediColumn);
+                        }
+                    }
+                }
+            }
+            
+            return null;
+        }
+
         public void Delete(Guid id)
         {
             using (var connection = DatabaseHelper.GetConnection())

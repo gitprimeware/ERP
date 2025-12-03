@@ -66,6 +66,8 @@ namespace ERP.UI.Forms
         private OrderRepository _orderRepository;
         private CuttingRepository _cuttingRepository;
         private PressingRepository _pressingRepository;
+        private ClampingRepository _clampingRepository;
+        private AssemblyRepository _assemblyRepository;
         private MachineRepository _machineRepository;
         private SerialNoRepository _serialNoRepository;
         private EmployeeRepository _employeeRepository;
@@ -81,6 +83,8 @@ namespace ERP.UI.Forms
             _orderRepository = new OrderRepository();
             _cuttingRepository = new CuttingRepository();
             _pressingRepository = new PressingRepository();
+            _clampingRepository = new ClampingRepository();
+            _assemblyRepository = new AssemblyRepository();
             _machineRepository = new MachineRepository();
             _serialNoRepository = new SerialNoRepository();
             _employeeRepository = new EmployeeRepository();
@@ -1149,6 +1153,20 @@ namespace ERP.UI.Forms
             CreatePresTab(tabPres);
             cuttingTabControl.TabPages.Add(tabPres);
 
+            var tabKenetleme = new TabPage("🔗 Kenetleme");
+            tabKenetleme.Padding = new Padding(20);
+            tabKenetleme.BackColor = Color.White;
+            tabKenetleme.UseVisualStyleBackColor = false;
+            CreateClampingTab(tabKenetleme);
+            cuttingTabControl.TabPages.Add(tabKenetleme);
+
+            var tabMontaj = new TabPage("🔩 Montaj");
+            tabMontaj.Padding = new Padding(20);
+            tabMontaj.BackColor = Color.White;
+            tabMontaj.UseVisualStyleBackColor = false;
+            CreateAssemblyTab(tabMontaj);
+            cuttingTabControl.TabPages.Add(tabMontaj);
+
             contentPanel.Controls.Add(cuttingTabControl);
         }
 
@@ -1586,6 +1604,419 @@ namespace ERP.UI.Forms
             catch (Exception ex)
             {
                 MessageBox.Show("Pres eklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void CreateClampingTab(TabPage tab)
+        {
+            // Ana panel - TableLayoutPanel kullan
+            var mainPanel = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 2,
+                BackColor = Color.White,
+                Padding = new Padding(20)
+            };
+            mainPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            mainPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F)); // Buton paneli için sabit yükseklik
+            mainPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F)); // Grid paneli için kalan alan
+
+            // Buton paneli - Üstte
+            var buttonPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Height = 50,
+                Padding = new Padding(0, 5, 20, 5),
+                BackColor = Color.White
+            };
+
+            // Ekle butonu
+            var btnEkle = ButtonFactory.CreateActionButton("➕ Ekle", ThemeColors.Primary, Color.White, 120, 35);
+            btnEkle.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            buttonPanel.Controls.Add(btnEkle);
+
+            // DataGridView paneli
+            var gridPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(0),
+                BackColor = Color.White
+            };
+
+            // DataGridView
+            var dataGridView = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                ReadOnly = true,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                MultiSelect = false,
+                BackgroundColor = Color.White,
+                BorderStyle = BorderStyle.None,
+                AutoGenerateColumns = false,
+                ColumnHeadersVisible = true,
+                RowHeadersVisible = false,
+                GridColor = Color.White,
+                CellBorderStyle = DataGridViewCellBorderStyle.None
+            };
+
+            // Kolonları ekle
+            AddClampingColumn(dataGridView, "Date", "Tarih", 120);
+            AddClampingColumn(dataGridView, "OrderNo", "Sipariş No", 100);
+            AddClampingColumn(dataGridView, "Hatve", "Hatve", 80);
+            AddClampingColumn(dataGridView, "Size", "Ölçü", 80);
+            AddClampingColumn(dataGridView, "Length", "Uzunluk", 80);
+            AddClampingColumn(dataGridView, "ClampCount", "Adet", 80);
+            AddClampingColumn(dataGridView, "Customer", "Müşteri", 150);
+            AddClampingColumn(dataGridView, "UsedPlateCount", "Kullanılan Plaka Adedi", 150);
+            AddClampingColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 120);
+            AddClampingColumn(dataGridView, "SerialNumber", "Rulo Seri No", 120);
+            AddClampingColumn(dataGridView, "MachineName", "Makina Adı", 120);
+            AddClampingColumn(dataGridView, "EmployeeName", "Operatör", 150);
+
+            // Stil ayarları
+            dataGridView.ColumnHeadersVisible = true;
+            dataGridView.RowHeadersVisible = false;
+            dataGridView.EnableHeadersVisualStyles = false;
+            dataGridView.ColumnHeadersHeight = 40;
+            dataGridView.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            dataGridView.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
+            
+            dataGridView.ColumnHeadersDefaultCellStyle.BackColor = ThemeColors.Primary;
+            dataGridView.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            dataGridView.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            dataGridView.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dataGridView.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.False;
+
+            dataGridView.DefaultCellStyle.BackColor = Color.White;
+            dataGridView.BackgroundColor = Color.White;
+            dataGridView.DefaultCellStyle.ForeColor = ThemeColors.TextPrimary;
+            dataGridView.DefaultCellStyle.SelectionBackColor = ThemeColors.Primary;
+            dataGridView.DefaultCellStyle.SelectionForeColor = Color.White;
+            dataGridView.DefaultCellStyle.Font = new Font("Segoe UI", 9F);
+
+            gridPanel.Controls.Add(dataGridView);
+            
+            // TableLayoutPanel'e ekle
+            mainPanel.Controls.Add(buttonPanel, 0, 0);
+            mainPanel.Controls.Add(gridPanel, 0, 1);
+            
+            tab.Controls.Add(mainPanel);
+
+            // Event handler
+            btnEkle.Click += (s, e) => BtnClampingEkle_Click(dataGridView);
+
+            // Verileri yükle
+            LoadClampingData(dataGridView);
+        }
+
+        private void AddClampingColumn(DataGridView dgv, string dataPropertyName, string headerText, int width)
+        {
+            var column = new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = dataPropertyName,
+                HeaderText = headerText,
+                Name = dataPropertyName,
+                Width = width,
+                Visible = true,
+                ReadOnly = true
+            };
+            dgv.Columns.Add(column);
+        }
+
+        private void LoadClampingData(DataGridView dataGridView)
+        {
+            try
+            {
+                var clampings = _clampingRepository.GetByOrderId(_orderId);
+                var order = _orderRepository.GetById(_orderId);
+                
+                var data = clampings.Select(c => new
+                {
+                    c.Id,
+                    Date = c.ClampingDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
+                    OrderNo = order?.TrexOrderNo ?? "",
+                    Hatve = c.Hatve.ToString("F2", CultureInfo.InvariantCulture),
+                    Size = c.Size.ToString("F2", CultureInfo.InvariantCulture),
+                    Length = c.Length.ToString("F2", CultureInfo.InvariantCulture),
+                    ClampCount = c.ClampCount.ToString(),
+                    Customer = order?.Company?.Name ?? "",
+                    UsedPlateCount = c.UsedPlateCount.ToString(),
+                    PlateThickness = c.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
+                    SerialNumber = c.SerialNo?.SerialNumber ?? "",
+                    MachineName = c.Machine?.Name ?? "",
+                    EmployeeName = c.Employee != null ? $"{c.Employee.FirstName} {c.Employee.LastName}" : ""
+                }).ToList();
+
+                // DataSource'u null yap (kolonlar kaybolmasın diye)
+                dataGridView.DataSource = null;
+                
+                // Kolonların var olduğundan emin ol
+                if (dataGridView.Columns.Count == 0)
+                {
+                    AddClampingColumn(dataGridView, "Date", "Tarih", 120);
+                    AddClampingColumn(dataGridView, "OrderNo", "Sipariş No", 100);
+                    AddClampingColumn(dataGridView, "Hatve", "Hatve", 80);
+                    AddClampingColumn(dataGridView, "Size", "Ölçü", 80);
+                    AddClampingColumn(dataGridView, "Length", "Uzunluk", 80);
+                    AddClampingColumn(dataGridView, "ClampCount", "Adet", 80);
+                    AddClampingColumn(dataGridView, "Customer", "Müşteri", 150);
+                    AddClampingColumn(dataGridView, "UsedPlateCount", "Kullanılan Plaka Adedi", 150);
+                    AddClampingColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 120);
+                    AddClampingColumn(dataGridView, "SerialNumber", "Rulo Seri No", 120);
+                    AddClampingColumn(dataGridView, "MachineName", "Makina Adı", 120);
+                    AddClampingColumn(dataGridView, "EmployeeName", "Operatör", 150);
+                }
+
+                // Kolon başlıklarını kesinlikle göster
+                dataGridView.ColumnHeadersVisible = true;
+                dataGridView.RowHeadersVisible = false;
+                dataGridView.ColumnHeadersHeight = 40;
+                
+                // Veri kaynağını ayarla
+                dataGridView.DataSource = data;
+                
+                // DataSource ayarlandıktan SONRA HeaderText'leri tekrar ayarla
+                foreach (DataGridViewColumn column in dataGridView.Columns)
+                {
+                    column.Visible = true;
+                    column.ReadOnly = true;
+                    // HeaderText'i tekrar ayarla
+                    switch (column.Name)
+                    {
+                        case "Date": column.HeaderText = "Tarih"; break;
+                        case "OrderNo": column.HeaderText = "Sipariş No"; break;
+                        case "Hatve": column.HeaderText = "Hatve"; break;
+                        case "Size": column.HeaderText = "Ölçü"; break;
+                        case "Length": column.HeaderText = "Uzunluk"; break;
+                        case "ClampCount": column.HeaderText = "Adet"; break;
+                        case "Customer": column.HeaderText = "Müşteri"; break;
+                        case "UsedPlateCount": column.HeaderText = "Kullanılan Plaka Adedi"; break;
+                        case "PlateThickness": column.HeaderText = "Plaka Kalınlığı"; break;
+                        case "SerialNumber": column.HeaderText = "Rulo Seri No"; break;
+                        case "MachineName": column.HeaderText = "Makina Adı"; break;
+                        case "EmployeeName": column.HeaderText = "Operatör"; break;
+                    }
+                }
+                
+                // Yeniden çiz
+                dataGridView.Invalidate();
+                dataGridView.Update();
+                dataGridView.Refresh();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Kenetleme verileri yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BtnClampingEkle_Click(DataGridView dataGridView)
+        {
+            try
+            {
+                using (var dialog = new ClampingDialog(_serialNoRepository, _employeeRepository, _machineRepository, _pressingRepository, _orderId))
+                {
+                    if (dialog.ShowDialog() == DialogResult.OK)
+                    {
+                        // Verileri yeniden yükle
+                        LoadClampingData(dataGridView);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Kenetleme eklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void CreateAssemblyTab(TabPage tab)
+        {
+            // Ana panel - TableLayoutPanel kullan
+            var mainPanel = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 2,
+                BackColor = Color.White,
+                Padding = new Padding(20)
+            };
+            mainPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            mainPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F)); // Buton paneli için sabit yükseklik
+            mainPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F)); // Grid paneli için kalan alan
+
+            // Buton paneli - Üstte
+            var buttonPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Height = 50,
+                Padding = new Padding(0, 5, 20, 5),
+                BackColor = Color.White
+            };
+
+            // Ekle butonu
+            var btnEkle = ButtonFactory.CreateActionButton("➕ Ekle", ThemeColors.Primary, Color.White, 120, 35);
+            btnEkle.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            buttonPanel.Controls.Add(btnEkle);
+
+            // DataGridView paneli
+            var gridPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(0),
+                BackColor = Color.White
+            };
+
+            // DataGridView
+            var dataGridView = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                ReadOnly = true,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                MultiSelect = false,
+                BackgroundColor = Color.White,
+                BorderStyle = BorderStyle.None,
+                AutoGenerateColumns = false,
+                ColumnHeadersVisible = true,
+                RowHeadersVisible = false,
+                GridColor = Color.White,
+                CellBorderStyle = DataGridViewCellBorderStyle.None
+            };
+
+            // Kolonları ekle
+            AddAssemblyColumn(dataGridView, "Date", "Tarih", 120);
+            AddAssemblyColumn(dataGridView, "OrderNo", "Sipariş No", 100);
+            AddAssemblyColumn(dataGridView, "Hatve", "Hatve", 80);
+            AddAssemblyColumn(dataGridView, "Size", "Ölçü", 80);
+            AddAssemblyColumn(dataGridView, "Length", "Uzunluk", 80);
+            AddAssemblyColumn(dataGridView, "AssemblyCount", "Montaj Adedi", 100);
+            AddAssemblyColumn(dataGridView, "Customer", "Müşteri", 150);
+            AddAssemblyColumn(dataGridView, "UsedClampCount", "Kullanılan Kenet Adedi", 150);
+            AddAssemblyColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 120);
+            AddAssemblyColumn(dataGridView, "SerialNumber", "Rulo Seri No", 120);
+            AddAssemblyColumn(dataGridView, "EmployeeName", "Operatör", 150);
+
+            // Stil ayarları
+            dataGridView.ColumnHeadersVisible = true;
+            dataGridView.RowHeadersVisible = false;
+            dataGridView.EnableHeadersVisualStyles = false;
+            dataGridView.ColumnHeadersHeight = 40;
+            dataGridView.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            dataGridView.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
+            
+            dataGridView.ColumnHeadersDefaultCellStyle.BackColor = ThemeColors.Primary;
+            dataGridView.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            dataGridView.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            dataGridView.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dataGridView.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.False;
+
+            dataGridView.DefaultCellStyle.BackColor = Color.White;
+            dataGridView.BackgroundColor = Color.White;
+            dataGridView.DefaultCellStyle.ForeColor = ThemeColors.TextPrimary;
+            dataGridView.DefaultCellStyle.SelectionBackColor = ThemeColors.Primary;
+            dataGridView.DefaultCellStyle.SelectionForeColor = Color.White;
+            dataGridView.DefaultCellStyle.Font = new Font("Segoe UI", 9F);
+
+            gridPanel.Controls.Add(dataGridView);
+            
+            // TableLayoutPanel'e ekle
+            mainPanel.Controls.Add(buttonPanel, 0, 0);
+            mainPanel.Controls.Add(gridPanel, 0, 1);
+            
+            tab.Controls.Add(mainPanel);
+
+            // Event handler
+            btnEkle.Click += (s, e) => BtnAssemblyEkle_Click(dataGridView);
+
+            // Verileri yükle
+            LoadAssemblyData(dataGridView);
+        }
+
+        private void AddAssemblyColumn(DataGridView dgv, string dataPropertyName, string headerText, int width)
+        {
+            var column = new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = dataPropertyName,
+                HeaderText = headerText,
+                Name = dataPropertyName,
+                Width = width,
+                Visible = true,
+                ReadOnly = true
+            };
+            dgv.Columns.Add(column);
+        }
+
+        private void LoadAssemblyData(DataGridView dataGridView)
+        {
+            try
+            {
+                var assemblies = _assemblyRepository.GetByOrderId(_orderId);
+                var order = _orderRepository.GetById(_orderId);
+                
+                var data = assemblies.Select(a => new
+                {
+                    a.Id,
+                    Date = a.AssemblyDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
+                    OrderNo = order?.TrexOrderNo ?? "",
+                    Hatve = a.Hatve.ToString("F2", CultureInfo.InvariantCulture),
+                    Size = a.Size.ToString("F2", CultureInfo.InvariantCulture),
+                    Length = a.Length.ToString("F2", CultureInfo.InvariantCulture),
+                    AssemblyCount = a.AssemblyCount.ToString(),
+                    Customer = order?.Company?.Name ?? "",
+                    UsedClampCount = a.UsedClampCount.ToString(),
+                    PlateThickness = a.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
+                    SerialNumber = a.SerialNo?.SerialNumber ?? "",
+                    EmployeeName = a.Employee != null ? $"{a.Employee.FirstName} {a.Employee.LastName}" : ""
+                }).ToList();
+
+                // DataSource'u null yap (kolonlar kaybolmasın diye)
+                dataGridView.DataSource = null;
+                
+                // Kolonların var olduğundan emin ol
+                if (dataGridView.Columns.Count == 0)
+                {
+                    AddAssemblyColumn(dataGridView, "Date", "Tarih", 120);
+                    AddAssemblyColumn(dataGridView, "OrderNo", "Sipariş No", 100);
+                    AddAssemblyColumn(dataGridView, "Hatve", "Hatve", 80);
+                    AddAssemblyColumn(dataGridView, "Size", "Ölçü", 80);
+                    AddAssemblyColumn(dataGridView, "Length", "Uzunluk", 80);
+                    AddAssemblyColumn(dataGridView, "AssemblyCount", "Montaj Adedi", 100);
+                    AddAssemblyColumn(dataGridView, "Customer", "Müşteri", 150);
+                    AddAssemblyColumn(dataGridView, "UsedClampCount", "Kullanılan Kenet Adedi", 150);
+                    AddAssemblyColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 120);
+                    AddAssemblyColumn(dataGridView, "SerialNumber", "Rulo Seri No", 120);
+                    AddAssemblyColumn(dataGridView, "EmployeeName", "Operatör", 150);
+                }
+
+                dataGridView.DataSource = data;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Montaj verileri yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BtnAssemblyEkle_Click(DataGridView dataGridView)
+        {
+            try
+            {
+                using (var dialog = new AssemblyDialog(_employeeRepository, _orderId))
+                {
+                    if (dialog.ShowDialog() == DialogResult.OK)
+                    {
+                        // Verileri yeniden yükle
+                        LoadAssemblyData(dataGridView);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Montaj eklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

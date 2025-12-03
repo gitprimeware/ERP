@@ -30,6 +30,8 @@ namespace ERP.DAL
                     CreateMaterialExitsTable(connection);
                     CreateCuttingsTable(connection);
                     CreatePressingsTable(connection);
+                    CreateClampingsTable(connection);
+                    CreateAssembliesTable(connection);
                 }
             }
             catch (Exception ex)
@@ -627,6 +629,78 @@ namespace ERP.DAL
                     System.Diagnostics.Debug.WriteLine($"Pressings migration hatası: {ex.Message}");
                     // Hata durumunda da devam et, çünkü kolon zaten var olabilir
                 }
+            }
+        }
+
+        private static void CreateClampingsTable(SqlConnection connection)
+        {
+            var query = @"
+                IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Clampings]') AND type in (N'U'))
+                BEGIN
+                    CREATE TABLE [dbo].[Clampings] (
+                        [Id] UNIQUEIDENTIFIER PRIMARY KEY,
+                        [OrderId] UNIQUEIDENTIFIER NULL,
+                        [PressingId] UNIQUEIDENTIFIER NULL,
+                        [PlateThickness] DECIMAL(10,3) NOT NULL,
+                        [Hatve] DECIMAL(10,2) NOT NULL,
+                        [Size] DECIMAL(10,2) NOT NULL,
+                        [Length] DECIMAL(10,2) NOT NULL,
+                        [SerialNoId] UNIQUEIDENTIFIER NULL,
+                        [MachineId] UNIQUEIDENTIFIER NULL,
+                        [ClampCount] INT NOT NULL,
+                        [UsedPlateCount] INT NOT NULL,
+                        [EmployeeId] UNIQUEIDENTIFIER NULL,
+                        [ClampingDate] DATETIME NOT NULL,
+                        [CreatedDate] DATETIME NOT NULL,
+                        [ModifiedDate] DATETIME NULL,
+                        [IsActive] BIT NOT NULL DEFAULT 1,
+                        FOREIGN KEY ([OrderId]) REFERENCES [Orders]([Id]),
+                        FOREIGN KEY ([PressingId]) REFERENCES [Pressings]([Id]),
+                        FOREIGN KEY ([SerialNoId]) REFERENCES [SerialNos]([Id]),
+                        FOREIGN KEY ([MachineId]) REFERENCES [Machines]([Id]),
+                        FOREIGN KEY ([EmployeeId]) REFERENCES [Employees]([Id])
+                    )
+                END";
+
+            using (var command = new SqlCommand(query, connection))
+            {
+                command.ExecuteNonQuery();
+            }
+        }
+
+        private static void CreateAssembliesTable(SqlConnection connection)
+        {
+            var query = @"
+                IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Assemblies]') AND type in (N'U'))
+                BEGIN
+                    CREATE TABLE [dbo].[Assemblies] (
+                        [Id] UNIQUEIDENTIFIER PRIMARY KEY,
+                        [OrderId] UNIQUEIDENTIFIER NULL,
+                        [ClampingId] UNIQUEIDENTIFIER NULL,
+                        [PlateThickness] DECIMAL(10,3) NOT NULL,
+                        [Hatve] DECIMAL(10,2) NOT NULL,
+                        [Size] DECIMAL(10,2) NOT NULL,
+                        [Length] DECIMAL(10,2) NOT NULL,
+                        [SerialNoId] UNIQUEIDENTIFIER NULL,
+                        [MachineId] UNIQUEIDENTIFIER NULL,
+                        [AssemblyCount] INT NOT NULL,
+                        [UsedClampCount] INT NOT NULL,
+                        [EmployeeId] UNIQUEIDENTIFIER NULL,
+                        [AssemblyDate] DATETIME NOT NULL,
+                        [CreatedDate] DATETIME NOT NULL,
+                        [ModifiedDate] DATETIME NULL,
+                        [IsActive] BIT NOT NULL DEFAULT 1,
+                        FOREIGN KEY ([OrderId]) REFERENCES [Orders]([Id]),
+                        FOREIGN KEY ([ClampingId]) REFERENCES [Clampings]([Id]),
+                        FOREIGN KEY ([SerialNoId]) REFERENCES [SerialNos]([Id]),
+                        FOREIGN KEY ([MachineId]) REFERENCES [Machines]([Id]),
+                        FOREIGN KEY ([EmployeeId]) REFERENCES [Employees]([Id])
+                    )
+                END";
+
+            using (var command = new SqlCommand(query, connection))
+            {
+                command.ExecuteNonQuery();
             }
         }
 

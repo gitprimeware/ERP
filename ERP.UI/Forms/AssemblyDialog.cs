@@ -10,47 +10,42 @@ using ERP.UI.UI;
 
 namespace ERP.UI.Forms
 {
-    public partial class PressingDialog : Form
+    public partial class AssemblyDialog : Form
     {
-        private TextBox _txtGerekenPresAdedi; // Formülden hesaplanan gereken pres adedi
-        private Label _lblMevcutKesilmisStok; // Mevcut kesilmiş stok bilgisi
+        private TextBox _txtGerekenMontajAdedi; // Formülden hesaplanan gereken montaj adedi
+        private Label _lblMevcutKenetlenmisStok; // Mevcut kenetlenmiş stok bilgisi
         private Label _lblBilgilendirme; // Kullanıcı bilgilendirmesi
-        private CheckedListBox _clbKesilmisStoklar; // Multi-select kesilmiş stoklar
-        private TextBox _txtPressCount;
-        private TextBox _txtPressNo;
-        private TextBox _txtPressure;
-        private TextBox _txtWasteAmount;
+        private CheckedListBox _clbKenetlenmisStoklar; // Multi-select kenetlenmiş stoklar
+        private TextBox _txtAssemblyCount; // Toplam montaj adedi (readonly)
         private ComboBox _cmbEmployee;
         private Button _btnAddEmployee;
         private Button _btnSave;
         private Button _btnCancel;
         
-        // Seçilen kesilmiş stoklar için dictionary (CuttingId -> Seçilen adet)
-        private Dictionary<Guid, int> _selectedCuttings = new Dictionary<Guid, int>();
+        // Seçilen kenetlenmiş stoklar için dictionary (ClampingId -> Seçilen adet)
+        private Dictionary<Guid, int> _selectedClampings = new Dictionary<Guid, int>();
         
-        private SerialNoRepository _serialNoRepository;
         private EmployeeRepository _employeeRepository;
-        private PressingRepository _pressingRepository;
+        private AssemblyRepository _assemblyRepository;
         private OrderRepository _orderRepository;
-        private CuttingRepository _cuttingRepository;
+        private ClampingRepository _clampingRepository;
         private Guid _orderId;
 
-        public PressingDialog(SerialNoRepository serialNoRepository, EmployeeRepository employeeRepository, Guid orderId)
+        public AssemblyDialog(EmployeeRepository employeeRepository, Guid orderId)
         {
-            _serialNoRepository = serialNoRepository;
             _employeeRepository = employeeRepository;
-            _pressingRepository = new PressingRepository();
+            _assemblyRepository = new AssemblyRepository();
             _orderRepository = new OrderRepository();
-            _cuttingRepository = new CuttingRepository();
+            _clampingRepository = new ClampingRepository();
             _orderId = orderId;
             InitializeComponent();
         }
 
         private void InitializeComponent()
         {
-            this.Text = "Pres Yap";
+            this.Text = "Montaj Yap";
             this.Width = 600;
-            this.Height = 750;
+            this.Height = 700;
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -68,16 +63,16 @@ namespace ERP.UI.Forms
             int controlWidth = 400;
             int spacing = 35;
 
-            // Gereken Pres Adedi (Formülden - Readonly)
-            var lblGerekenPresAdedi = new Label
+            // Gereken Montaj Adedi (Formülden - Readonly)
+            var lblGerekenMontajAdedi = new Label
             {
-                Text = "Gereken Pres Adedi:",
+                Text = "Gereken Montaj Adedi:",
                 Location = new Point(20, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 ForeColor = ThemeColors.Primary
             };
-            _txtGerekenPresAdedi = new TextBox
+            _txtGerekenMontajAdedi = new TextBox
             {
                 Location = new Point(180, yPos - 3),
                 Width = controlWidth,
@@ -87,19 +82,19 @@ namespace ERP.UI.Forms
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 ForeColor = ThemeColors.Primary
             };
-            this.Controls.Add(lblGerekenPresAdedi);
-            this.Controls.Add(_txtGerekenPresAdedi);
+            this.Controls.Add(lblGerekenMontajAdedi);
+            this.Controls.Add(_txtGerekenMontajAdedi);
             yPos += spacing;
 
-            // Mevcut Kesilmiş Stok Bilgisi
+            // Mevcut Kenetlenmiş Stok Bilgisi
             var lblMevcutStokLabel = new Label
             {
-                Text = "Mevcut Kesilmiş Stok:",
+                Text = "Mevcut Kenetlenmiş Stok:",
                 Location = new Point(20, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F)
             };
-            _lblMevcutKesilmisStok = new Label
+            _lblMevcutKenetlenmisStok = new Label
             {
                 Location = new Point(180, yPos),
                 Width = controlWidth,
@@ -109,7 +104,7 @@ namespace ERP.UI.Forms
                 AutoSize = false
             };
             this.Controls.Add(lblMevcutStokLabel);
-            this.Controls.Add(_lblMevcutKesilmisStok);
+            this.Controls.Add(_lblMevcutKenetlenmisStok);
             yPos += spacing;
 
             // Bilgilendirme Mesajı
@@ -127,15 +122,15 @@ namespace ERP.UI.Forms
             this.Controls.Add(_lblBilgilendirme);
             yPos += 45;
 
-            // Kesilmiş Stoklar (Multi-select CheckedListBox)
-            var lblKesilmisStoklar = new Label
+            // Kenetlenmiş Stoklar (Multi-select CheckedListBox)
+            var lblKenetlenmisStoklar = new Label
             {
-                Text = "Kesilmiş Stoklardan Seçiniz:",
+                Text = "Kenetlenmiş Stoklardan Seçiniz:",
                 Location = new Point(20, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold)
             };
-            _clbKesilmisStoklar = new CheckedListBox
+            _clbKenetlenmisStoklar = new CheckedListBox
             {
                 Location = new Point(180, yPos - 3),
                 Width = controlWidth,
@@ -143,21 +138,21 @@ namespace ERP.UI.Forms
                 Font = new Font("Segoe UI", 9F),
                 BorderStyle = BorderStyle.FixedSingle
             };
-            _clbKesilmisStoklar.ItemCheck += ClbKesilmisStoklar_ItemCheck;
-            _clbKesilmisStoklar.MouseDoubleClick += ClbKesilmisStoklar_MouseDoubleClick;
-            this.Controls.Add(lblKesilmisStoklar);
-            this.Controls.Add(_clbKesilmisStoklar);
+            _clbKenetlenmisStoklar.ItemCheck += ClbKenetlenmisStoklar_ItemCheck;
+            _clbKenetlenmisStoklar.MouseDoubleClick += ClbKenetlenmisStoklar_MouseDoubleClick;
+            this.Controls.Add(lblKenetlenmisStoklar);
+            this.Controls.Add(_clbKenetlenmisStoklar);
             yPos += 160;
 
-            // Pres Adedi
-            var lblPressCount = new Label
+            // Montaj Adedi
+            var lblAssemblyCount = new Label
             {
-                Text = "Toplam Pres Adedi:",
+                Text = "Toplam Montaj Adedi:",
                 Location = new Point(20, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold)
             };
-            _txtPressCount = new TextBox
+            _txtAssemblyCount = new TextBox
             {
                 Location = new Point(180, yPos - 3),
                 Width = controlWidth,
@@ -166,66 +161,8 @@ namespace ERP.UI.Forms
                 ReadOnly = true,
                 BackColor = Color.LightGray
             };
-            _txtPressCount.TextChanged += TxtPressCount_TextChanged;
-            this.Controls.Add(lblPressCount);
-            this.Controls.Add(_txtPressCount);
-            yPos += spacing;
-
-            // Pres No
-            var lblPressNo = new Label
-            {
-                Text = "Pres No:",
-                Location = new Point(20, yPos),
-                Width = labelWidth,
-                Font = new Font("Segoe UI", 10F)
-            };
-            _txtPressNo = new TextBox
-            {
-                Location = new Point(180, yPos - 3),
-                Width = controlWidth,
-                Height = 30,
-                Font = new Font("Segoe UI", 10F)
-            };
-            this.Controls.Add(lblPressNo);
-            this.Controls.Add(_txtPressNo);
-            yPos += spacing;
-
-            // Basınç
-            var lblPressure = new Label
-            {
-                Text = "Basınç:",
-                Location = new Point(20, yPos),
-                Width = labelWidth,
-                Font = new Font("Segoe UI", 10F)
-            };
-            _txtPressure = new TextBox
-            {
-                Location = new Point(180, yPos - 3),
-                Width = controlWidth,
-                Height = 30,
-                Font = new Font("Segoe UI", 10F)
-            };
-            this.Controls.Add(lblPressure);
-            this.Controls.Add(_txtPressure);
-            yPos += spacing;
-
-            // Hurda Miktarı
-            var lblWasteAmount = new Label
-            {
-                Text = "Hurda Miktarı:",
-                Location = new Point(20, yPos),
-                Width = labelWidth,
-                Font = new Font("Segoe UI", 10F)
-            };
-            _txtWasteAmount = new TextBox
-            {
-                Location = new Point(180, yPos - 3),
-                Width = controlWidth,
-                Height = 30,
-                Font = new Font("Segoe UI", 10F)
-            };
-            this.Controls.Add(lblWasteAmount);
-            this.Controls.Add(_txtWasteAmount);
+            this.Controls.Add(lblAssemblyCount);
+            this.Controls.Add(_txtAssemblyCount);
             yPos += spacing;
 
             // Operatör
@@ -315,13 +252,13 @@ namespace ERP.UI.Forms
                     return;
                 }
 
-                // Gereken pres adedini hesapla (formül sayfasından - aynı plaka adedi formülü)
-                CalculateGerekenPresAdedi(order);
+                // Gereken montaj adedini hesapla (formül sayfasından - aynı plaka adedi formülü)
+                CalculateGerekenMontajAdedi(order);
 
-                // Tüm kesilmiş stokları yükle (sadece bu sipariş için değil, tüm stoktan)
-                LoadKesilmisStoklar(order);
+                // Tüm kenetlenmiş stokları yükle (sadece bu sipariş için değil, tüm stoktan)
+                LoadKenetlenmisStoklar(order);
 
-                // Mevcut kesilmiş stok bilgisini göster
+                // Mevcut kenetlenmiş stok bilgisini göster
                 LoadMevcutStokBilgisi(order);
 
                 // Kullanıcı bilgilendirmesini güncelle
@@ -336,20 +273,20 @@ namespace ERP.UI.Forms
             }
         }
 
-        private void CalculateGerekenPresAdedi(Order order)
+        private void CalculateGerekenMontajAdedi(Order order)
         {
             try
             {
                 if (order == null || string.IsNullOrEmpty(order.ProductCode))
                 {
-                    _txtGerekenPresAdedi.Text = "0";
+                    _txtGerekenMontajAdedi.Text = "0";
                     return;
                 }
 
                 var parts = order.ProductCode.Split('-');
                 if (parts.Length < 6)
                 {
-                    _txtGerekenPresAdedi.Text = "0";
+                    _txtGerekenMontajAdedi.Text = "0";
                     return;
                 }
 
@@ -396,16 +333,17 @@ namespace ERP.UI.Forms
                 int toplamSiparisAdedi = order.Quantity * boyAdet * plakaAdet;
 
                 // Formül: plaka adedi = (Kapaksız Yükseklik (mm) / 100) * 10cm Plaka Adedi * Toplam Sipariş Adedi
-                // Pres adedi = Plaka adedi (çünkü her plaka bir pres işlemi gerektirir)
+                // Montaj adedi = Sipariş adedi (çünkü her ürün bir montaj işlemi gerektirir)
                 decimal onCmDilimi = kapaksizYukseklikMM / 100m;
-                decimal gerekenPresAdedi = onCmDilimi * plakaAdedi10cm * toplamSiparisAdedi;
+                decimal gerekenPlakaAdedi = onCmDilimi * plakaAdedi10cm * toplamSiparisAdedi;
                 
-                _txtGerekenPresAdedi.Text = Math.Round(gerekenPresAdedi, 0, MidpointRounding.AwayFromZero).ToString(CultureInfo.InvariantCulture);
+                // Montaj adedi = Sipariş adedi
+                _txtGerekenMontajAdedi.Text = order.Quantity.ToString();
             }
             catch (Exception ex)
             {
-                _txtGerekenPresAdedi.Text = "0";
-                System.Diagnostics.Debug.WriteLine($"Gereken pres adedi hesaplanırken hata: {ex.Message}");
+                _txtGerekenMontajAdedi.Text = "0";
+                System.Diagnostics.Debug.WriteLine($"Gereken montaj adedi hesaplanırken hata: {ex.Message}");
             }
         }
 
@@ -421,12 +359,12 @@ namespace ERP.UI.Forms
             }
         }
 
-        private void LoadKesilmisStoklar(Order order)
+        private void LoadKenetlenmisStoklar(Order order)
         {
             try
             {
-                _clbKesilmisStoklar.Items.Clear();
-                _selectedCuttings.Clear();
+                _clbKenetlenmisStoklar.Items.Clear();
+                _selectedClampings.Clear();
 
                 if (order == null || string.IsNullOrEmpty(order.ProductCode))
                     return;
@@ -451,51 +389,51 @@ namespace ERP.UI.Forms
                     size = size / 10; // cm'ye çevir
                 }
 
-                // Tüm kesilmiş stokları yükle (aynı hatve ve ölçü için)
-                var allCuttings = _cuttingRepository.GetAll()
+                // Tüm kenetlenmiş stokları yükle (aynı hatve ve ölçü için)
+                var allClampings = _clampingRepository.GetAll()
                     .Where(c => Math.Abs(c.Hatve - hatve) < 0.01m && 
                                 Math.Abs(c.Size - size) < 0.1m && 
-                                c.PlakaAdedi > 0 && 
+                                c.ClampCount > 0 && 
                                 c.IsActive)
-                    .OrderByDescending(c => c.CuttingDate)
+                    .OrderByDescending(c => c.ClampingDate)
                     .ToList();
 
-                foreach (var cutting in allCuttings)
+                foreach (var clamping in allClampings)
                 {
-                    // Kullanılan plaka adedini hesapla
-                    var usedPlakaAdedi = _pressingRepository.GetAll()
-                        .Where(p => p.CuttingId == cutting.Id && p.IsActive)
-                        .Sum(p => p.PressCount);
+                    // Kullanılan kenet adedini hesapla (montaj işlemlerinde kullanılan)
+                    var usedClampCount = _assemblyRepository.GetAll()
+                        .Where(a => a.ClampingId == clamping.Id && a.IsActive)
+                        .Sum(a => a.UsedClampCount);
                     
-                    int kalanPlakaAdedi = cutting.PlakaAdedi - usedPlakaAdedi;
+                    int kalanKenetAdedi = clamping.ClampCount - usedClampCount;
                     
-                    if (kalanPlakaAdedi > 0)
+                    if (kalanKenetAdedi > 0)
                     {
-                        var orderInfo = cutting.OrderId.HasValue ? _orderRepository.GetById(cutting.OrderId.Value) : null;
+                        var orderInfo = clamping.OrderId.HasValue ? _orderRepository.GetById(clamping.OrderId.Value) : null;
                         string orderNo = orderInfo?.TrexOrderNo ?? "-";
                         
-                        string displayText = $"Kesim #{cutting.CuttingDate:dd.MM.yyyy} - Sipariş: {orderNo} - {kalanPlakaAdedi} adet kalan";
-                        var cuttingItem = new CuttingItem 
+                        string displayText = $"Kenet #{clamping.ClampingDate:dd.MM.yyyy} - Sipariş: {orderNo} - {kalanKenetAdedi} adet kalan";
+                        var clampingItem = new ClampingItem 
                         { 
-                            CuttingId = cutting.Id,
-                            Cutting = cutting,
-                            KalanAdet = kalanPlakaAdedi,
+                            ClampingId = clamping.Id,
+                            Clamping = clamping,
+                            KalanAdet = kalanKenetAdedi,
                             DisplayText = displayText
                         };
-                        _clbKesilmisStoklar.Items.Add(cuttingItem, false);
+                        _clbKenetlenmisStoklar.Items.Add(clampingItem, false);
                         
                         // Eğer daha önce seçilmişse, checkbox'ı işaretle
-                        if (_selectedCuttings.ContainsKey(cutting.Id))
+                        if (_selectedClampings.ContainsKey(clamping.Id))
                         {
-                            int index = _clbKesilmisStoklar.Items.Count - 1;
-                            _clbKesilmisStoklar.SetItemChecked(index, true);
+                            int index = _clbKenetlenmisStoklar.Items.Count - 1;
+                            _clbKenetlenmisStoklar.SetItemChecked(index, true);
                         }
                     }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Kesilmiş stoklar yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Kenetlenmiş stoklar yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -505,21 +443,21 @@ namespace ERP.UI.Forms
             {
                 if (order == null || string.IsNullOrEmpty(order.ProductCode))
                 {
-                    _lblMevcutKesilmisStok.Text = "Stok bilgisi bulunamadı";
+                    _lblMevcutKenetlenmisStok.Text = "Stok bilgisi bulunamadı";
                     return;
                 }
 
                 var parts = order.ProductCode.Split('-');
                 if (parts.Length < 3)
                 {
-                    _lblMevcutKesilmisStok.Text = "Stok bilgisi bulunamadı";
+                    _lblMevcutKenetlenmisStok.Text = "Stok bilgisi bulunamadı";
                     return;
                 }
 
                 string modelProfile = parts[2];
                 if (modelProfile.Length == 0)
                 {
-                    _lblMevcutKesilmisStok.Text = "Stok bilgisi bulunamadı";
+                    _lblMevcutKenetlenmisStok.Text = "Stok bilgisi bulunamadı";
                     return;
                 }
 
@@ -534,29 +472,29 @@ namespace ERP.UI.Forms
                 }
 
                 // Toplam mevcut stok
-                var mevcutKesilmisler = _cuttingRepository.GetAll()
+                var mevcutKenetlenmisler = _clampingRepository.GetAll()
                     .Where(c => Math.Abs(c.Hatve - hatve) < 0.01m && 
                                 Math.Abs(c.Size - size) < 0.1m && 
                                 c.IsActive)
                     .ToList();
 
                 int toplamMevcutStok = 0;
-                foreach (var cutting in mevcutKesilmisler)
+                foreach (var clamping in mevcutKenetlenmisler)
                 {
-                    var kullanilanPlakaAdedi = _pressingRepository.GetAll()
-                        .Where(p => p.CuttingId == cutting.Id && p.IsActive)
-                        .Sum(p => p.PressCount);
+                    var kullanilanKenetAdedi = _assemblyRepository.GetAll()
+                        .Where(a => a.ClampingId == clamping.Id && a.IsActive)
+                        .Sum(a => a.UsedClampCount);
                     
-                    int kalanPlakaAdedi = cutting.PlakaAdedi - kullanilanPlakaAdedi;
-                    if (kalanPlakaAdedi > 0)
-                        toplamMevcutStok += kalanPlakaAdedi;
+                    int kalanKenetAdedi = clamping.ClampCount - kullanilanKenetAdedi;
+                    if (kalanKenetAdedi > 0)
+                        toplamMevcutStok += kalanKenetAdedi;
                 }
 
-                _lblMevcutKesilmisStok.Text = $"{toplamMevcutStok} adet (Hatve: {hatve:F2}, Ölçü: {size:F1}cm)";
+                _lblMevcutKenetlenmisStok.Text = $"{toplamMevcutStok} adet (Hatve: {hatve:F2}, Ölçü: {size:F1}cm)";
             }
             catch (Exception ex)
             {
-                _lblMevcutKesilmisStok.Text = "Stok bilgisi yüklenemedi";
+                _lblMevcutKenetlenmisStok.Text = "Stok bilgisi yüklenemedi";
                 System.Diagnostics.Debug.WriteLine($"Mevcut stok bilgisi yüklenirken hata: {ex.Message}");
             }
         }
@@ -572,10 +510,10 @@ namespace ERP.UI.Forms
                 }
 
                 int gereken = 0;
-                int.TryParse(_txtGerekenPresAdedi.Text, out gereken);
+                int.TryParse(_txtGerekenMontajAdedi.Text, out gereken);
 
                 int mevcut = 0;
-                string mevcutText = _lblMevcutKesilmisStok.Text;
+                string mevcutText = _lblMevcutKenetlenmisStok.Text;
                 if (!string.IsNullOrEmpty(mevcutText))
                 {
                     var mevcutParts = mevcutText.Split(' ');
@@ -600,7 +538,7 @@ namespace ERP.UI.Forms
                 }
                 else
                 {
-                    _lblBilgilendirme.Text = "Formül bilgisi eksik, gereken pres adedi hesaplanamadı.";
+                    _lblBilgilendirme.Text = "Formül bilgisi eksik, gereken montaj adedi hesaplanamadı.";
                 }
             }
             catch (Exception ex)
@@ -610,64 +548,64 @@ namespace ERP.UI.Forms
             }
         }
 
-        private void ClbKesilmisStoklar_ItemCheck(object sender, ItemCheckEventArgs e)
+        private void ClbKenetlenmisStoklar_ItemCheck(object sender, ItemCheckEventArgs e)
         {
             // ItemCheck event'i önce çalışır, bu yüzden async olarak güncelleme yapmalıyız
             this.BeginInvoke((MethodInvoker)delegate
             {
-                var item = _clbKesilmisStoklar.Items[e.Index] as CuttingItem;
+                var item = _clbKenetlenmisStoklar.Items[e.Index] as ClampingItem;
                 if (item == null) return;
 
                 if (e.NewValue == CheckState.Checked)
                 {
                     // Item seçildiğinde, kullanılacak adet sor
                     // Eğer daha önce seçilmişse, önceki değeri göster
-                    int oncekiAdet = _selectedCuttings.ContainsKey(item.CuttingId) ? _selectedCuttings[item.CuttingId] : item.KalanAdet;
+                    int oncekiAdet = _selectedClampings.ContainsKey(item.ClampingId) ? _selectedClampings[item.ClampingId] : item.KalanAdet;
                     int kullanilacakAdet = ShowKullanilacakAdetDialog(item, oncekiAdet);
                     if (kullanilacakAdet > 0)
                     {
-                        _selectedCuttings[item.CuttingId] = kullanilacakAdet;
+                        _selectedClampings[item.ClampingId] = kullanilacakAdet;
                     }
                     else
                     {
                         // Kullanıcı iptal etti veya 0 girdi, seçimi geri al
-                        _clbKesilmisStoklar.SetItemChecked(e.Index, false);
+                        _clbKenetlenmisStoklar.SetItemChecked(e.Index, false);
                         return;
                     }
                 }
                 else
                 {
                     // Item seçimi kaldırıldığında, dictionary'den çıkar
-                    _selectedCuttings.Remove(item.CuttingId);
+                    _selectedClampings.Remove(item.ClampingId);
                 }
 
-                UpdatePressCount();
+                UpdateAssemblyCount();
                 UpdateBilgilendirme(_orderRepository.GetById(_orderId));
             });
         }
 
-        private void ClbKesilmisStoklar_MouseDoubleClick(object sender, MouseEventArgs e)
+        private void ClbKenetlenmisStoklar_MouseDoubleClick(object sender, MouseEventArgs e)
         {
             // Çift tıklama ile seçili item'ın kullanılacak adedini değiştir
-            int index = _clbKesilmisStoklar.IndexFromPoint(e.Location);
-            if (index >= 0 && _clbKesilmisStoklar.GetItemChecked(index))
+            int index = _clbKenetlenmisStoklar.IndexFromPoint(e.Location);
+            if (index >= 0 && _clbKenetlenmisStoklar.GetItemChecked(index))
             {
-                var item = _clbKesilmisStoklar.Items[index] as CuttingItem;
+                var item = _clbKenetlenmisStoklar.Items[index] as ClampingItem;
                 if (item != null)
                 {
-                    int mevcutAdet = _selectedCuttings.ContainsKey(item.CuttingId) ? _selectedCuttings[item.CuttingId] : item.KalanAdet;
+                    int mevcutAdet = _selectedClampings.ContainsKey(item.ClampingId) ? _selectedClampings[item.ClampingId] : item.KalanAdet;
                     int yeniAdet = ShowKullanilacakAdetDialog(item, mevcutAdet);
                     if (yeniAdet > 0)
                     {
-                        _selectedCuttings[item.CuttingId] = yeniAdet;
-                        UpdatePressCount();
+                        _selectedClampings[item.ClampingId] = yeniAdet;
+                        UpdateAssemblyCount();
                         UpdateBilgilendirme(_orderRepository.GetById(_orderId));
                     }
                 }
             }
         }
 
-        private int ShowKullanilacakAdetDialog(CuttingItem item, int oncekiAdet = 0)
+        private int ShowKullanilacakAdetDialog(ClampingItem item, int oncekiAdet = 0)
         {
             using (var dialog = new Form
             {
@@ -682,7 +620,7 @@ namespace ERP.UI.Forms
             {
                 var lblInfo = new Label
                 {
-                    Text = $"Kesim: {item.DisplayText}\n\nMaksimum kullanılabilir: {item.KalanAdet} adet",
+                    Text = $"Kenet: {item.DisplayText}\n\nMaksimum kullanılabilir: {item.KalanAdet} adet",
                     Location = new Point(20, 20),
                     Width = 350,
                     Height = 60,
@@ -735,32 +673,21 @@ namespace ERP.UI.Forms
             return 0;
         }
 
-        private void UpdateSelectedCuttings()
-        {
-            // Bu metod artık kullanılmıyor, ClbKesilmisStoklar_ItemCheck içinde direkt yapılıyor
-            // Ama geriye dönük uyumluluk için bırakıyoruz
-        }
-
         private int GetSelectedTotalCount()
         {
-            return _selectedCuttings.Values.Sum();
+            return _selectedClampings.Values.Sum();
         }
 
-        private void UpdatePressCount()
+        private void UpdateAssemblyCount()
         {
             int toplam = GetSelectedTotalCount();
-            _txtPressCount.Text = toplam.ToString();
+            _txtAssemblyCount.Text = toplam.ToString();
         }
 
-        private void TxtPressCount_TextChanged(object sender, EventArgs e)
+        private class ClampingItem
         {
-            // Readonly olduğu için bu event tetiklenmeyecek
-        }
-
-        private class CuttingItem
-        {
-            public Guid CuttingId { get; set; }
-            public Cutting Cutting { get; set; }
+            public Guid ClampingId { get; set; }
+            public Clamping Clamping { get; set; }
             public int KalanAdet { get; set; }
             public string DisplayText { get; set; }
 
@@ -909,10 +836,11 @@ namespace ERP.UI.Forms
                     return;
                 }
 
-                // Ürün kodundan plaka kalınlığını hesapla
+                // Ürün kodundan bilgileri hesapla
                 decimal plateThickness = 0;
                 decimal hatve = 0;
                 decimal size = 0;
+                decimal length = 0;
                 
                 if (!string.IsNullOrEmpty(order.ProductCode))
                 {
@@ -940,60 +868,58 @@ namespace ERP.UI.Forms
                     }
                 }
 
-                // Seçilen kesilmiş stoklar için pres kayıtları oluştur
+                // Seçilen kenetlenmiş stoklar için montaj kayıtları oluştur
                 bool hasError = false;
                 string errorMessage = "";
 
-                foreach (var selectedCutting in _selectedCuttings)
+                foreach (var selectedClamping in _selectedClampings)
                 {
-                    var cutting = _cuttingRepository.GetById(selectedCutting.Key);
-                    if (cutting == null)
+                    var clamping = _clampingRepository.GetById(selectedClamping.Key);
+                    if (clamping == null)
                         continue;
 
-                    int kullanilacakAdet = selectedCutting.Value;
+                    int kullanilacakAdet = selectedClamping.Value;
 
-                    // Bu kesim için zaten kullanılan adeti kontrol et
-                    var usedPlakaAdedi = _pressingRepository.GetAll()
-                        .Where(p => p.CuttingId == cutting.Id && p.IsActive)
-                        .Sum(p => p.PressCount);
+                    // Bu kenet için zaten kullanılan adeti kontrol et
+                    var usedClampCount = _assemblyRepository.GetAll()
+                        .Where(a => a.ClampingId == clamping.Id && a.IsActive)
+                        .Sum(a => a.UsedClampCount);
                     
-                    int kalanPlakaAdedi = cutting.PlakaAdedi - usedPlakaAdedi;
+                    int kalanKenetAdedi = clamping.ClampCount - usedClampCount;
                     
-                    if (kullanilacakAdet > kalanPlakaAdedi)
+                    if (kullanilacakAdet > kalanKenetAdedi)
                     {
                         hasError = true;
-                        errorMessage += $"Kesim #{cutting.CuttingDate:dd.MM.yyyy} için yeterli stok yok (Kalan: {kalanPlakaAdedi}, İstenen: {kullanilacakAdet})\n";
+                        errorMessage += $"Kenet #{clamping.ClampingDate:dd.MM.yyyy} için yeterli stok yok (Kalan: {kalanKenetAdedi}, İstenen: {kullanilacakAdet})\n";
                         continue;
                     }
 
-                    // Pres kaydı oluştur
-                    var pressing = new Pressing
+                    // Montaj kaydı oluştur
+                    var assembly = new Assembly
                     {
                         OrderId = _orderId,
-                        PlateThickness = plateThickness > 0 ? plateThickness : cutting.Size, // Varsayılan olarak Size kullan
-                        Hatve = hatve > 0 ? hatve : cutting.Hatve,
-                        Size = size > 0 ? size : cutting.Size,
-                        SerialNoId = cutting.SerialNoId,
-                        CuttingId = cutting.Id,
-                        PressNo = _txtPressNo.Text,
-                        Pressure = decimal.Parse(_txtPressure.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
-                        PressCount = kullanilacakAdet,
-                        WasteAmount = !string.IsNullOrWhiteSpace(_txtWasteAmount.Text) ? 
-                                     decimal.Parse(_txtWasteAmount.Text, NumberStyles.Any, CultureInfo.InvariantCulture) : 0,
+                        PlateThickness = plateThickness > 0 ? plateThickness : clamping.PlateThickness,
+                        Hatve = hatve > 0 ? hatve : clamping.Hatve,
+                        Size = size > 0 ? size : clamping.Size,
+                        Length = length > 0 ? length : clamping.Length,
+                        SerialNoId = clamping.SerialNoId,
+                        ClampingId = clamping.Id,
+                        AssemblyCount = 1, // Her montaj kaydı bir ürün montajını temsil eder
+                        UsedClampCount = kullanilacakAdet,
                         EmployeeId = _cmbEmployee.SelectedItem != null ? GetSelectedId(_cmbEmployee) : (Guid?)null,
-                        PressingDate = DateTime.Now
+                        AssemblyDate = DateTime.Now
                     };
 
-                    _pressingRepository.Insert(pressing);
+                    _assemblyRepository.Insert(assembly);
                 }
 
                 if (hasError)
                 {
-                    MessageBox.Show("Bazı pres kayıtları oluşturulamadı:\n\n" + errorMessage, "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("Bazı montaj kayıtları oluşturulamadı:\n\n" + errorMessage, "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
                 else
                 {
-                    MessageBox.Show("Pres kayıtları başarıyla oluşturuldu!", "Başarılı", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show("Montaj kayıtları başarıyla oluşturuldu!", "Başarılı", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
 
                 this.DialogResult = DialogResult.OK;
@@ -1001,35 +927,35 @@ namespace ERP.UI.Forms
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Pres kaydedilirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Montaj kaydedilirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         private bool ValidateForm()
         {
-            // Kesilmiş stok seçimi kontrolü
-            if (_selectedCuttings.Count == 0)
+            // Kenetlenmiş stok seçimi kontrolü
+            if (_selectedClampings.Count == 0)
             {
-                MessageBox.Show("Lütfen en az bir kesilmiş stok seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Lütfen en az bir kenetlenmiş stok seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
 
-            // Toplam pres adedi kontrolü
-            int toplamPresAdedi = GetSelectedTotalCount();
-            if (toplamPresAdedi <= 0)
+            // Toplam montaj adedi kontrolü
+            int toplamMontajAdedi = GetSelectedTotalCount();
+            if (toplamMontajAdedi <= 0)
             {
-                MessageBox.Show("Seçilen kesilmiş stoklardan toplam pres adedi 0'dan büyük olmalıdır.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Seçilen kenetlenmiş stoklardan toplam montaj adedi 0'dan büyük olmalıdır.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
 
-            // Gereken pres adedi kontrolü
+            // Gereken montaj adedi kontrolü
             int gereken = 0;
-            int.TryParse(_txtGerekenPresAdedi.Text, out gereken);
+            int.TryParse(_txtGerekenMontajAdedi.Text, out gereken);
             
-            if (gereken > 0 && toplamPresAdedi < gereken)
+            if (gereken > 0 && toplamMontajAdedi < gereken)
             {
                 var result = MessageBox.Show(
-                    $"Gereken pres adedi: {gereken}, seçilen: {toplamPresAdedi}.\nDevam etmek istiyor musunuz?",
+                    $"Gereken montaj adedi: {gereken}, seçilen: {toplamMontajAdedi}.\nDevam etmek istiyor musunuz?",
                     "Uyarı",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Question);
@@ -1038,44 +964,23 @@ namespace ERP.UI.Forms
                     return false;
             }
 
-            if (string.IsNullOrWhiteSpace(_txtPressNo.Text))
+            // Seçilen kenetlenmiş stoklar için adet kontrolü
+            foreach (var selectedClamping in _selectedClampings)
             {
-                MessageBox.Show("Lütfen pres no giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return false;
-            }
-
-            if (string.IsNullOrWhiteSpace(_txtPressure.Text) || !decimal.TryParse(_txtPressure.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal pressure) || pressure <= 0)
-            {
-                MessageBox.Show("Lütfen geçerli bir basınç giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return false;
-            }
-
-            // Seçilen kesilmiş stoklar için adet kontrolü
-            foreach (var selectedCutting in _selectedCuttings)
-            {
-                var cutting = _cuttingRepository.GetById(selectedCutting.Key);
-                if (cutting != null)
+                var clamping = _clampingRepository.GetById(selectedClamping.Key);
+                if (clamping != null)
                 {
-                    var usedPlakaAdedi = _pressingRepository.GetAll()
-                        .Where(p => p.CuttingId == cutting.Id && p.IsActive)
-                        .Sum(p => p.PressCount);
+                    var usedClampCount = _assemblyRepository.GetAll()
+                        .Where(a => a.ClampingId == clamping.Id && a.IsActive)
+                        .Sum(a => a.UsedClampCount);
                     
-                    int kalanPlakaAdedi = cutting.PlakaAdedi - usedPlakaAdedi;
+                    int kalanKenetAdedi = clamping.ClampCount - usedClampCount;
                     
-                    if (selectedCutting.Value > kalanPlakaAdedi)
+                    if (selectedClamping.Value > kalanKenetAdedi)
                     {
-                        MessageBox.Show($"Kesim #{cutting.CuttingDate:dd.MM.yyyy} için yeterli stok yok (Kalan: {kalanPlakaAdedi}, Seçilen: {selectedCutting.Value})", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        MessageBox.Show($"Kenet #{clamping.ClampingDate:dd.MM.yyyy} için yeterli stok yok (Kalan: {kalanKenetAdedi}, Seçilen: {selectedClamping.Value})", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         return false;
                     }
-                }
-            }
-
-            if (!string.IsNullOrWhiteSpace(_txtWasteAmount.Text))
-            {
-                if (!decimal.TryParse(_txtWasteAmount.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal wasteAmount))
-                {
-                    MessageBox.Show("Lütfen geçerli bir hurda miktarı giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return false;
                 }
             }
 

@@ -15,6 +15,10 @@ namespace ERP.UI.Forms
         private Panel _mainPanel;
         private DataGridView _dataGridView;
         private PressingRepository _pressingRepository;
+        private ClampingRepository _clampingRepository;
+        private SerialNoRepository _serialNoRepository;
+        private EmployeeRepository _employeeRepository;
+        private MachineRepository _machineRepository;
 
         // Model kodları
         private readonly string[] _modelCodes = new string[]
@@ -29,6 +33,10 @@ namespace ERP.UI.Forms
         public PreslenmisStokTakipForm()
         {
             _pressingRepository = new PressingRepository();
+            _clampingRepository = new ClampingRepository();
+            _serialNoRepository = new SerialNoRepository();
+            _employeeRepository = new EmployeeRepository();
+            _machineRepository = new MachineRepository();
             InitializeCustomComponents();
         }
 
@@ -53,22 +61,52 @@ namespace ERP.UI.Forms
 
             UIHelper.ApplyCardStyle(_mainPanel, 12);
 
-            // Başlık
+            // Başlık ve buton paneli
+            var headerPanel = new Panel
+            {
+                Location = new Point(30, 30),
+                Width = _mainPanel.Width - 60,
+                Height = 50,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                BackColor = Color.Transparent
+            };
+
             var titleLabel = new Label
             {
                 Text = "Preslenmiş Stok Takip",
                 Font = new Font("Segoe UI", 20F, FontStyle.Bold),
                 ForeColor = ThemeColors.Primary,
                 AutoSize = true,
-                Location = new Point(30, 30)
+                Location = new Point(0, 10)
             };
+
+            // Yeni Kenetleme Ekle butonu
+            var btnKenetlemeEkle = new Button
+            {
+                Text = "➕ Yeni Kenetleme Ekle",
+                Location = new Point(headerPanel.Width - 200, 5),
+                Width = 180,
+                Height = 35,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                BackColor = ThemeColors.Primary,
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                FlatStyle = FlatStyle.Flat
+            };
+            btnKenetlemeEkle.FlatAppearance.BorderSize = 0;
+            btnKenetlemeEkle.Click += BtnKenetlemeEkle_Click;
+            UIHelper.ApplyRoundedButton(btnKenetlemeEkle, 4);
+
+            headerPanel.Controls.Add(titleLabel);
+            headerPanel.Controls.Add(btnKenetlemeEkle);
 
             // DataGridView
             _dataGridView = new DataGridView
             {
-                Location = new Point(30, 80),
+                Location = new Point(30, 90),
                 Width = _mainPanel.Width - 60,
-                Height = _mainPanel.Height - 130,
+                Height = _mainPanel.Height - 140,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
                 AllowUserToAddRows = false,
@@ -84,7 +122,9 @@ namespace ERP.UI.Forms
             _mainPanel.Resize += (s, e) =>
             {
                 _dataGridView.Width = _mainPanel.Width - 60;
-                _dataGridView.Height = _mainPanel.Height - 130;
+                _dataGridView.Height = _mainPanel.Height - 140;
+                headerPanel.Width = _mainPanel.Width - 60;
+                btnKenetlemeEkle.Location = new Point(headerPanel.Width - 200, 5);
             };
 
             // Kolonlar
@@ -112,7 +152,7 @@ namespace ERP.UI.Forms
                 Width = 150
             });
 
-            _mainPanel.Controls.Add(titleLabel);
+            _mainPanel.Controls.Add(headerPanel);
             _mainPanel.Controls.Add(_dataGridView);
 
             this.Controls.Add(_mainPanel);
@@ -142,13 +182,28 @@ namespace ERP.UI.Forms
                 }
                 else
                 {
+                    // Kenetleme işlemlerinden kullanılan plaka adedini hesapla
+                    var allClampings = _clampingRepository.GetAll();
+                    var usedPlateCountByPressingId = allClampings
+                        .Where(c => c.PressingId.HasValue)
+                        .GroupBy(c => c.PressingId.Value)
+                        .ToDictionary(g => g.Key, g => g.Sum(c => c.UsedPlateCount));
+
                     foreach (var modelCode in _modelCodes)
                     {
                         // Model koduna göre pres işlemlerini filtrele
                         var modelPressings = GetPressingsForModel(pressings, modelCode);
                         
-                        // Plaka adedi toplamını hesapla
-                        int totalPlakaAdedi = modelPressings.Sum(p => p.PressCount);
+                        // Plaka adedi toplamını hesapla (kenetleme işlemlerinden kullanılanları çıkar)
+                        int totalPlakaAdedi = modelPressings.Sum(p =>
+                        {
+                            int usedPlateCount = 0;
+                            if (usedPlateCountByPressingId.ContainsKey(p.Id))
+                            {
+                                usedPlateCount = usedPlateCountByPressingId[p.Id];
+                            }
+                            return p.PressCount - usedPlateCount;
+                        });
 
                         // Stok ürünler bilgisini oluştur (örnek: "H20 - 50cm x 0.165")
                         string stokUrunler = GetStokUrunlerInfo(modelPressings, modelCode);
@@ -223,6 +278,26 @@ namespace ERP.UI.Forms
             // Pres işlemlerinden örnek bilgileri al
             var firstPressing = pressings.First();
             return $"{modelCode} - {firstPressing.Size}cm x {firstPressing.PlateThickness}";
+        }
+
+        private void BtnKenetlemeEkle_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // OrderId null olarak gönder - tüm preslenmiş stoktan seçim yapılabilir
+                using (var dialog = new ClampingDialog(_serialNoRepository, _employeeRepository, _machineRepository, _pressingRepository, Guid.Empty))
+                {
+                    if (dialog.ShowDialog() == DialogResult.OK)
+                    {
+                        // Verileri yeniden yükle
+                        LoadData();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Kenetleme eklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private class StockRowData

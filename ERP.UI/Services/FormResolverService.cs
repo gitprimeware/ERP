@@ -69,6 +69,7 @@ namespace ERP.UI.Services
             RegisterForm("RuloStokTakip", typeof(RuloStokTakipForm), "Rulo Stok Takip");
             RegisterForm("KesilmisStokTakip", typeof(KesilmisStokTakipForm), "Kesilmiş Stok Takip");
             RegisterForm("PreslenmisStokTakip", typeof(PreslenmisStokTakipForm), "Preslenmiş Stok Takip");
+            RegisterForm("KenetlenmisStokTakip", typeof(KenetlenmisStokTakipForm), "Kenetlenmiş Stok Takip");
             RegisterForm("Consumption", typeof(ConsumptionListForm), "Sarfiyat");
             RegisterForm("ConsumptionDetail", typeof(ConsumptionDetailForm), "Sarfiyat Detayları");
             RegisterForm("MaterialEntry", typeof(MaterialEntryForm), "Malzeme Giriş");

@@ -30,8 +30,9 @@ namespace ERP.UI.Services
             productionItem.AddSubMenuItem(new MenuItem("📦 Rulo Stok Takip", "RuloStokTakip", "📦", 2));
             productionItem.AddSubMenuItem(new MenuItem("✂️ Kesilmiş Stok Takip", "KesilmisStokTakip", "✂️", 3));
             productionItem.AddSubMenuItem(new MenuItem("📦 Preslenmiş Stok Takip", "PreslenmisStokTakip", "📦", 4));
-            productionItem.AddSubMenuItem(new MenuItem("📐 Formül", "ProductionFormul", "📐", 5));
-            productionItem.AddSubMenuItem(new MenuItem("📄 Rapor", "ProductionReport", "📄", 6));
+            productionItem.AddSubMenuItem(new MenuItem("🔗 Kenetlenmiş Stok Takip", "KenetlenmisStokTakip", "🔗", 5));
+            productionItem.AddSubMenuItem(new MenuItem("📐 Formül", "ProductionFormul", "📐", 6));
+            productionItem.AddSubMenuItem(new MenuItem("📄 Rapor", "ProductionReport", "📄", 7));
 
             var consumptionItem = new MenuItem("⚡ Sarfiyat", "Consumption", "⚡", 6);
 

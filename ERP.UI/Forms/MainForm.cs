@@ -114,6 +114,10 @@ namespace ERP.UI.Forms
             {
                 _contentManager.ShowForm("PreslenmisStokTakip");
             }
+            else if (formTag == "KenetlenmisStokTakip")
+            {
+                _contentManager.ShowForm("KenetlenmisStokTakip");
+            }
             else if (formTag == "Consumption")
             {
                 _contentManager.ShowForm("Consumption");
