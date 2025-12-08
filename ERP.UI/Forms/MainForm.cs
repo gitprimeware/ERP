@@ -106,6 +106,10 @@ namespace ERP.UI.Forms
                 // Üretim menüsü ProductionListForm'u açsın
                 _contentManager.ShowForm("Production");
             }
+            else if (formTag == "CuttingRequests")
+            {
+                _contentManager.ShowForm("CuttingRequests");
+            }
             else if (formTag == "RuloStokTakip")
             {
                 _contentManager.ShowForm("RuloStokTakip");

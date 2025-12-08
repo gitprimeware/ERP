@@ -32,6 +32,7 @@ namespace ERP.DAL
                     CreatePressingsTable(connection);
                     CreateClampingsTable(connection);
                     CreateAssembliesTable(connection);
+                    CreateCuttingRequestsTable(connection);
                 }
             }
             catch (Exception ex)
@@ -724,6 +725,45 @@ namespace ERP.DAL
                         [ModifiedDate] DATETIME NULL,
                         [IsActive] BIT NOT NULL DEFAULT 1,
                         FOREIGN KEY ([CompanyId]) REFERENCES [Companies]([Id])
+                    )
+                END";
+
+            using (var command = new SqlCommand(query, connection))
+            {
+                command.ExecuteNonQuery();
+            }
+        }
+
+        private static void CreateCuttingRequestsTable(SqlConnection connection)
+        {
+            var query = @"
+                IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[CuttingRequests]') AND type in (N'U'))
+                BEGIN
+                    CREATE TABLE [dbo].[CuttingRequests] (
+                        [Id] UNIQUEIDENTIFIER PRIMARY KEY,
+                        [OrderId] UNIQUEIDENTIFIER NOT NULL,
+                        [Hatve] DECIMAL(10,2) NOT NULL,
+                        [Size] DECIMAL(10,2) NOT NULL,
+                        [PlateThickness] DECIMAL(10,3) NOT NULL,
+                        [MachineId] UNIQUEIDENTIFIER NULL,
+                        [SerialNoId] UNIQUEIDENTIFIER NULL,
+                        [RequestedPlateCount] INT NOT NULL,
+                        [OnePlateWeight] DECIMAL(18,3) NOT NULL,
+                        [TotalRequiredPlateWeight] DECIMAL(18,3) NOT NULL,
+                        [RemainingKg] DECIMAL(18,3) NOT NULL,
+                        [EmployeeId] UNIQUEIDENTIFIER NULL,
+                        [ActualCutCount] INT NULL,
+                        [IsRollFinished] BIT NOT NULL DEFAULT 0,
+                        [Status] NVARCHAR(50) NOT NULL DEFAULT 'Beklemede',
+                        [RequestDate] DATETIME NOT NULL,
+                        [CompletionDate] DATETIME NULL,
+                        [CreatedDate] DATETIME NOT NULL,
+                        [ModifiedDate] DATETIME NULL,
+                        [IsActive] BIT NOT NULL DEFAULT 1,
+                        FOREIGN KEY ([OrderId]) REFERENCES [Orders]([Id]),
+                        FOREIGN KEY ([MachineId]) REFERENCES [Machines]([Id]),
+                        FOREIGN KEY ([SerialNoId]) REFERENCES [SerialNos]([Id]),
+                        FOREIGN KEY ([EmployeeId]) REFERENCES [Employees]([Id])
                     )
                 END";
 

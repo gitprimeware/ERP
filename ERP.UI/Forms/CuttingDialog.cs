@@ -12,23 +12,19 @@ namespace ERP.UI.Forms
 {
     public partial class CuttingDialog : Form
     {
-        private TextBox _txtHatve;
-        private TextBox _txtSize;
+        private TextBox _txtHatve; // Readonly - gösterim için
+        private TextBox _txtSize; // Readonly - gösterim için
+        private TextBox _txtPlateThickness; // Readonly - gösterim için (Plaka Kalınlığı)
         private ComboBox _cmbMachine;
         private Button _btnAddMachine;
         private ComboBox _cmbSerialNo;
-        private TextBox _txtTotalKg;
-        private TextBox _txtCutKg; // Toplam Kesilen Kg (readonly - adet * bir plaka ağırlığı)
-        private TextBox _txtBirPlakaAgirligi; // Bir Plaka Ağırlığı (readonly - hesaplanır)
-        private TextBox _txtPlakaAdedi; // Bu Kesimde Oluşan Plaka Adedi (readonly - yeni kesilecek adet ile aynı)
-        private TextBox _txtWasteKg;
-        private TextBox _txtRemainingKg;
-        private TextBox _txtGerekenPlakaAdedi; // Formülden hesaplanan gereken plaka adedi
-        private Label _lblMevcutStokBilgisi; // Mevcut kesilmiş stok bilgisi
+        private TextBox _txtTotalKg; // Readonly - bilgilendirme için
+        private TextBox _txtBirPlakaAgirligi; // Readonly - bilgilendirme için
+        private TextBox _txtTotalRequiredPlateWeight; // Readonly - bilgilendirme için (Toplam Gereken Plaka)
+        private TextBox _txtRemainingKg; // Readonly - Kalan
+        private TextBox _txtGerekenPlakaAdedi; // Readonly - Formülden hesaplanan gereken plaka adedi (bilgilendirme)
         private Label _lblBilgilendirme; // Kullanıcı bilgilendirmesi
-        private CheckedListBox _clbMevcutKesilmisStok; // Mevcut kesilmiş stoklardan seçim
-        private TextBox _txtKullanilacakMevcutStok; // Mevcut stoktan kullanılacak adet (readonly)
-        private TextBox _txtYeniKesilecekAdet; // Yeni kesilecek adet (gereken - mevcut stoktan kullanılan)
+        private TextBox _txtIstenenPlakaAdedi; // İstenen Plaka Adedi (kullanıcı girer)
         private ComboBox _cmbEmployee;
         private Button _btnAddEmployee;
         private Button _btnSave;
@@ -37,22 +33,17 @@ namespace ERP.UI.Forms
         private MachineRepository _machineRepository;
         private SerialNoRepository _serialNoRepository;
         private EmployeeRepository _employeeRepository;
-        private CuttingRepository _cuttingRepository;
-        private PressingRepository _pressingRepository;
+        private CuttingRequestRepository _cuttingRequestRepository;
         private MaterialEntryRepository _materialEntryRepository;
         private OrderRepository _orderRepository;
         private Guid _orderId;
-        
-        // Seçilen mevcut kesilmiş stoklar için dictionary (CuttingId -> Seçilen adet)
-        private Dictionary<Guid, int> _selectedMevcutStoklar = new Dictionary<Guid, int>();
 
         public CuttingDialog(MachineRepository machineRepository, SerialNoRepository serialNoRepository, EmployeeRepository employeeRepository, Guid orderId)
         {
             _machineRepository = machineRepository;
             _serialNoRepository = serialNoRepository;
             _employeeRepository = employeeRepository;
-            _cuttingRepository = new CuttingRepository();
-            _pressingRepository = new PressingRepository();
+            _cuttingRequestRepository = new CuttingRequestRepository();
             _materialEntryRepository = new MaterialEntryRepository();
             _orderRepository = new OrderRepository();
             _orderId = orderId;
@@ -94,6 +85,8 @@ namespace ERP.UI.Forms
                 Location = new Point(180, yPos - 3),
                 Width = controlWidth,
                 Height = 30,
+                ReadOnly = true,
+                BackColor = ThemeColors.SurfaceDark,
                 Font = new Font("Segoe UI", 10F)
             };
             this.Controls.Add(lblHatve);
@@ -113,10 +106,33 @@ namespace ERP.UI.Forms
                 Location = new Point(180, yPos - 3),
                 Width = controlWidth,
                 Height = 30,
+                ReadOnly = true,
+                BackColor = ThemeColors.SurfaceDark,
                 Font = new Font("Segoe UI", 10F)
             };
             this.Controls.Add(lblSize);
             this.Controls.Add(_txtSize);
+            yPos += spacing;
+
+            // Plaka Kalınlığı
+            var lblPlateThickness = new Label
+            {
+                Text = "Plaka Kalınlığı:",
+                Location = new Point(20, yPos),
+                Width = labelWidth,
+                Font = new Font("Segoe UI", 10F)
+            };
+            _txtPlateThickness = new TextBox
+            {
+                Location = new Point(180, yPos - 3),
+                Width = controlWidth,
+                Height = 30,
+                ReadOnly = true,
+                BackColor = ThemeColors.SurfaceDark,
+                Font = new Font("Segoe UI", 10F)
+            };
+            this.Controls.Add(lblPlateThickness);
+            this.Controls.Add(_txtPlateThickness);
             yPos += spacing;
 
             // Makina No
@@ -206,16 +222,16 @@ namespace ERP.UI.Forms
             this.Controls.Add(_txtTotalKg);
             yPos += spacing;
 
-            // Yeni Kesilecek Plaka Adedi (Kullanıcı girer)
-            var lblYeniKesilecekPlakaAdedi = new Label
+            // İstenen Plaka Adedi (Kullanıcı girer)
+            var lblIstenenPlakaAdedi = new Label
             {
-                Text = "Yeni Kesilecek Plaka Adedi:",
+                Text = "İstenen Plaka Adedi:",
                 Location = new Point(20, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 ForeColor = ThemeColors.Primary
             };
-            _txtYeniKesilecekAdet = new TextBox
+            _txtIstenenPlakaAdedi = new TextBox
             {
                 Location = new Point(180, yPos - 3),
                 Width = controlWidth,
@@ -223,20 +239,10 @@ namespace ERP.UI.Forms
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 ForeColor = ThemeColors.Primary
             };
-            _txtYeniKesilecekAdet.TextChanged += (s, e) => 
+            _txtIstenenPlakaAdedi.TextChanged += (s, e) => 
             {
-                // Oluşan plaka adedi = Yeni kesilecek adet
-                if (int.TryParse(_txtYeniKesilecekAdet.Text, out int adet))
-                {
-                    _txtPlakaAdedi.Text = adet.ToString();
-                }
-                else
-                {
-                    _txtPlakaAdedi.Text = "0";
-                }
-                
-                // Toplam kesilen kg'yi hesapla
-                CalculateKgFromAdet();
+                // Toplam gereken plaka ağırlığını hesapla
+                CalculateTotalRequiredPlateWeight();
                 CalculateRemainingKg();
                 var order = _orderRepository.GetById(_orderId);
                 if (order != null)
@@ -244,8 +250,8 @@ namespace ERP.UI.Forms
                     UpdateBilgilendirme(order);
                 }
             };
-            this.Controls.Add(lblYeniKesilecekPlakaAdedi);
-            this.Controls.Add(_txtYeniKesilecekAdet);
+            this.Controls.Add(lblIstenenPlakaAdedi);
+            this.Controls.Add(_txtIstenenPlakaAdedi);
             yPos += spacing;
 
             // Bir Plaka Ağırlığı (Readonly - hesaplanır)
@@ -269,9 +275,9 @@ namespace ERP.UI.Forms
             // Readonly TextBox'larda TextChanged bazen tetiklenmeyebilir, bu yüzden CalculateBirPlakaAgirligi içinde de çağrıyoruz
             _txtBirPlakaAgirligi.TextChanged += (s, e) => 
             {
-                if (_txtYeniKesilecekAdet != null && !string.IsNullOrWhiteSpace(_txtYeniKesilecekAdet.Text))
+                if (_txtIstenenPlakaAdedi != null && !string.IsNullOrWhiteSpace(_txtIstenenPlakaAdedi.Text))
                 {
-                    CalculateKgFromAdet();
+                    CalculateTotalRequiredPlateWeight();
                     CalculateRemainingKg();
                 }
             };
@@ -279,25 +285,25 @@ namespace ERP.UI.Forms
             this.Controls.Add(_txtBirPlakaAgirligi);
             yPos += spacing;
 
-            // Toplam Kesilen Kg (Readonly - otomatik hesaplanır: Adet × Bir Plaka Ağırlığı)
-            var lblCutKg = new Label
+            // Toplam Gereken Plaka (Readonly - bilgilendirme için)
+            var lblTotalRequiredPlateWeight = new Label
             {
-                Text = "Toplam Kesilen Kg:",
+                Text = "Toplam Gereken Plaka (kg):",
                 Location = new Point(20, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F)
             };
-            _txtCutKg = new TextBox
+            _txtTotalRequiredPlateWeight = new TextBox
             {
                 Location = new Point(180, yPos - 3),
                 Width = controlWidth,
                 Height = 30,
                 ReadOnly = true,
                 BackColor = Color.LightGray,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold)
+                Font = new Font("Segoe UI", 10F)
             };
-            this.Controls.Add(lblCutKg);
-            this.Controls.Add(_txtCutKg);
+            this.Controls.Add(lblTotalRequiredPlateWeight);
+            this.Controls.Add(_txtTotalRequiredPlateWeight);
             yPos += spacing;
 
             // Gereken Plaka Adedi (Formülden - Readonly)
@@ -323,27 +329,6 @@ namespace ERP.UI.Forms
             this.Controls.Add(_txtGerekenPlakaAdedi);
             yPos += spacing;
 
-            // Mevcut Stok Bilgisi (Readonly)
-            var lblMevcutStokLabel = new Label
-            {
-                Text = "Mevcut Kesilmiş Stok:",
-                Location = new Point(20, yPos),
-                Width = labelWidth,
-                Font = new Font("Segoe UI", 10F)
-            };
-            _lblMevcutStokBilgisi = new Label
-            {
-                Location = new Point(180, yPos),
-                Width = controlWidth,
-                Height = 30,
-                Font = new Font("Segoe UI", 9F),
-                ForeColor = ThemeColors.TextPrimary,
-                AutoSize = false
-            };
-            this.Controls.Add(lblMevcutStokLabel);
-            this.Controls.Add(_lblMevcutStokBilgisi);
-            yPos += spacing;
-
             // Bilgilendirme Mesajı
             _lblBilgilendirme = new Label
             {
@@ -358,70 +343,6 @@ namespace ERP.UI.Forms
             };
             this.Controls.Add(_lblBilgilendirme);
             yPos += 45;
-
-            // Mevcut Kesilmiş Stoklardan Seçim (Multi-select)
-            var lblMevcutStokSecim = new Label
-            {
-                Text = "Mevcut Kesilmiş Stoklardan Seçiniz:",
-                Location = new Point(20, yPos),
-                Width = labelWidth,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold)
-            };
-            _clbMevcutKesilmisStok = new CheckedListBox
-            {
-                Location = new Point(180, yPos - 3),
-                Width = controlWidth,
-                Height = 120,
-                Font = new Font("Segoe UI", 9F),
-                BorderStyle = BorderStyle.FixedSingle
-            };
-            _clbMevcutKesilmisStok.ItemCheck += ClbMevcutKesilmisStok_ItemCheck;
-            this.Controls.Add(lblMevcutStokSecim);
-            this.Controls.Add(_clbMevcutKesilmisStok);
-            yPos += 130;
-
-            // Mevcut Stoktan Kullanılacak Adet (Readonly)
-            var lblKullanilacakMevcutStok = new Label
-            {
-                Text = "Mevcut Stoktan Kullanılacak:",
-                Location = new Point(20, yPos),
-                Width = labelWidth,
-                Font = new Font("Segoe UI", 10F)
-            };
-            _txtKullanilacakMevcutStok = new TextBox
-            {
-                Location = new Point(180, yPos - 3),
-                Width = controlWidth,
-                Height = 30,
-                ReadOnly = true,
-                BackColor = Color.LightGray,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold)
-            };
-            this.Controls.Add(lblKullanilacakMevcutStok);
-            this.Controls.Add(_txtKullanilacakMevcutStok);
-            yPos += spacing;
-
-
-            // Oluşan Plaka Adedi (Readonly - otomatik hesaplanır)
-            var lblPlakaAdedi = new Label
-            {
-                Text = "Bu Kesimde Oluşan Plaka Adedi:",
-                Location = new Point(20, yPos),
-                Width = labelWidth,
-                Font = new Font("Segoe UI", 10F)
-            };
-            _txtPlakaAdedi = new TextBox
-            {
-                Location = new Point(180, yPos - 3),
-                Width = controlWidth,
-                Height = 30,
-                ReadOnly = true,
-                BackColor = ThemeColors.SurfaceDark,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold)
-            };
-            this.Controls.Add(lblPlakaAdedi);
-            this.Controls.Add(_txtPlakaAdedi);
-            yPos += spacing;
 
 
             // Kalan Kg (Readonly)
@@ -555,7 +476,7 @@ namespace ERP.UI.Forms
                 _cmbEmployee.DisplayMember = "FullName";
                 _cmbEmployee.ValueMember = "Id";
 
-                // Siparişten hatve ve size bilgisini al
+                // Siparişten hatve, size ve plaka kalınlığı bilgisini al
                 var order = _orderRepository.GetById(_orderId);
                 if (order != null && !string.IsNullOrEmpty(order.ProductCode))
                 {
@@ -567,11 +488,7 @@ namespace ERP.UI.Forms
                         // Plaka ölçüsü com (mm): <= 1150 ise aynı, > 1150 ise /2
                         int plakaOlcusuComMM = plakaOlcusuMM <= 1150 ? plakaOlcusuMM : plakaOlcusuMM / 2;
                         decimal sizeCM = plakaOlcusuComMM / 10.0m;
-                        
-                        if (string.IsNullOrEmpty(_txtSize.Text))
-                        {
-                            _txtSize.Text = sizeCM.ToString("F1", CultureInfo.InvariantCulture);
-                        }
+                        _txtSize.Text = sizeCM.ToString("F1", CultureInfo.InvariantCulture);
                     }
                     
                     if (parts.Length >= 3)
@@ -588,20 +505,20 @@ namespace ERP.UI.Forms
                         }
                     }
                     
-                    // Mevcut kesilmiş stok bilgisini yükle
-                    LoadMevcutStokBilgisi(order);
-                    
-                    // Mevcut kesilmiş stokları listele (seçim için)
-                    LoadMevcutKesilmisStoklar(order);
+                    // Plaka Kalınlığı (Lamel Kalınlığı)
+                    if (order.LamelThickness.HasValue)
+                    {
+                        _txtPlateThickness.Text = order.LamelThickness.Value.ToString("F3", CultureInfo.InvariantCulture);
+                    }
                 }
 
                 // Bir plaka ağırlığını hesapla ve göster
                 CalculateBirPlakaAgirligi(order);
                 
-                // Eğer yeni kesilecek adet girilmişse, toplam kg'yi hesapla
-                if (!string.IsNullOrWhiteSpace(_txtYeniKesilecekAdet.Text))
+                // Eğer istenen plaka adedi girilmişse, toplam gereken plaka ağırlığını hesapla
+                if (!string.IsNullOrWhiteSpace(_txtIstenenPlakaAdedi.Text))
                 {
-                    CalculateKgFromAdet();
+                    CalculateTotalRequiredPlateWeight();
                 }
                 
                 // Kullanıcı bilgilendirmesini güncelle (order ve hesaplanan değerlerle)
@@ -652,12 +569,17 @@ namespace ERP.UI.Forms
                     // Toplam kg = Tüm malzeme girişlerinin toplamı - Daha önce kesilen kg'lar
                     decimal totalEntryKg = materialEntries.Sum(me => me.Quantity);
                     
-                    // Bu seri no için daha önce kesilen kg'ları hesapla
-                    var previousCuttings = _cuttingRepository.GetAll()
-                        .Where(c => c.SerialNoId == serialNoId && c.IsActive)
-                        .Sum(c => c.CutKg);
+                    // Bu seri no için daha önce kesilen kg'ları hesapla (CuttingRequest'lerden - sadece tamamlananlar)
+                    // ÖNEMLİ: Gerçek kesilen adede göre hesapla (ActualCutCount varsa onu kullan, yoksa RequestedPlateCount)
+                    decimal previousCutKg = _cuttingRequestRepository.GetAll()
+                        .Where(cr => cr.SerialNoId == serialNoId && cr.IsActive && cr.Status == "Tamamlandı")
+                        .Sum(cr => 
+                        {
+                            int actualCount = cr.ActualCutCount ?? cr.RequestedPlateCount;
+                            return cr.OnePlateWeight * actualCount;
+                        });
                     
-                    decimal availableKg = totalEntryKg - previousCuttings;
+                    decimal availableKg = totalEntryKg - previousCutKg;
                     _txtTotalKg.Text = availableKg.ToString("F3", CultureInfo.InvariantCulture);
                 }
                 else
@@ -725,12 +647,12 @@ namespace ERP.UI.Forms
                 
                 // Bir plaka ağırlığı hesaplandıktan sonra, eğer yeni kesilecek adet girilmişse toplam kg'yi hesapla
                 // Readonly TextBox'larda TextChanged bazen tetiklenmeyebilir, bu yüzden burada da çağrıyoruz
-                if (_txtYeniKesilecekAdet != null && !string.IsNullOrWhiteSpace(_txtYeniKesilecekAdet.Text))
+                if (_txtIstenenPlakaAdedi != null && !string.IsNullOrWhiteSpace(_txtIstenenPlakaAdedi.Text))
                 {
                     // Kısa bir gecikme ekleyerek TextChanged event'inin tamamlanmasını bekleyelim
                     this.BeginInvoke(new Action(() =>
                     {
-                        CalculateKgFromAdet();
+                        CalculateTotalRequiredPlateWeight();
                         CalculateRemainingKg();
                     }));
                 }
@@ -742,55 +664,51 @@ namespace ERP.UI.Forms
             }
         }
 
-        private void CalculateKgFromAdet()
+        private void CalculateTotalRequiredPlateWeight()
         {
             try
             {
-                // Yeni kesilecek adet kontrolü
-                if (_txtYeniKesilecekAdet == null || string.IsNullOrWhiteSpace(_txtYeniKesilecekAdet.Text))
+                // İstenen plaka adedi kontrolü
+                if (_txtIstenenPlakaAdedi == null || string.IsNullOrWhiteSpace(_txtIstenenPlakaAdedi.Text))
                 {
-                    if (_txtCutKg != null) _txtCutKg.Text = "0";
-                    if (_txtRemainingKg != null) _txtRemainingKg.Text = "0";
+                    if (_txtTotalRequiredPlateWeight != null) _txtTotalRequiredPlateWeight.Text = "0";
                     return;
                 }
 
-                if (!int.TryParse(_txtYeniKesilecekAdet.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out int yeniKesilecekAdet) || yeniKesilecekAdet <= 0)
+                if (!int.TryParse(_txtIstenenPlakaAdedi.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out int istenenPlakaAdedi) || istenenPlakaAdedi <= 0)
                 {
-                    if (_txtCutKg != null) _txtCutKg.Text = "0";
-                    if (_txtRemainingKg != null) _txtRemainingKg.Text = "0";
+                    if (_txtTotalRequiredPlateWeight != null) _txtTotalRequiredPlateWeight.Text = "0";
                     return;
                 }
 
                 // Bir plaka ağırlığı kontrolü
                 if (_txtBirPlakaAgirligi == null || string.IsNullOrWhiteSpace(_txtBirPlakaAgirligi.Text))
                 {
-                    if (_txtCutKg != null) _txtCutKg.Text = "0";
-                    if (_txtRemainingKg != null) _txtRemainingKg.Text = "0";
+                    if (_txtTotalRequiredPlateWeight != null) _txtTotalRequiredPlateWeight.Text = "0";
                     return;
                 }
 
                 if (!decimal.TryParse(_txtBirPlakaAgirligi.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal birPlakaAgirligi) || birPlakaAgirligi <= 0)
                 {
-                    if (_txtCutKg != null) _txtCutKg.Text = "0";
-                    if (_txtRemainingKg != null) _txtRemainingKg.Text = "0";
+                    if (_txtTotalRequiredPlateWeight != null) _txtTotalRequiredPlateWeight.Text = "0";
                     return;
                 }
 
-                // Toplam Kesilen Kg = Yeni Kesilecek Adet × Bir Plaka Ağırlığı
-                decimal toplamKesilenKg = yeniKesilecekAdet * birPlakaAgirligi;
+                // Toplam Gereken Plaka Ağırlığı = İstenen Plaka Adedi × Bir Plaka Ağırlığı
+                decimal toplamGerekenPlakaAgirligi = istenenPlakaAdedi * birPlakaAgirligi;
                 
-                // Toplam kesilen kg'yi güncelle
-                if (_txtCutKg != null)
+                // Toplam gereken plaka ağırlığını güncelle
+                if (_txtTotalRequiredPlateWeight != null)
                 {
-                    _txtCutKg.Text = toplamKesilenKg.ToString("F3", CultureInfo.InvariantCulture);
+                    _txtTotalRequiredPlateWeight.Text = toplamGerekenPlakaAgirligi.ToString("F3", CultureInfo.InvariantCulture);
                 }
                 
-                // Kalan kg'yi hesapla (Toplam Kg - Toplam Kesilen Kg)
+                // Kalan kg'yi hesapla (Toplam Kg - Toplam Gereken Plaka Ağırlığı)
                 CalculateRemainingKg();
             }
             catch (Exception ex)
             {
-                if (_txtCutKg != null) _txtCutKg.Text = "0";
+                if (_txtTotalRequiredPlateWeight != null) _txtTotalRequiredPlateWeight.Text = "0";
                 if (_txtRemainingKg != null) _txtRemainingKg.Text = "0";
                 System.Diagnostics.Debug.WriteLine($"Kg hesaplanırken hata: {ex.Message}");
             }
@@ -958,71 +876,7 @@ namespace ERP.UI.Forms
             }
         }
 
-        private void LoadMevcutStokBilgisi(Order order)
-        {
-            try
-            {
-                if (order == null || string.IsNullOrEmpty(order.ProductCode))
-                {
-                    _lblMevcutStokBilgisi.Text = "Stok bilgisi bulunamadı";
-                    return;
-                }
-
-                var parts = order.ProductCode.Split('-');
-                if (parts.Length < 3)
-                {
-                    _lblMevcutStokBilgisi.Text = "Stok bilgisi bulunamadı";
-                    return;
-                }
-
-                string modelProfile = parts[2];
-                if (modelProfile.Length == 0)
-                {
-                    _lblMevcutStokBilgisi.Text = "Stok bilgisi bulunamadı";
-                    return;
-                }
-
-                char modelLetter = modelProfile[0];
-                decimal hatve = GetHtave(modelLetter);
-                
-                // Ölçü bilgisini al
-                decimal size = 0;
-                if (parts.Length >= 4 && int.TryParse(parts[3], out int plakaOlcusuMM))
-                {
-                    size = plakaOlcusuMM <= 1150 ? plakaOlcusuMM : plakaOlcusuMM / 2;
-                    size = size / 10; // cm'ye çevir
-                }
-
-                // Aynı hatve ve ölçüdeki kesilmiş stokları bul
-                var mevcutKesilmisler = _cuttingRepository.GetAll()
-                    .Where(c => Math.Abs(c.Hatve - hatve) < 0.01m && 
-                                Math.Abs(c.Size - size) < 0.1m && 
-                                c.IsActive)
-                    .ToList();
-
-                // Her kesim işleminden kalan plaka adedi
-                int toplamMevcutStok = 0;
-                foreach (var cutting in mevcutKesilmisler)
-                {
-                    var kullanilanPlakaAdedi = _pressingRepository.GetAll()
-                        .Where(p => p.CuttingId == cutting.Id && p.IsActive)
-                        .Sum(p => p.PressCount);
-                    
-                    int kalanPlakaAdedi = cutting.PlakaAdedi - kullanilanPlakaAdedi;
-                    if (kalanPlakaAdedi > 0)
-                    {
-                        toplamMevcutStok += kalanPlakaAdedi;
-                    }
-                }
-
-                _lblMevcutStokBilgisi.Text = $"{toplamMevcutStok} adet (Hatve: {hatve:F2}, Ölçü: {size:F1}cm)";
-            }
-            catch (Exception ex)
-            {
-                _lblMevcutStokBilgisi.Text = "Stok bilgisi yüklenemedi";
-                System.Diagnostics.Debug.WriteLine($"Mevcut stok bilgisi yüklenirken hata: {ex.Message}");
-            }
-        }
+        // LoadMevcutStokBilgisi metodu kaldırıldı - artık mevcut stok kullanılmıyor
 
         private void UpdateBilgilendirme(Order order)
         {
@@ -1037,37 +891,22 @@ namespace ERP.UI.Forms
                 int gereken = 0;
                 int.TryParse(_txtGerekenPlakaAdedi.Text, out gereken);
 
-                int mevcut = 0;
-                string mevcutText = _lblMevcutStokBilgisi.Text;
-                if (!string.IsNullOrEmpty(mevcutText))
-                {
-                    var mevcutParts = mevcutText.Split(' ');
-                    if (mevcutParts.Length > 0)
-                    {
-                        int.TryParse(mevcutParts[0], out mevcut);
-                    }
-                }
-
-                int mevcutStoktanKullanilacak = GetSelectedMevcutStokTotalCount();
-                int yeniKesilecek = 0;
-                int.TryParse(_txtYeniKesilecekAdet.Text, out yeniKesilecek);
+                int istenen = 0;
+                int.TryParse(_txtIstenenPlakaAdedi.Text, out istenen);
 
                 if (gereken > 0)
                 {
                     string bilgi = $"📊 Gereken: {gereken} adet | ";
-                    bilgi += $"📦 Stokta var: {mevcut} adet | ";
-                    bilgi += $"✅ Stoktan seçilen: {mevcutStoktanKullanilacak} adet | ";
-                    bilgi += $"🆕 Yeni kesilecek: {yeniKesilecek} adet";
+                    bilgi += $"🆕 İstenen: {istenen} adet";
                     
-                    int toplam = mevcutStoktanKullanilacak + yeniKesilecek;
-                    if (toplam < gereken)
+                    if (istenen < gereken)
                     {
-                        int eksik = gereken - toplam;
+                        int eksik = gereken - istenen;
                         bilgi += $" | ⚠️ {eksik} adet eksik!";
                     }
-                    else if (toplam > gereken)
+                    else if (istenen > gereken)
                     {
-                        int fazla = toplam - gereken;
+                        int fazla = istenen - gereken;
                         bilgi += $" | ℹ️ {fazla} adet fazla (kenara konacak)";
                     }
                     
@@ -1085,161 +924,22 @@ namespace ERP.UI.Forms
             }
         }
 
-        private int GetSelectedMevcutStokTotalCount()
-        {
-            return _selectedMevcutStoklar.Values.Sum();
-        }
-
-        private void UpdateSelectedMevcutStoklar()
-        {
-            _selectedMevcutStoklar.Clear();
-            
-            for (int i = 0; i < _clbMevcutKesilmisStok.Items.Count; i++)
-            {
-                if (_clbMevcutKesilmisStok.GetItemChecked(i))
-                {
-                    var item = _clbMevcutKesilmisStok.Items[i] as CuttingStockItem;
-                    if (item != null)
-                    {
-                        // Seçilen tüm adedi kullan
-                        _selectedMevcutStoklar[item.CuttingId] = item.KalanAdet;
-                    }
-                }
-            }
-        }
-
-        private void UpdateKullanilacakMevcutStok()
-        {
-            int toplam = _selectedMevcutStoklar.Values.Sum();
-            _txtKullanilacakMevcutStok.Text = toplam.ToString();
-        }
-
-        private void UpdateYeniKesilecekAdet(Order order)
-        {
-            // Artık kullanıcı adeti manuel giriyor, kg otomatik hesaplanıyor
-            // Bu metod artık sadece adet değiştiğinde kg'yi güncellemek için kullanılıyor
-            try
-            {
-                if (!string.IsNullOrWhiteSpace(_txtYeniKesilecekAdet.Text))
-                {
-                    CalculateKgFromAdet();
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Yeni kesilecek adet güncellenirken hata: {ex.Message}");
-            }
-        }
-
-        private void ClbMevcutKesilmisStok_ItemCheck(object sender, ItemCheckEventArgs e)
-        {
-            // ItemCheck event'i önce çalışır, bu yüzden async olarak güncelleme yapmalıyız
-            this.BeginInvoke((MethodInvoker)delegate
-            {
-                UpdateSelectedMevcutStoklar();
-                UpdateKullanilacakMevcutStok();
-                UpdateYeniKesilecekAdet(_orderRepository.GetById(_orderId));
-                UpdateBilgilendirme(_orderRepository.GetById(_orderId));
-            });
-        }
-
-        private void LoadMevcutKesilmisStoklar(Order order)
-        {
-            try
-            {
-                _clbMevcutKesilmisStok.Items.Clear();
-                _selectedMevcutStoklar.Clear();
-
-                if (order == null || string.IsNullOrEmpty(order.ProductCode))
-                    return;
-
-                var parts = order.ProductCode.Split('-');
-                if (parts.Length < 3)
-                    return;
-
-                // Model bilgisini al
-                string modelProfile = parts[2];
-                if (modelProfile.Length == 0)
-                    return;
-
-                char modelLetter = modelProfile[0];
-                decimal hatve = GetHtave(modelLetter);
-                
-                // Ölçü bilgisini al
-                decimal size = 0;
-                if (parts.Length >= 4 && int.TryParse(parts[3], out int plakaOlcusuMM))
-                {
-                    size = plakaOlcusuMM <= 1150 ? plakaOlcusuMM : plakaOlcusuMM / 2;
-                    size = size / 10; // cm'ye çevir
-                }
-
-                // Tüm kesilmiş stokları yükle (aynı hatve ve ölçü için)
-                var allCuttings = _cuttingRepository.GetAll()
-                    .Where(c => Math.Abs(c.Hatve - hatve) < 0.01m && 
-                                Math.Abs(c.Size - size) < 0.1m && 
-                                c.PlakaAdedi > 0 && 
-                                c.IsActive)
-                    .OrderByDescending(c => c.CuttingDate)
-                    .ToList();
-
-                foreach (var cutting in allCuttings)
-                {
-                    // Kullanılan plaka adedini hesapla (pres işlemlerinde kullanılan)
-                    var usedPlakaAdedi = _pressingRepository.GetAll()
-                        .Where(p => p.CuttingId == cutting.Id && p.IsActive)
-                        .Sum(p => p.PressCount);
-                    
-                    int kalanPlakaAdedi = cutting.PlakaAdedi - usedPlakaAdedi;
-                    
-                    if (kalanPlakaAdedi > 0)
-                    {
-                        var orderInfo = cutting.OrderId.HasValue ? _orderRepository.GetById(cutting.OrderId.Value) : null;
-                        string orderNo = orderInfo?.TrexOrderNo ?? "-";
-                        
-                        string displayText = $"Kesim #{cutting.CuttingDate:dd.MM.yyyy} - Sipariş: {orderNo} - {kalanPlakaAdedi} adet kalan";
-                        _clbMevcutKesilmisStok.Items.Add(new CuttingStockItem 
-                        { 
-                            CuttingId = cutting.Id,
-                            Cutting = cutting,
-                            KalanAdet = kalanPlakaAdedi,
-                            DisplayText = displayText
-                        }, false);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Mevcut kesilmiş stoklar yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private class CuttingStockItem
-        {
-            public Guid CuttingId { get; set; }
-            public Cutting Cutting { get; set; }
-            public int KalanAdet { get; set; }
-            public string DisplayText { get; set; }
-
-            public override string ToString()
-            {
-                return DisplayText;
-            }
-        }
+        // Mevcut stok ile ilgili metodlar kaldırıldı - artık kullanılmıyor
 
         private void CalculateRemainingKg()
         {
             try
             {
-                if (_txtTotalKg == null || _txtCutKg == null || _txtRemainingKg == null)
+                if (_txtTotalKg == null || _txtTotalRequiredPlateWeight == null || _txtRemainingKg == null)
                     return;
 
                 if (decimal.TryParse(_txtTotalKg.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal totalKg))
                 {
-                    decimal cutKg = 0;
-                    decimal.TryParse(_txtCutKg.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out cutKg);
+                    decimal totalRequiredWeight = 0;
+                    decimal.TryParse(_txtTotalRequiredPlateWeight.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out totalRequiredWeight);
                     
-                    // Kalan Kg = Toplam Kg - Toplam Kesilen Kg
-                    decimal remainingKg = totalKg - cutKg;
+                    // Kalan Kg = Toplam Kg - Toplam Gereken Plaka Ağırlığı
+                    decimal remainingKg = totalKg - totalRequiredWeight;
                     _txtRemainingKg.Text = remainingKg.ToString("F3", CultureInfo.InvariantCulture);
                 }
                 else
@@ -1539,30 +1239,37 @@ namespace ERP.UI.Forms
 
             try
             {
-                var cutting = new Cutting
+                var order = _orderRepository.GetById(_orderId);
+                if (order == null)
+                {
+                    MessageBox.Show("Sipariş bulunamadı!", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                var cuttingRequest = new CuttingRequest
                 {
                     OrderId = _orderId,
                     Hatve = decimal.Parse(_txtHatve.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
                     Size = decimal.Parse(_txtSize.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
+                    PlateThickness = order.LamelThickness ?? 0m,
                     MachineId = _cmbMachine.SelectedItem != null ? GetSelectedId(_cmbMachine) : (Guid?)null,
                     SerialNoId = _cmbSerialNo.SelectedItem != null ? GetSelectedId(_cmbSerialNo) : (Guid?)null,
-                    TotalKg = decimal.Parse(_txtTotalKg.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
-                    CutKg = decimal.Parse(_txtCutKg.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
-                    CuttingCount = 1, // Artık kesim adedi kullanılmıyor, her kayıt bir kesim işlemi
-                    PlakaAdedi = int.TryParse(_txtYeniKesilecekAdet.Text, out int plakaAdedi) ? plakaAdedi : 0,
-                    WasteKg = decimal.Parse("0"),
+                    RequestedPlateCount = int.Parse(_txtIstenenPlakaAdedi.Text),
+                    OnePlateWeight = decimal.Parse(_txtBirPlakaAgirligi.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
+                    TotalRequiredPlateWeight = decimal.Parse(_txtTotalRequiredPlateWeight.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
                     RemainingKg = decimal.Parse(_txtRemainingKg.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
                     EmployeeId = _cmbEmployee.SelectedItem != null ? GetSelectedId(_cmbEmployee) : (Guid?)null,
-                    CuttingDate = DateTime.Now
+                    Status = "Beklemede"
                 };
 
-                _cuttingRepository.Insert(cutting);
+                _cuttingRequestRepository.Insert(cuttingRequest);
+                MessageBox.Show("Kesim talebi başarıyla oluşturuldu!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 this.DialogResult = DialogResult.OK;
                 this.Close();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Kesim kaydedilirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Kesim talebi oluşturulurken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -1586,23 +1293,17 @@ namespace ERP.UI.Forms
                 return false;
             }
 
-            // Yeni kesilecek adet kontrolü (kullanıcı girer)
-            if (string.IsNullOrWhiteSpace(_txtYeniKesilecekAdet.Text) || !int.TryParse(_txtYeniKesilecekAdet.Text, out int yeniKesilecekAdet) || yeniKesilecekAdet <= 0)
+            // İstenen plaka adedi kontrolü (kullanıcı girer)
+            if (string.IsNullOrWhiteSpace(_txtIstenenPlakaAdedi.Text) || !int.TryParse(_txtIstenenPlakaAdedi.Text, out int istenenPlakaAdedi) || istenenPlakaAdedi <= 0)
             {
-                MessageBox.Show("Lütfen geçerli bir yeni kesilecek plaka adedi giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Lütfen geçerli bir istenen plaka adedi giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
 
-            // Toplam kesilen kg kontrolü (otomatik hesaplanır ama kontrol edelim)
-            if (string.IsNullOrWhiteSpace(_txtCutKg.Text) || !decimal.TryParse(_txtCutKg.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal cutKg) || cutKg <= 0)
+            // Toplam gereken plaka ağırlığı kontrolü
+            if (string.IsNullOrWhiteSpace(_txtTotalRequiredPlateWeight.Text) || !decimal.TryParse(_txtTotalRequiredPlateWeight.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal totalRequiredWeight) || totalRequiredWeight <= 0)
             {
-                MessageBox.Show("Kesilen kg hesaplanamadı. Lütfen bir plaka ağırlığının doğru hesaplandığından emin olun.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return false;
-            }
-
-            if (decimal.TryParse(_txtTotalKg.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal totalKg) && cutKg > totalKg)
-            {
-                MessageBox.Show("Kesilen kg, toplam kg'dan fazla olamaz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Toplam gereken plaka ağırlığı hesaplanamadı. Lütfen bir plaka ağırlığının doğru hesaplandığından emin olun.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
 
