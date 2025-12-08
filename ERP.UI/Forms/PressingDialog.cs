@@ -346,7 +346,7 @@ namespace ERP.UI.Forms
                     return;
                 }
 
-                var parts = order.ProductCode.Split('-');
+                    var parts = order.ProductCode.Split('-');
                 if (parts.Length < 6)
                 {
                     _txtGerekenPresAdedi.Text = "0";
@@ -355,10 +355,10 @@ namespace ERP.UI.Forms
 
                 // Model harfi
                 char modelLetter = 'H';
-                if (parts.Length >= 3)
-                {
-                    string modelProfile = parts[2];
-                    if (modelProfile.Length > 0)
+                    if (parts.Length >= 3)
+                    {
+                        string modelProfile = parts[2];
+                        if (modelProfile.Length > 0)
                         modelLetter = modelProfile[0];
                 }
 
@@ -440,8 +440,8 @@ namespace ERP.UI.Forms
                 if (modelProfile.Length == 0)
                     return;
 
-                char modelLetter = modelProfile[0];
-                decimal hatve = GetHtave(modelLetter);
+                            char modelLetter = modelProfile[0];
+                            decimal hatve = GetHtave(modelLetter);
                 
                 // Ölçü bilgisini al
                 decimal size = 0;
@@ -502,16 +502,16 @@ namespace ERP.UI.Forms
         private void LoadMevcutStokBilgisi(Order order)
         {
             try
-            {
+        {
                 if (order == null || string.IsNullOrEmpty(order.ProductCode))
                 {
                     _lblMevcutKesilmisStok.Text = "Stok bilgisi bulunamadı";
-                    return;
+                return;
                 }
 
                 var parts = order.ProductCode.Split('-');
                 if (parts.Length < 3)
-                {
+            {
                     _lblMevcutKesilmisStok.Text = "Stok bilgisi bulunamadı";
                     return;
                 }
@@ -577,7 +577,7 @@ namespace ERP.UI.Forms
                 int mevcut = 0;
                 string mevcutText = _lblMevcutKesilmisStok.Text;
                 if (!string.IsNullOrEmpty(mevcutText))
-                {
+                    {
                     var mevcutParts = mevcutText.Split(' ');
                     if (mevcutParts.Length > 0)
                         int.TryParse(mevcutParts[0], out mevcut);
@@ -586,7 +586,7 @@ namespace ERP.UI.Forms
                 int secilen = GetSelectedTotalCount();
 
                 if (gereken > 0)
-                {
+                        {
                     string bilgi = $"📊 Gereken: {gereken} adet | ";
                     bilgi += $"📦 Stokta var: {mevcut} adet | ";
                     bilgi += $"✅ Seçilen: {secilen} adet";
@@ -599,7 +599,7 @@ namespace ERP.UI.Forms
                     _lblBilgilendirme.Text = bilgi;
                 }
                 else
-                {
+                            {
                     _lblBilgilendirme.Text = "Formül bilgisi eksik, gereken pres adedi hesaplanamadı.";
                 }
             }
@@ -967,24 +967,24 @@ namespace ERP.UI.Forms
                     }
 
                     // Pres kaydı oluştur
-                    var pressing = new Pressing
-                    {
-                        OrderId = _orderId,
+                var pressing = new Pressing
+                {
+                    OrderId = _orderId,
                         PlateThickness = plateThickness > 0 ? plateThickness : cutting.Size, // Varsayılan olarak Size kullan
                         Hatve = hatve > 0 ? hatve : cutting.Hatve,
                         Size = size > 0 ? size : cutting.Size,
                         SerialNoId = cutting.SerialNoId,
                         CuttingId = cutting.Id,
-                        PressNo = _txtPressNo.Text,
-                        Pressure = decimal.Parse(_txtPressure.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
+                    PressNo = _txtPressNo.Text,
+                    Pressure = decimal.Parse(_txtPressure.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
                         PressCount = kullanilacakAdet,
                         WasteAmount = !string.IsNullOrWhiteSpace(_txtWasteAmount.Text) ? 
                                      decimal.Parse(_txtWasteAmount.Text, NumberStyles.Any, CultureInfo.InvariantCulture) : 0,
-                        EmployeeId = _cmbEmployee.SelectedItem != null ? GetSelectedId(_cmbEmployee) : (Guid?)null,
-                        PressingDate = DateTime.Now
-                    };
+                    EmployeeId = _cmbEmployee.SelectedItem != null ? GetSelectedId(_cmbEmployee) : (Guid?)null,
+                    PressingDate = DateTime.Now
+                };
 
-                    _pressingRepository.Insert(pressing);
+                _pressingRepository.Insert(pressing);
                 }
 
                 if (hasError)
@@ -1035,7 +1035,7 @@ namespace ERP.UI.Forms
                     MessageBoxIcon.Question);
                 
                 if (result != DialogResult.Yes)
-                    return false;
+                return false;
             }
 
             if (string.IsNullOrWhiteSpace(_txtPressNo.Text))
@@ -1054,26 +1054,26 @@ namespace ERP.UI.Forms
             foreach (var selectedCutting in _selectedCuttings)
             {
                 var cutting = _cuttingRepository.GetById(selectedCutting.Key);
-                if (cutting != null)
-                {
-                    var usedPlakaAdedi = _pressingRepository.GetAll()
+            if (cutting != null)
+            {
+                var usedPlakaAdedi = _pressingRepository.GetAll()
                         .Where(p => p.CuttingId == cutting.Id && p.IsActive)
-                        .Sum(p => p.PressCount);
-                    
+                    .Sum(p => p.PressCount);
+                
                     int kalanPlakaAdedi = cutting.PlakaAdedi - usedPlakaAdedi;
-                    
+                
                     if (selectedCutting.Value > kalanPlakaAdedi)
-                    {
+                {
                         MessageBox.Show($"Kesim #{cutting.CuttingDate:dd.MM.yyyy} için yeterli stok yok (Kalan: {kalanPlakaAdedi}, Seçilen: {selectedCutting.Value})", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        return false;
+                    return false;
                     }
                 }
             }
 
             if (!string.IsNullOrWhiteSpace(_txtWasteAmount.Text))
             {
-                if (!decimal.TryParse(_txtWasteAmount.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal wasteAmount))
-                {
+            if (!decimal.TryParse(_txtWasteAmount.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal wasteAmount))
+            {
                     MessageBox.Show("Lütfen geçerli bir hurda miktarı giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return false;
                 }

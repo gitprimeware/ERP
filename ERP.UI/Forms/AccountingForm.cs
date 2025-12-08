@@ -232,8 +232,8 @@ namespace ERP.UI.Forms
                 _dataGridView.RowPrePaint -= DataGridView_RowPrePaint;
                 _dataGridView.CellPainting -= DataGridView_CellPainting;
 
-                _dataGridView.DataSource = null;
-                _dataGridView.Columns.Clear();
+            _dataGridView.DataSource = null;
+            _dataGridView.Columns.Clear();
                 _dataGridView.Rows.Clear();
                 _dataGridView.Tag = null;
 
@@ -241,90 +241,90 @@ namespace ERP.UI.Forms
                 _dataGridView.Update();
                 Application.DoEvents();
 
-                if (orders.Count == 0)
-                {
-                    return;
-                }
+            if (orders.Count == 0)
+            {
+                return;
+            }
 
-                _dataGridView.AutoGenerateColumns = false;
+            _dataGridView.AutoGenerateColumns = false;
 
-                // Kolonları ekle
-                _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
-                {
-                    DataPropertyName = "TrexOrderNo",
-                    HeaderText = "Trex Sipariş No",
-                    Name = "TrexOrderNo",
-                    Width = 120
-                });
+            // Kolonları ekle
+            _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "TrexOrderNo",
+                HeaderText = "Trex Sipariş No",
+                Name = "TrexOrderNo",
+                Width = 120
+            });
 
-                _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
-                {
-                    DataPropertyName = "CustomerOrderNo",
-                    HeaderText = "Müşteri Sipariş No",
-                    Name = "CustomerOrderNo",
-                    Width = 130
-                });
+            _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "CustomerOrderNo",
+                HeaderText = "Müşteri Sipariş No",
+                Name = "CustomerOrderNo",
+                Width = 130
+            });
 
-                var companyColumn = new DataGridViewTextBoxColumn
-                {
+            var companyColumn = new DataGridViewTextBoxColumn
+            {
                     DataPropertyName = "CompanyName",
-                    HeaderText = "Firma",
-                    Name = "CompanyName",
-                    Width = 150
-                };
-                _dataGridView.Columns.Add(companyColumn);
+                HeaderText = "Firma",
+                Name = "CompanyName",
+                Width = 150
+            };
+            _dataGridView.Columns.Add(companyColumn);
 
-                _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
-                {
-                    DataPropertyName = "ProductCode",
-                    HeaderText = "Ürün Kodu",
-                    Name = "ProductCode",
-                    Width = 150
-                });
+            _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "ProductCode",
+                HeaderText = "Ürün Kodu",
+                Name = "ProductCode",
+                Width = 150
+            });
 
-                _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
-                {
-                    DataPropertyName = "TotalPrice",
-                    HeaderText = "Toplam Fiyat (₺)",
-                    Name = "TotalPrice",
-                    Width = 120
-                });
+            _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "TotalPrice",
+                HeaderText = "Toplam Fiyat (₺)",
+                Name = "TotalPrice",
+                Width = 120
+            });
 
-                _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
-                {
-                    DataPropertyName = "Status",
-                    HeaderText = "Durum",
-                    Name = "Status",
-                    Width = 100
-                });
+            _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "Status",
+                HeaderText = "Durum",
+                Name = "Status",
+                Width = 100
+            });
 
-                // İşlemler kolonu (sadece emoji)
-                var actionsColumn = new DataGridViewButtonColumn
-                {
-                    HeaderText = "İşlemler",
-                    Name = "Actions",
+            // İşlemler kolonu (sadece emoji)
+            var actionsColumn = new DataGridViewButtonColumn
+            {
+                HeaderText = "İşlemler",
+                Name = "Actions",
                     Width = 150,
-                    Text = "",
-                    UseColumnTextForButtonValue = false
-                };
-                _dataGridView.Columns.Add(actionsColumn);
+                Text = "",
+                UseColumnTextForButtonValue = false
+            };
+            _dataGridView.Columns.Add(actionsColumn);
 
-                // DataSource için özel bir liste oluştur
-                var dataSource = orders.Select(o => new
-                {
-                    o.Id,
-                    o.TrexOrderNo,
-                    o.CustomerOrderNo,
-                    CompanyName = o.Company?.Name ?? "",
-                    o.ProductCode,
-                    TotalPrice = o.TotalPrice.ToString("N2") + " ₺",
-                    o.Status,
+            // DataSource için özel bir liste oluştur
+            var dataSource = orders.Select(o => new
+            {
+                o.Id,
+                o.TrexOrderNo,
+                o.CustomerOrderNo,
+                CompanyName = o.Company?.Name ?? "",
+                o.ProductCode,
+                TotalPrice = o.TotalPrice.ToString("N2") + " ₺",
+                o.Status,
                     CurrencyRate = o.CurrencyRate,
-                    IsInAccounting = o.Status == "Muhasebede"
-                }).ToList();
+                IsInAccounting = o.Status == "Muhasebede"
+            }).ToList();
 
-                _dataGridView.DataSource = dataSource;
-                _dataGridView.Tag = orders; // Orijinal order listesini sakla
+            _dataGridView.DataSource = dataSource;
+            _dataGridView.Tag = orders; // Orijinal order listesini sakla
 
                 // Event handler'ları tekrar ekle
                 _dataGridView.DataBindingComplete += DataGridView_DataBindingComplete;
@@ -332,24 +332,24 @@ namespace ERP.UI.Forms
                 _dataGridView.RowPrePaint += DataGridView_RowPrePaint;
                 _dataGridView.CellPainting += DataGridView_CellPainting;
 
-                // Stil ayarları
+            // Stil ayarları
                 _dataGridView.BackgroundColor = Color.White;
                 _dataGridView.DefaultCellStyle.SelectionBackColor = Color.FromArgb(220, ThemeColors.Primary.R, ThemeColors.Primary.G, ThemeColors.Primary.B);
                 _dataGridView.GridColor = Color.FromArgb(230, 230, 230);
                 _dataGridView.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
-                _dataGridView.ColumnHeadersDefaultCellStyle.BackColor = ThemeColors.Primary;
-                _dataGridView.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
-                _dataGridView.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-                _dataGridView.EnableHeadersVisualStyles = false;
+            _dataGridView.ColumnHeadersDefaultCellStyle.BackColor = ThemeColors.Primary;
+            _dataGridView.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            _dataGridView.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            _dataGridView.EnableHeadersVisualStyles = false;
                 _dataGridView.RowHeadersVisible = false;
                 _dataGridView.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
                 _dataGridView.BorderStyle = BorderStyle.None;
 
-                // Buton kolonu stil
+            // Buton kolonu stil
                 if (_dataGridView.Columns["Actions"] != null)
                 {
                     _dataGridView.Columns["Actions"].DefaultCellStyle.Font = new Font("Segoe UI", 10F);
-                    _dataGridView.Columns["Actions"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            _dataGridView.Columns["Actions"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
                     _dataGridView.Columns["Actions"].DefaultCellStyle.Padding = new Padding(2, 2, 2, 2);
                 }
                 
@@ -445,8 +445,8 @@ namespace ERP.UI.Forms
 
                 // Actions kolonu için özel işlem
                 if (isActionsColumn && order != null)
-                {
-                    bool isInAccounting = order.Status == "Muhasebede";
+                        {
+                            bool isInAccounting = order.Status == "Muhasebede";
 
                     // Actions kolonu için satır arka planını çiz
                     using (SolidBrush bgBrush = new SolidBrush(rowBgColor))
@@ -460,13 +460,13 @@ namespace ERP.UI.Forms
                     // Butonlar: 📋 Detay, 📝 İşle, 📦 Sevkıyata Gönder
                     string[] emojis = new[] { "📋", "📝", "📦" };
                     Color[] colors;
-                    if (isInAccounting)
-                    {
+                                if (isInAccounting)
+                                {
                         // Mavi, Turuncu, Yeşil (tümü aktif)
                         colors = new[] { Color.FromArgb(33, 150, 243), Color.FromArgb(255, 152, 0), Color.FromArgb(76, 175, 80) };
-                    }
-                    else
-                    {
+                                }
+                                else
+                                {
                         // Mavi aktif, diğerleri gri (pasif)
                         colors = new[] { Color.FromArgb(33, 150, 243), Color.FromArgb(200, 200, 200), Color.FromArgb(200, 200, 200) };
                     }

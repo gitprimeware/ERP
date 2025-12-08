@@ -21,12 +21,18 @@ namespace ERP.UI.Forms
         private bool _isTableView = true; // Default tablo görünümü
         private ToolTip _actionToolTip;
         private string _currentToolTipText = "";
-        private TextBox _txtSearch;
-        private ComboBox _cmbCompanyFilter;
-        private ComboBox _cmbModelFilter;
-        private ComboBox _cmbLamelThicknessFilter;
-        private Button _btnSearch;
-        private Button _btnRefresh;
+        
+        // Sütun filtreleri
+        private Panel _columnFilterPanel;
+        private Dictionary<string, Control> _columnFilters = new Dictionary<string, Control>();
+        private string _currentSortColumn = "";
+        private enum SortDirection
+        {
+            None = 0,
+            Ascending = 1,
+            Descending = 2
+        }
+        private SortDirection _sortDirection = SortDirection.None;
 
         public event EventHandler<Guid> ProductionDetailRequested;
         public event EventHandler<Guid> ProductionSendToAccountingRequested;
@@ -62,38 +68,47 @@ namespace ERP.UI.Forms
                 AutoScroll = false // Ana panel kaymasın, sadece tablo kayacak
             };
 
-            // Başlık
+            // Başlık ve görünüm switch'i - tek satır
+            var titlePanel = new Panel
+            {
+                Height = 50,
+                Dock = DockStyle.None,
+                Location = new Point(30, 30),
+                Width = _mainPanel.Width - 60,
+                BackColor = Color.White,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+
             var titleLabel = new Label
             {
                 Text = "Üretim",
                 Font = new Font("Segoe UI", 20F, FontStyle.Bold),
                 ForeColor = ThemeColors.Primary,
                 AutoSize = true,
-                Location = new Point(30, 30)
+                Location = new Point(0, 10)
             };
 
-            // Arama paneli
-            var searchPanel = CreateSearchPanel();
-            searchPanel.Location = new Point(30, 80);
-
-            // Görünüm switch'i
             _chkTableView = new CheckBox
             {
                 Text = "📊 Tablo Görünümü",
                 Font = new Font("Segoe UI", 10F),
                 ForeColor = ThemeColors.TextPrimary,
                 AutoSize = true,
-                Location = new Point(30, 135),
+                Location = new Point(titlePanel.Width - 200, 12),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 Checked = _isTableView
             };
             _chkTableView.CheckedChanged += ChkTableView_CheckedChanged;
 
+            titlePanel.Controls.Add(titleLabel);
+            titlePanel.Controls.Add(_chkTableView);
+
             // Cards panel
             _cardsPanel = new FlowLayoutPanel
             {
-                Location = new Point(30, 170),
+                Location = new Point(30, 100),
                 Width = _mainPanel.Width - 60,
-                Height = _mainPanel.Height - 210,
+                Height = _mainPanel.Height - 140,
                 AutoScroll = true,
                 FlowDirection = FlowDirection.LeftToRight,
                 WrapContents = true,
@@ -101,12 +116,12 @@ namespace ERP.UI.Forms
                 Visible = !_isTableView
             };
 
-            // DataGridView
+            // DataGridView - Filtre panelinin altında, header'lar görünür olacak şekilde
             _dataGridView = new DataGridView
             {
-                Location = new Point(30, 170),
+                Location = new Point(30, 140), // Filtre panelinin altında (100px + 40px = 140px)
                 Width = _mainPanel.Width - 60,
-                Height = _mainPanel.Height - 210,
+                Height = _mainPanel.Height - 180, // Filtre paneli için yükseklik azaltıldı
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
                 AllowUserToAddRows = false,
@@ -127,6 +142,7 @@ namespace ERP.UI.Forms
             _dataGridView.CellMouseEnter += DataGridView_CellMouseEnter;
             _dataGridView.CellMouseLeave += DataGridView_CellMouseLeave;
             _dataGridView.Scroll += DataGridView_Scroll;
+            _dataGridView.ColumnHeaderMouseClick += DataGridView_ColumnHeaderMouseClick;
             
             // DoubleBuffered özelliğini aç - scroll sırasında üst üste binmeyi önler
             typeof(DataGridView).InvokeMember("DoubleBuffered",
@@ -135,314 +151,51 @@ namespace ERP.UI.Forms
 
             _mainPanel.Resize += (s, e) =>
             {
-                searchPanel.Width = _mainPanel.Width - 60;
+                if (titlePanel != null)
+                    titlePanel.Width = _mainPanel.Width - 60;
                 _cardsPanel.Width = _mainPanel.Width - 60;
-                _cardsPanel.Height = _mainPanel.Height - 210;
+                _cardsPanel.Height = _mainPanel.Height - 140;
+                _columnFilterPanel.Width = _mainPanel.Width - 60;
                 _dataGridView.Width = _mainPanel.Width - 60;
-                _dataGridView.Height = _mainPanel.Height - 210;
+                _dataGridView.Height = _mainPanel.Height - 180;
+                UpdateColumnFilterPanel();
             };
 
-            _mainPanel.Controls.Add(titleLabel);
-            _mainPanel.Controls.Add(searchPanel);
-            _mainPanel.Controls.Add(_chkTableView);
+            // Sütun filtre paneli (DataGridView header'larının üstünde)
+            _columnFilterPanel = new Panel
+            {
+                Location = new Point(30, 100), // Başlığın hemen altında
+                Width = _mainPanel.Width - 60,
+                Height = 40,
+                BackColor = Color.FromArgb(245, 245, 245),
+                Visible = _isTableView,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+
+            _mainPanel.Controls.Add(titlePanel);
+            _mainPanel.Controls.Add(_columnFilterPanel); // Önce filtre paneli (header'ların üstünde)
+            _mainPanel.Controls.Add(_dataGridView); // Sonra DataGridView (filtre panelinin altında, header'lar görünür)
             _mainPanel.Controls.Add(_cardsPanel);
-            _mainPanel.Controls.Add(_dataGridView);
 
             this.Controls.Add(_mainPanel);
             _mainPanel.BringToFront();
         }
 
-        private Panel CreateSearchPanel()
-        {
-            var panel = new Panel
-            {
-                Height = 50,
-                BackColor = Color.Transparent,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
-            };
+        // CreateSearchPanel ve ilgili metodlar kaldırıldı - artık sütun filtreleri kullanılıyor
 
-            // TableLayoutPanel ile responsive yapı
-            var tableLayout = new TableLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                ColumnCount = 12, // 12 kolon: Ara(2), Firma(3), Model(2), Lamel(2), Butonlar(3)
-                RowCount = 1,
-                AutoSize = true,
-                BackColor = Color.Transparent
-            };
-
-            // Kolon genişliklerini yüzdelik olarak ayarla
-            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); // Ara:
-            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 18F)); // Arama kutusu
-            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); // Firma:
-            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 15F)); // Firma combo
-            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); // Model:
-            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 8F)); // Model combo
-            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); // Lamel:
-            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 8F)); // Lamel combo
-            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 3F)); // Boşluk
-            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); // Ara butonu
-            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); // Yenile butonu
-            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 3F)); // Sağ boşluk
-
-            // Ara
-            var lblSearch = new Label
-            {
-                Text = "Ara:",
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                ForeColor = ThemeColors.TextPrimary,
-                AutoSize = true,
-                Anchor = AnchorStyles.Left | AnchorStyles.Top,
-                Padding = new Padding(0, 15, 0, 0)
-            };
-            tableLayout.Controls.Add(lblSearch, 0, 0);
-
-            _txtSearch = new TextBox
-            {
-                Height = 30,
-                Font = new Font("Segoe UI", 10F),
-                BorderStyle = BorderStyle.FixedSingle,
-                BackColor = Color.White,
-                Dock = DockStyle.Fill,
-                Margin = new Padding(5, 12, 5, 8)
-            };
-            _txtSearch.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) PerformSearch(); };
-            tableLayout.Controls.Add(_txtSearch, 1, 0);
-
-            // Firma
-            var lblCompany = new Label
-            {
-                Text = "Firma:",
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                ForeColor = ThemeColors.TextPrimary,
-                AutoSize = true,
-                Anchor = AnchorStyles.Left | AnchorStyles.Top,
-                Padding = new Padding(5, 15, 0, 0)
-            };
-            tableLayout.Controls.Add(lblCompany, 2, 0);
-
-            _cmbCompanyFilter = new ComboBox
-            {
-                Height = 30,
-                Font = new Font("Segoe UI", 10F),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                BackColor = Color.White,
-                Dock = DockStyle.Fill,
-                Margin = new Padding(5, 12, 5, 8)
-            };
-            LoadCompaniesForFilter();
-            tableLayout.Controls.Add(_cmbCompanyFilter, 3, 0);
-
-            // Model
-            var lblModel = new Label
-            {
-                Text = "Model:",
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                ForeColor = ThemeColors.TextPrimary,
-                AutoSize = true,
-                Anchor = AnchorStyles.Left | AnchorStyles.Top,
-                Padding = new Padding(5, 15, 0, 0)
-            };
-            tableLayout.Controls.Add(lblModel, 4, 0);
-
-            _cmbModelFilter = new ComboBox
-            {
-                Height = 30,
-                Font = new Font("Segoe UI", 10F),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                BackColor = Color.White,
-                Dock = DockStyle.Fill,
-                Margin = new Padding(5, 12, 5, 8)
-            };
-            LoadModelFilter();
-            tableLayout.Controls.Add(_cmbModelFilter, 5, 0);
-
-            // Lamel
-            var lblLamelThickness = new Label
-            {
-                Text = "Lamel:",
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                ForeColor = ThemeColors.TextPrimary,
-                AutoSize = true,
-                Anchor = AnchorStyles.Left | AnchorStyles.Top,
-                Padding = new Padding(5, 15, 0, 0)
-            };
-            tableLayout.Controls.Add(lblLamelThickness, 6, 0);
-
-            _cmbLamelThicknessFilter = new ComboBox
-            {
-                Height = 30,
-                Font = new Font("Segoe UI", 10F),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                BackColor = Color.White,
-                Dock = DockStyle.Fill,
-                Margin = new Padding(5, 12, 5, 8)
-            };
-            LoadLamelThicknessFilter();
-            tableLayout.Controls.Add(_cmbLamelThicknessFilter, 7, 0);
-
-            // Butonlar
-            _btnSearch = ButtonFactory.CreateActionButton("🔍 Ara", ThemeColors.Info, Color.White, 90, 30);
-            _btnSearch.Anchor = AnchorStyles.Left | AnchorStyles.Top;
-            _btnSearch.Margin = new Padding(5, 12, 5, 8);
-            _btnSearch.Click += (s, e) => PerformSearch();
-            tableLayout.Controls.Add(_btnSearch, 9, 0);
-
-            _btnRefresh = ButtonFactory.CreateActionButton("🔄 Yenile", ThemeColors.Secondary, Color.White, 90, 30);
-            _btnRefresh.Anchor = AnchorStyles.Left | AnchorStyles.Top;
-            _btnRefresh.Margin = new Padding(5, 12, 5, 8);
-            _btnRefresh.Click += (s, e) => {
-                _txtSearch.Text = "";
-                _cmbCompanyFilter.SelectedIndex = 0;
-                _cmbModelFilter.SelectedIndex = 0;
-                _cmbLamelThicknessFilter.SelectedIndex = 0;
-                PerformSearch();
-            };
-            tableLayout.Controls.Add(_btnRefresh, 10, 0);
-
-            panel.Controls.Add(tableLayout);
-            return panel;
-        }
-
-        private void LoadCompaniesForFilter()
-        {
-            try
-            {
-                _cmbCompanyFilter.Items.Clear();
-                _cmbCompanyFilter.Items.Add(new { Id = (Guid?)null, Name = "Tüm Firmalar" });
-                _cmbCompanyFilter.DisplayMember = "Name";
-                _cmbCompanyFilter.ValueMember = "Id";
-                _cmbCompanyFilter.SelectedIndex = 0;
-
-                var companies = _companyRepository.GetAll();
-                foreach (var company in companies)
-                {
-                    _cmbCompanyFilter.Items.Add(new { Id = (Guid?)company.Id, Name = company.Name });
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Firmalar yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void LoadModelFilter()
-        {
-            _cmbModelFilter.Items.Clear();
-            _cmbModelFilter.Items.Add(new { Value = (string)null, Name = "Tüm Modeller" });
-            _cmbModelFilter.Items.Add(new { Value = "H", Name = "H (3.25)" });
-            _cmbModelFilter.Items.Add(new { Value = "D", Name = "D (4.5)" });
-            _cmbModelFilter.Items.Add(new { Value = "M", Name = "M (6.5)" });
-            _cmbModelFilter.Items.Add(new { Value = "L", Name = "L (9)" });
-            _cmbModelFilter.DisplayMember = "Name";
-            _cmbModelFilter.ValueMember = "Value";
-            _cmbModelFilter.SelectedIndex = 0;
-        }
-
-        private void LoadLamelThicknessFilter()
-        {
-            try
-            {
-                _cmbLamelThicknessFilter.Items.Clear();
-                _cmbLamelThicknessFilter.Items.Add(new { Value = (decimal?)null, Name = "Tüm Kalınlıklar" });
-                
-                // Tüm siparişlerden unique lamel kalınlıklarını al
-                var allOrders = _orderRepository.GetAll();
-                var uniqueThicknesses = allOrders
-                    .Where(o => o.LamelThickness.HasValue)
-                    .Select(o => o.LamelThickness.Value)
-                    .Distinct()
-                    .OrderBy(t => t)
-                    .ToList();
-
-                foreach (var thickness in uniqueThicknesses)
-                {
-                    _cmbLamelThicknessFilter.Items.Add(new { Value = (decimal?)thickness, Name = thickness.ToString("0.000") });
-                }
-                
-                _cmbLamelThicknessFilter.DisplayMember = "Name";
-                _cmbLamelThicknessFilter.ValueMember = "Value";
-                _cmbLamelThicknessFilter.SelectedIndex = 0;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Lamel kalınlıkları yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void PerformSearch()
-        {
-            // Tablo görünümü aktifse, tabloyu görünür yap
-            if (_isTableView && _dataGridView != null)
-            {
-                _dataGridView.Visible = true;
-                _cardsPanel.Visible = false;
-            }
-            
-            string searchTerm = _txtSearch.Text.Trim();
-            Guid? companyId = null;
-            string modelFilter = null;
-            decimal? lamelThicknessFilter = null;
-
-            if (_cmbCompanyFilter.SelectedItem != null)
-            {
-                var selected = _cmbCompanyFilter.SelectedItem;
-                var idProperty = selected.GetType().GetProperty("Id");
-                if (idProperty != null)
-                {
-                    var idValue = idProperty.GetValue(selected);
-                    if (idValue != null && idValue != DBNull.Value)
-                    {
-                        companyId = (Guid?)idValue;
-                    }
-                }
-            }
-
-            if (_cmbModelFilter.SelectedItem != null)
-            {
-                var selected = _cmbModelFilter.SelectedItem;
-                var valueProperty = selected.GetType().GetProperty("Value");
-                if (valueProperty != null)
-                {
-                    modelFilter = valueProperty.GetValue(selected) as string;
-                }
-            }
-
-            if (_cmbLamelThicknessFilter.SelectedItem != null)
-            {
-                var selected = _cmbLamelThicknessFilter.SelectedItem;
-                var valueProperty = selected.GetType().GetProperty("Value");
-                if (valueProperty != null)
-                {
-                    lamelThicknessFilter = valueProperty.GetValue(selected) as decimal?;
-                }
-            }
-
-            LoadProductionOrders(searchTerm, companyId, modelFilter, lamelThicknessFilter);
-        }
-
-        private void LoadProductionOrders(string searchTerm = null, Guid? companyId = null, string modelFilter = null, decimal? lamelThicknessFilter = null)
+        private void LoadProductionOrders()
         {
             try
             {
                 // Tüm siparişleri getir
-                var allOrders = _orderRepository.GetAll(searchTerm, companyId).ToList();
-
-                // Model filtresi uygula
-                if (!string.IsNullOrEmpty(modelFilter))
-                {
-                    allOrders = allOrders.Where(o => GetModelLetterFromProductCode(o.ProductCode) == modelFilter.ToUpper()).ToList();
-                }
-
-                // Lamel kalınlığı filtresi uygula
-                if (lamelThicknessFilter.HasValue)
-                {
-                    allOrders = allOrders.Where(o => o.LamelThickness.HasValue && Math.Abs(o.LamelThickness.Value - lamelThicknessFilter.Value) < 0.001m).ToList();
-                }
+                var allOrders = _orderRepository.GetAll().ToList();
 
                 if (_isTableView)
                 {
                     LoadDataGridView(allOrders);
+                    // Sütun filtrelerini uygula
+                    ApplyColumnFilters();
                 }
                 else
                 {
@@ -504,6 +257,106 @@ namespace ERP.UI.Forms
             }
         }
 
+        private (string Hatve, string PlakaOlcusu, string Yukseklik, string Kapak, string Profil) ParseProductCodeForTable(string productCode)
+        {
+            if (string.IsNullOrEmpty(productCode))
+                return ("", "", "", "", "");
+
+            try
+            {
+                // Format: TREX-CR-LG-1422-1900-030
+                var parts = productCode.Split('-');
+                if (parts.Length < 6)
+                    return ("", "", "", "", "");
+
+                string hatve = "";
+                string plakaOlcusu = "";
+                string yukseklik = "";
+                string kapak = "";
+                string profil = "";
+
+                // Model ve Profil: LG -> Model: L, Profil: G
+                string modelProfile = parts[2];
+                if (modelProfile.Length >= 2)
+                {
+                    char modelLetter = modelProfile[0];
+                    char profileLetter = modelProfile[1];
+
+                    // Hatve: H, D, M, L olarak göster
+                    hatve = modelLetter.ToString().ToUpper();
+
+                    // Profil
+                    profil = profileLetter.ToString().ToUpper();
+                }
+
+                // Plaka Ölçüsü (mm): Rapor formülüne göre hesapla ve yuvarla
+                if (parts.Length >= 4 && int.TryParse(parts[3], out int plakaOlcusuMM))
+                {
+                    // Plaka Ölçüsü com (mm): 1422 <= 1150 ise 1422, > 1150 ise 1422/2 = 711
+                    int plakaOlcusuComMM = plakaOlcusuMM <= 1150 ? plakaOlcusuMM : plakaOlcusuMM / 2;
+                    
+                    // 100'ün katlarına yuvarla: 711 -> 700
+                    int roundedPlakaOlcusu = (plakaOlcusuComMM / 100) * 100;
+                    plakaOlcusu = roundedPlakaOlcusu.ToString(); // MM cinsinden göster
+                }
+
+                // Yükseklik: Rapor formülüne göre
+                // Yükseklik <= 1800 ise Yükseklik, > 1800 ise Yükseklik/2
+                // Sonra kapak değeri çıkarılır
+                if (parts.Length >= 5 && int.TryParse(parts[4], out int yukseklikMM))
+                {
+                    // Yükseklik com hesaplama
+                    int yukseklikCom = yukseklikMM <= 1800 ? yukseklikMM : yukseklikMM / 2;
+                    
+                    // Kapak değeri
+                    int kapakDegeri = 16; // Varsayılan
+                    if (parts.Length >= 6)
+                    {
+                        string kapakStr = parts[5];
+                        if (kapakStr == "030" || kapakStr == "002")
+                            kapakDegeri = 16; // (30+2)/2 = 16
+                        else if (kapakStr == "016")
+                            kapakDegeri = 16;
+                        else if (int.TryParse(kapakStr, out int kapakVal))
+                        {
+                            if (kapakVal == 30 || kapakVal == 2)
+                                kapakDegeri = 16;
+                            else
+                                kapakDegeri = kapakVal;
+                        }
+                    }
+                    
+                    // Rapor yükseklik = Yükseklik com - Kapak
+                    int raporYukseklik = yukseklikCom - kapakDegeri;
+                    yukseklik = raporYukseklik.ToString();
+                }
+
+                // Kapak: 030 -> 30
+                if (parts.Length >= 6)
+                {
+                    string kapakStr = parts[5];
+                    if (int.TryParse(kapakStr, out int kapakValue))
+                    {
+                        kapak = kapakValue.ToString();
+                    }
+                    else if (kapakStr == "030")
+                        kapak = "30";
+                    else if (kapakStr == "002")
+                        kapak = "2";
+                    else if (kapakStr == "016")
+                        kapak = "16";
+                    else
+                        kapak = kapakStr;
+                }
+
+                return (hatve, plakaOlcusu, yukseklik, kapak, profil);
+            }
+            catch
+            {
+                return ("", "", "", "", "");
+            }
+        }
+
         private void LoadCardsView(List<Order> orders)
         {
             _cardsPanel.Controls.Clear();
@@ -562,13 +415,14 @@ namespace ERP.UI.Forms
 
                 _dataGridView.AutoGenerateColumns = false;
 
-                // Kolonları ekle - Trex Sipariş No, Firma, Ürün Kodu, Adet, Lamel Kalınlığı, Model
+                // Kolonları ekle - İstenen sıraya göre
                 _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
                 {
                     DataPropertyName = "TrexOrderNo",
                     HeaderText = "Trex Sipariş No",
                     Name = "TrexOrderNo",
-                    Width = 150
+                    Width = 150,
+                    SortMode = DataGridViewColumnSortMode.Programmatic
                 });
 
                 var companyColumn = new DataGridViewTextBoxColumn
@@ -576,7 +430,8 @@ namespace ERP.UI.Forms
                     DataPropertyName = "CompanyName",
                     HeaderText = "Firma",
                     Name = "CompanyName",
-                    Width = 200
+                    Width = 200,
+                    SortMode = DataGridViewColumnSortMode.Programmatic
                 };
                 _dataGridView.Columns.Add(companyColumn);
 
@@ -585,15 +440,53 @@ namespace ERP.UI.Forms
                     DataPropertyName = "ProductCode",
                     HeaderText = "Ürün Kodu",
                     Name = "ProductCode",
-                    Width = 200
+                    Width = 200,
+                    SortMode = DataGridViewColumnSortMode.Programmatic
                 });
 
                 _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
                 {
-                    DataPropertyName = "Quantity",
-                    HeaderText = "Adet",
-                    Name = "Quantity",
-                    Width = 100
+                    DataPropertyName = "Hatve",
+                    HeaderText = "Hatve",
+                    Name = "Hatve",
+                    Width = 100,
+                    SortMode = DataGridViewColumnSortMode.Programmatic
+                });
+
+                _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+                {
+                    DataPropertyName = "PlakaOlcusu",
+                    HeaderText = "Plaka Ölçüsü",
+                    Name = "PlakaOlcusu",
+                    Width = 120,
+                    SortMode = DataGridViewColumnSortMode.Programmatic
+                });
+
+                _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+                {
+                    DataPropertyName = "Yukseklik",
+                    HeaderText = "Yükseklik",
+                    Name = "Yukseklik",
+                    Width = 100,
+                    SortMode = DataGridViewColumnSortMode.Programmatic
+                });
+
+                _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+                {
+                    DataPropertyName = "Kapak",
+                    HeaderText = "Kapak",
+                    Name = "Kapak",
+                    Width = 80,
+                    SortMode = DataGridViewColumnSortMode.Programmatic
+                });
+
+                _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+                {
+                    DataPropertyName = "Profil",
+                    HeaderText = "Profil",
+                    Name = "Profil",
+                    Width = 80,
+                    SortMode = DataGridViewColumnSortMode.Programmatic
                 });
 
                 _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
@@ -601,15 +494,17 @@ namespace ERP.UI.Forms
                     DataPropertyName = "LamelThickness",
                     HeaderText = "Lamel Kalınlığı",
                     Name = "LamelThickness",
-                    Width = 120
+                    Width = 120,
+                    SortMode = DataGridViewColumnSortMode.Programmatic
                 });
 
                 _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
                 {
-                    DataPropertyName = "ModelLetter",
-                    HeaderText = "Model",
-                    Name = "ModelLetter",
-                    Width = 120
+                    DataPropertyName = "Quantity",
+                    HeaderText = "Adet",
+                    Name = "Quantity",
+                    Width = 100,
+                    SortMode = DataGridViewColumnSortMode.Programmatic
                 });
 
                 // İşlemler kolonu (emoji butonları)
@@ -623,19 +518,27 @@ namespace ERP.UI.Forms
                 };
                 _dataGridView.Columns.Add(actionsColumn);
 
-                // DataSource için özel bir liste oluştur
-                var dataSource = orders.Select(o => new
+                // DataSource için özel bir liste oluştur - Ürün kodundan parse edilen değerlerle
+                var dataSource = orders.Select(o => 
                 {
-                    o.Id,
-                    o.TrexOrderNo,
-                    CompanyName = o.Company?.Name ?? "",
-                    o.ProductCode,
-                    o.Quantity,
-                    LamelThickness = o.LamelThickness.HasValue ? o.LamelThickness.Value.ToString("0.000") : "",
-                    ModelLetter = GetModelLetterWithSize(o.ProductCode),
-                    o.Status,
-                    IsInProduction = o.Status == "Üretimde",
-                    IsStockOrder = o.IsStockOrder
+                    var parsedData = ParseProductCodeForTable(o.ProductCode);
+                    return new
+                    {
+                        o.Id,
+                        o.TrexOrderNo,
+                        CompanyName = o.Company?.Name ?? "",
+                        o.ProductCode,
+                        Hatve = parsedData.Hatve,
+                        PlakaOlcusu = parsedData.PlakaOlcusu,
+                        Yukseklik = parsedData.Yukseklik,
+                        Kapak = parsedData.Kapak,
+                        Profil = parsedData.Profil,
+                        LamelThickness = o.LamelThickness.HasValue ? o.LamelThickness.Value.ToString("0.000", System.Globalization.CultureInfo.GetCultureInfo("tr-TR")) : "",
+                        o.Quantity,
+                        o.Status,
+                        IsInProduction = o.Status == "Üretimde",
+                        IsStockOrder = o.IsStockOrder
+                    };
                 }).ToList();
 
                 _dataGridView.Tag = orders; // Orijinal order listesini sakla
@@ -654,13 +557,20 @@ namespace ERP.UI.Forms
                 _dataGridView.DefaultCellStyle.SelectionBackColor = Color.FromArgb(220, ThemeColors.Primary.R, ThemeColors.Primary.G, ThemeColors.Primary.B);
                 _dataGridView.GridColor = Color.FromArgb(230, 230, 230);
                 _dataGridView.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+                _dataGridView.ColumnHeadersVisible = true; // Başlıklar görünür olmalı
+                _dataGridView.ColumnHeadersHeight = 40;
+                _dataGridView.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
                 _dataGridView.ColumnHeadersDefaultCellStyle.BackColor = ThemeColors.Primary;
                 _dataGridView.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
                 _dataGridView.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+                _dataGridView.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
                 _dataGridView.EnableHeadersVisualStyles = false;
                 _dataGridView.RowHeadersVisible = false;
                 _dataGridView.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
                 _dataGridView.BorderStyle = BorderStyle.None;
+                
+                // Sütun filtre panelini güncelle
+                UpdateColumnFilterPanel();
 
                 // Buton kolonu stil
                 if (_dataGridView.Columns["Actions"] != null)
@@ -731,7 +641,12 @@ namespace ERP.UI.Forms
             _isTableView = _chkTableView.Checked;
             _cardsPanel.Visible = !_isTableView;
             _dataGridView.Visible = _isTableView;
-            PerformSearch(); // Filtreleri koruyarak arama yap
+            _columnFilterPanel.Visible = _isTableView;
+            if (_isTableView)
+            {
+                UpdateColumnFilterPanel();
+            }
+            LoadProductionOrders(); // Filtreleri koruyarak arama yap
         }
 
         private void DataGridView_CellClick(object sender, DataGridViewCellEventArgs e)
@@ -1354,6 +1269,345 @@ namespace ERP.UI.Forms
         {
             _actionToolTip.Hide(_dataGridView);
             _currentToolTipText = "";
+        }
+
+        private void UpdateColumnFilterPanel()
+        {
+            if (_columnFilterPanel == null || _dataGridView == null || _dataGridView.Columns.Count == 0)
+                return;
+
+            _columnFilterPanel.Controls.Clear();
+            _columnFilters.Clear();
+
+            int xPos = 0;
+            int filterHeight = 35;
+
+            foreach (DataGridViewColumn column in _dataGridView.Columns)
+            {
+                if (column.Name == "Actions")
+                {
+                    // İşlemler kolonu için filtre yok
+                    xPos += column.Width;
+                    continue;
+                }
+
+                Control filterControl = null;
+
+                // Sütun tipine göre filtre kontrolü oluştur
+                if (column.Name == "CompanyName")
+                {
+                    // Firma için ComboBox
+                    var cmb = new ComboBox
+                    {
+                        Width = column.Width - 2,
+                        Height = filterHeight,
+                        Font = new Font("Segoe UI", 9F),
+                        DropDownStyle = ComboBoxStyle.DropDown,
+                        Location = new Point(xPos, 2),
+                        BackColor = Color.White
+                    };
+                    cmb.Items.Add("Tümü");
+                    var companies = _companyRepository.GetAll().OrderBy(c => c.Name).ToList();
+                    foreach (var company in companies)
+                    {
+                        cmb.Items.Add(company.Name);
+                    }
+                    cmb.SelectedIndex = 0;
+                    cmb.TextChanged += (s, e) => ApplyColumnFilters();
+                    filterControl = cmb;
+                }
+                else if (column.Name == "Hatve")
+                {
+                    // Hatve için ComboBox
+                    var cmb = new ComboBox
+                    {
+                        Width = column.Width - 2,
+                        Height = filterHeight,
+                        Font = new Font("Segoe UI", 9F),
+                        DropDownStyle = ComboBoxStyle.DropDownList,
+                        Location = new Point(xPos, 2),
+                        BackColor = Color.White
+                    };
+                    cmb.Items.Add("Tümü");
+                    cmb.Items.Add("H");
+                    cmb.Items.Add("D");
+                    cmb.Items.Add("M");
+                    cmb.Items.Add("L");
+                    cmb.SelectedIndex = 0;
+                    cmb.SelectedIndexChanged += (s, e) => ApplyColumnFilters();
+                    filterControl = cmb;
+                }
+                else if (column.Name == "Kapak")
+                {
+                    // Kapak için ComboBox (30, 2)
+                    var cmb = new ComboBox
+                    {
+                        Width = column.Width - 2,
+                        Height = filterHeight,
+                        Font = new Font("Segoe UI", 9F),
+                        DropDownStyle = ComboBoxStyle.DropDownList,
+                        Location = new Point(xPos, 2),
+                        BackColor = Color.White
+                    };
+                    cmb.Items.Add("Tümü");
+                    cmb.Items.Add("30");
+                    cmb.Items.Add("2");
+                    cmb.SelectedIndex = 0;
+                    cmb.SelectedIndexChanged += (s, e) => ApplyColumnFilters();
+                    filterControl = cmb;
+                }
+                else if (column.Name == "Profil")
+                {
+                    // Profil için ComboBox (S, G)
+                    var cmb = new ComboBox
+                    {
+                        Width = column.Width - 2,
+                        Height = filterHeight,
+                        Font = new Font("Segoe UI", 9F),
+                        DropDownStyle = ComboBoxStyle.DropDownList,
+                        Location = new Point(xPos, 2),
+                        BackColor = Color.White
+                    };
+                    cmb.Items.Add("Tümü");
+                    cmb.Items.Add("S");
+                    cmb.Items.Add("G");
+                    cmb.SelectedIndex = 0;
+                    cmb.SelectedIndexChanged += (s, e) => ApplyColumnFilters();
+                    filterControl = cmb;
+                }
+                else if (column.Name == "LamelThickness")
+                {
+                    // Lamel Kalınlığı için ComboBox (0,100, 0,120, 0,150, 0,165, 0,180) - virgülle
+                    var cmb = new ComboBox
+                    {
+                        Width = column.Width - 2,
+                        Height = filterHeight,
+                        Font = new Font("Segoe UI", 9F),
+                        DropDownStyle = ComboBoxStyle.DropDownList,
+                        Location = new Point(xPos, 2),
+                        BackColor = Color.White
+                    };
+                    cmb.Items.Add("Tümü");
+                    cmb.Items.Add("0,100");
+                    cmb.Items.Add("0,120");
+                    cmb.Items.Add("0,150");
+                    cmb.Items.Add("0,165");
+                    cmb.Items.Add("0,180");
+                    cmb.SelectedIndex = 0;
+                    cmb.SelectedIndexChanged += (s, e) => ApplyColumnFilters();
+                    filterControl = cmb;
+                }
+                else
+                {
+                    // Diğer sütunlar için TextBox
+                    var txt = new TextBox
+                    {
+                        Width = column.Width - 2,
+                        Height = filterHeight,
+                        Font = new Font("Segoe UI", 9F),
+                        Location = new Point(xPos, 2),
+                        BackColor = Color.White,
+                        BorderStyle = BorderStyle.FixedSingle
+                    };
+                    txt.TextChanged += (s, e) => ApplyColumnFilters();
+                    filterControl = txt;
+                }
+
+                if (filterControl != null)
+                {
+                    _columnFilterPanel.Controls.Add(filterControl);
+                    _columnFilters[column.Name] = filterControl;
+                }
+
+                xPos += column.Width;
+            }
+        }
+
+        private void ApplyColumnFilters()
+        {
+            if (!_isTableView || _dataGridView.Tag == null)
+                return;
+
+            try
+            {
+                // Orijinal veriyi Tag'den al (filtrelenmemiş)
+                if (!(_dataGridView.Tag is List<Order> originalOrders))
+                    return;
+
+                var filteredData = originalOrders.Select(o => 
+                {
+                    var parsedData = ParseProductCodeForTable(o.ProductCode);
+                    return new
+                    {
+                        o.Id,
+                        o.TrexOrderNo,
+                        CompanyName = o.Company?.Name ?? "",
+                        o.ProductCode,
+                        Hatve = parsedData.Hatve,
+                        PlakaOlcusu = parsedData.PlakaOlcusu,
+                        Yukseklik = parsedData.Yukseklik,
+                        Kapak = parsedData.Kapak,
+                        Profil = parsedData.Profil,
+                        LamelThickness = o.LamelThickness.HasValue ? o.LamelThickness.Value.ToString("0.000", System.Globalization.CultureInfo.GetCultureInfo("tr-TR")) : "",
+                        o.Quantity,
+                        o.Status,
+                        IsInProduction = o.Status == "Üretimde",
+                        IsStockOrder = o.IsStockOrder
+                    };
+                }).Cast<object>().ToList();
+
+                // Her sütun filtresini uygula
+                foreach (var kvp in _columnFilters)
+                {
+                    string columnName = kvp.Key;
+                    Control filterControl = kvp.Value;
+
+                    if (filterControl is TextBox txt && !string.IsNullOrWhiteSpace(txt.Text))
+                    {
+                        string filterText = txt.Text.ToLower();
+                        filteredData = filteredData.Where(item =>
+                        {
+                            var prop = item.GetType().GetProperty(columnName);
+                            if (prop != null)
+                            {
+                                var value = prop.GetValue(item);
+                                return value != null && value.ToString().ToLower().Contains(filterText);
+                            }
+                            return true;
+                        }).ToList();
+                    }
+                    else if (filterControl is ComboBox cmb)
+                    {
+                        // "Tümü" seçildiğinde filtreleme yapma (SelectedIndex == 0)
+                        if (cmb.SelectedIndex > 0)
+                        {
+                            string filterValue = cmb.SelectedItem.ToString();
+                            
+                            // LamelThickness için özel kontrol - virgül/nokta dönüşümü
+                            if (columnName == "LamelThickness")
+                            {
+                                // ComboBox'tan gelen değer: "0,100" şeklinde
+                                // Tablodaki değer: "0,100" şeklinde (Türkçe format)
+                                // Her iki tarafı da normalize et
+                                string normalizedFilter = filterValue.Replace(".", ",").Trim();
+                                
+                                filteredData = filteredData.Where(item =>
+                                {
+                                    var prop = item.GetType().GetProperty(columnName);
+                                    if (prop != null)
+                                    {
+                                        var value = prop.GetValue(item)?.ToString() ?? "";
+                                        // Değeri normalize et (virgül/nokta)
+                                        string normalizedValue = value.Replace(".", ",").Trim();
+                                        // Tam eşitlik kontrolü
+                                        return normalizedValue == normalizedFilter;
+                                    }
+                                    return true;
+                                }).ToList();
+                            }
+                            else
+                            {
+                                // Diğer ComboBox'lar için normal eşitlik kontrolü
+                                filteredData = filteredData.Where(item =>
+                                {
+                                    var prop = item.GetType().GetProperty(columnName);
+                                    if (prop != null)
+                                    {
+                                        var value = prop.GetValue(item);
+                                        return value != null && value.ToString().Equals(filterValue, StringComparison.OrdinalIgnoreCase);
+                                    }
+                                    return true;
+                                }).ToList();
+                            }
+                        }
+                        // SelectedIndex == 0 ise (Tümü) filtreleme yapma, tüm veriler kalsın
+                    }
+                }
+
+                // Sıralama uygula
+                if (!string.IsNullOrEmpty(_currentSortColumn) && _sortDirection != SortDirection.None)
+                {
+                    var prop = filteredData.FirstOrDefault()?.GetType().GetProperty(_currentSortColumn);
+                    if (prop != null)
+                    {
+                        if (_sortDirection == SortDirection.Ascending)
+                        {
+                            filteredData = filteredData.OrderBy(item => prop.GetValue(item)).ToList();
+                        }
+                        else if (_sortDirection == SortDirection.Descending)
+                        {
+                            filteredData = filteredData.OrderByDescending(item => prop.GetValue(item)).ToList();
+                        }
+                    }
+                }
+
+                // DataSource'u güncelle - Tag'i koru (orijinal order listesi)
+                var bindingSource = new BindingSource();
+                foreach (var item in filteredData)
+                {
+                    bindingSource.Add(item);
+                }
+                _dataGridView.DataSource = bindingSource;
+                // Tag'i koru - orijinal order listesi kalmalı
+                _dataGridView.Tag = originalOrders;
+            }
+            catch (Exception ex)
+            {
+                // Hata durumunda sessizce devam et
+                System.Diagnostics.Debug.WriteLine($"Filtre uygulanırken hata: {ex.Message}");
+            }
+        }
+
+        private void DataGridView_ColumnHeaderMouseClick(object sender, DataGridViewCellMouseEventArgs e)
+        {
+            if (e.ColumnIndex < 0 || _dataGridView.Columns[e.ColumnIndex].Name == "Actions")
+                return;
+
+            string columnName = _dataGridView.Columns[e.ColumnIndex].Name;
+
+            // Sıralama yönünü değiştir
+            if (_currentSortColumn == columnName)
+            {
+                if (_sortDirection == SortDirection.None)
+                    _sortDirection = SortDirection.Ascending;
+                else if (_sortDirection == SortDirection.Ascending)
+                    _sortDirection = SortDirection.Descending;
+                else
+                    _sortDirection = SortDirection.None;
+            }
+            else
+            {
+                _currentSortColumn = columnName;
+                _sortDirection = SortDirection.Ascending;
+            }
+
+            // Header'da sıralama işaretini göster
+            UpdateSortIndicators();
+
+            // Filtreleri uygula (sıralama dahil)
+            ApplyColumnFilters();
+        }
+
+        private void UpdateSortIndicators()
+        {
+            foreach (DataGridViewColumn column in _dataGridView.Columns)
+            {
+                string originalHeader = column.HeaderText.Replace(" ▲", "").Replace(" ▼", "");
+
+                if (column.Name == _currentSortColumn)
+                {
+                    if (_sortDirection == SortDirection.Ascending)
+                        column.HeaderText = originalHeader + " ▲";
+                    else if (_sortDirection == SortDirection.Descending)
+                        column.HeaderText = originalHeader + " ▼";
+                    else
+                        column.HeaderText = originalHeader;
+                }
+                else
+                {
+                    column.HeaderText = originalHeader;
+                }
+            }
         }
     }
 }

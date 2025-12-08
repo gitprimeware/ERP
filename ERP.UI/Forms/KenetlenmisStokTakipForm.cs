@@ -15,11 +15,13 @@ namespace ERP.UI.Forms
         private Panel _mainPanel;
         private DataGridView _dataGridView;
         private ClampingRepository _clampingRepository;
+        private AssemblyRepository _assemblyRepository;
         private OrderRepository _orderRepository;
 
         public KenetlenmisStokTakipForm()
         {
             _clampingRepository = new ClampingRepository();
+            _assemblyRepository = new AssemblyRepository();
             _orderRepository = new OrderRepository();
             InitializeCustomComponents();
         }
@@ -132,6 +134,22 @@ namespace ERP.UI.Forms
 
             _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
             {
+                DataPropertyName = "KalanAdet",
+                HeaderText = "KALAN ADET (REMAINING PCS.)",
+                Name = "KalanAdet",
+                Width = 150
+            });
+
+            _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "UsedInAssembly",
+                HeaderText = "MONTAJDA KULLANILAN (USED IN ASSEMBLY)",
+                Name = "UsedInAssembly",
+                Width = 200
+            });
+
+            _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+            {
                 DataPropertyName = "Customer",
                 HeaderText = "MÜŞTERİ (CUSTOMER)",
                 Name = "Customer",
@@ -202,9 +220,27 @@ namespace ERP.UI.Forms
                 var clampings = _clampingRepository.GetAll();
                 var orders = _orderRepository.GetAll();
 
+                // Montaj işlemlerinden kullanılan kenet adedini hesapla
+                var allAssemblies = _assemblyRepository.GetAll();
+                var usedClampCountByClampingId = allAssemblies
+                    .Where(a => a.ClampingId.HasValue)
+                    .GroupBy(a => a.ClampingId.Value)
+                    .ToDictionary(g => g.Key, g => g.Sum(a => a.UsedClampCount));
+
                 var data = clampings.Select(c =>
                 {
                     var order = orders.FirstOrDefault(o => o.Id == c.OrderId);
+                    
+                    // Bu kenet için montaj işlemlerinde kullanılan adeti hesapla
+                    int usedInAssembly = 0;
+                    if (usedClampCountByClampingId.ContainsKey(c.Id))
+                    {
+                        usedInAssembly = usedClampCountByClampingId[c.Id];
+                    }
+                    
+                    // Kalan adet = Toplam kenet adedi - Montajda kullanılan adet
+                    int kalanAdet = c.ClampCount - usedInAssembly;
+                    
                     return new
                     {
                         Date = c.ClampingDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
@@ -213,6 +249,8 @@ namespace ERP.UI.Forms
                         Size = c.Size.ToString("F2", CultureInfo.InvariantCulture),
                         Length = c.Length.ToString("F2", CultureInfo.InvariantCulture),
                         ClampCount = c.ClampCount.ToString(),
+                        KalanAdet = kalanAdet > 0 ? kalanAdet.ToString() : "0",
+                        UsedInAssembly = usedInAssembly > 0 ? usedInAssembly.ToString() : "0",
                         Customer = order?.Company?.Name ?? "",
                         UsedPlateCount = c.UsedPlateCount.ToString(),
                         PlateThickness = c.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),

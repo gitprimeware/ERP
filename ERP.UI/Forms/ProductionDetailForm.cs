@@ -45,6 +45,7 @@ namespace ERP.UI.Forms
         // İkinci tab (Rapor sayfası)
         private TableLayoutPanel reportTableLayout;
         private TextBox txtReportTrexOrderNo;
+        private TextBox txtReportProductCode;
         private TextBox txtReportHtave;
         private TextBox txtReportPlakaOlcusuCM;
         private TextBox txtReportYukseklikCM;
@@ -397,31 +398,31 @@ namespace ERP.UI.Forms
 
             // Trex Sipariş No
             AddReportTableRow("Trex Sipariş No:", CreateReadOnlyTextBox(txtReportTrexOrderNo = new TextBox()),
-                       "Hatve:", CreateReadOnlyTextBox(txtReportHtave = new TextBox()), row++);
+                       "Ürün Kodu:", CreateReadOnlyTextBox(txtReportProductCode = new TextBox()), row++);
 
             // Plaka Ölçüsü (mm)
             AddReportTableRow("Plaka Ölçüsü (mm):", CreateReadOnlyTextBox(txtReportPlakaOlcusuCM = new TextBox()),
-                       "Yükseklik (mm):", CreateReadOnlyTextBox(txtReportYukseklikCM = new TextBox()), row++);
+                       "Hatve:", CreateReadOnlyTextBox(txtReportHtave = new TextBox()), row++);
 
             // Toplam Sipariş Adedi
             AddReportTableRow("Toplam Sipariş Adedi:", CreateReadOnlyTextBox(txtReportToplamSiparisAdedi = new TextBox()),
-                       "Kapak:", CreateReadOnlyTextBox(txtReportKapak = new TextBox()), row++);
+                       "Yükseklik (mm):", CreateReadOnlyTextBox(txtReportYukseklikCM = new TextBox()), row++);
 
             // Plaka Adedi
             AddReportTableRow("Plaka Adedi:", CreateReadOnlyTextBox(txtReportPlakaAdedi = new TextBox()),
-                       "Profil:", CreateReadOnlyTextBox(txtReportProfil = new TextBox()), row++);
+                       "Kapak:", CreateReadOnlyTextBox(txtReportKapak = new TextBox()), row++);
 
             // Termin Tarihi
             AddReportTableRow("Termin Tarihi:", CreateReadOnlyTextBox(txtReportTerminTarihi = new TextBox()),
-                       "Firma:", CreateReadOnlyTextBox(txtReportFirma = new TextBox()), row++);
+                       "Profil:", CreateReadOnlyTextBox(txtReportProfil = new TextBox()), row++);
 
             // Lamel Kalınlığı
             AddReportTableRow("Lamel Kalınlığı:", CreateReadOnlyTextBox(txtReportLamelKalinligi = new TextBox()),
-                       "Ürün Türü:", CreateReadOnlyTextBox(txtReportUrunTuru = new TextBox()), row++);
+                       "Firma:", CreateReadOnlyTextBox(txtReportFirma = new TextBox()), row++);
 
             // Durum
             AddReportTableRow("Durum:", CreateReadOnlyTextBox(txtReportDurum = new TextBox()),
-                       "", new Label { Text = "", Dock = DockStyle.Fill }, row++);
+                       "Ürün Türü:", CreateReadOnlyTextBox(txtReportUrunTuru = new TextBox()), row++);
         }
 
         private void AddReportTableRow(string label1Text, Control control1, string label2Text, Control control2, int row)
@@ -568,18 +569,59 @@ namespace ERP.UI.Forms
             if (txtReportTrexOrderNo != null)
                 txtReportTrexOrderNo.Text = _order.TrexOrderNo ?? "";
 
-            // Htave - Model satırından (formül sayfasındaki txtHtave'den)
-            if (txtReportHtave != null && txtHtave != null)
-                txtReportHtave.Text = txtHtave.Text;
+            // Ürün Kodu
+            if (txtReportProductCode != null)
+                txtReportProductCode.Text = _order.ProductCode ?? "";
 
-            // Plaka Ölçüsü (mm) - Formül sayfasındaki plaka ölçüsü cm'yi mm'ye çevir
+            // Htave - Model satırından (formül sayfasındaki txtHtave'den) ve parantez içinde sözel olarak
+            if (txtReportHtave != null && txtHtave != null)
+            {
+                string hatveText = txtHtave.Text;
+                
+                // Model harfini ürün kodundan al
+                char modelLetter = ' ';
+                if (_order != null && !string.IsNullOrEmpty(_order.ProductCode))
+                {
+                    var parts = _order.ProductCode.Split('-');
+                    if (parts.Length >= 3 && parts[2].Length > 0)
+                    {
+                        modelLetter = parts[2][0];
+                    }
+                }
+                
+                // Sözel karşılığını belirle
+                string sozelKarsilik = "";
+                switch (char.ToUpper(modelLetter))
+                {
+                    case 'H': sozelKarsilik = "Yüksek"; break;
+                    case 'D': sozelKarsilik = "Düşük"; break;
+                    case 'M': sozelKarsilik = "Orta"; break;
+                    case 'L': sozelKarsilik = "Büyük"; break;
+                    default: sozelKarsilik = ""; break;
+                }
+                
+                // Parantez içinde sözel olarak göster
+                if (!string.IsNullOrEmpty(sozelKarsilik))
+                {
+                    txtReportHtave.Text = $"{hatveText} ({sozelKarsilik})";
+                }
+                else
+                {
+                    txtReportHtave.Text = hatveText;
+                }
+            }
+
+            // Plaka Ölçüsü (mm) - Formül sayfasındaki plaka ölçüsü cm'yi mm'ye çevir ve 100'ün katlarına yuvarla
             if (txtReportPlakaOlcusuCM != null && txtPlakaOlcusuCM != null)
             {
                 if (decimal.TryParse(txtPlakaOlcusuCM.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal plakaOlcusuCM))
                 {
-                    // cm'yi mm'ye çevir (10 ile çarp ve ondalık kısmı kaldır)
+                    // cm'yi mm'ye çevir (10 ile çarp)
                     int plakaOlcusuMM = (int)Math.Round(plakaOlcusuCM * 10m);
-                    txtReportPlakaOlcusuCM.Text = plakaOlcusuMM.ToString();
+                    
+                    // 100'ün katlarına yuvarla (711 -> 700)
+                    int roundedPlakaOlcusuMM = (plakaOlcusuMM / 100) * 100;
+                    txtReportPlakaOlcusuCM.Text = roundedPlakaOlcusuMM.ToString();
                 }
                 else
                 {
@@ -601,7 +643,7 @@ namespace ERP.UI.Forms
                     int cikarilacakKapakDegeri = 16; // Varsayılan olarak 16
                     
                     if (int.TryParse(txtKapakBoyuMM.Text, out int kapakBoyuMM))
-                    {
+                {
                         // Kapak tipi 30 veya 2 ise 16 kullan, diğer durumlarda direkt değeri kullan
                         if (kapakBoyuMM == 30 || kapakBoyuMM == 2)
                         {
@@ -638,14 +680,14 @@ namespace ERP.UI.Forms
                                 else
                                 {
                                     cikarilacakKapakDegeri = parsedKapak;
-                                }
+                            }
                             }
                         }
                     }
                     
                     // Rapor yükseklik = (Yükseklik com) - Kapak değeri
                     raporYukseklikMM = yukseklikCom - cikarilacakKapakDegeri;
-                    txtReportYukseklikCM.Text = raporYukseklikMM.ToString();
+                            txtReportYukseklikCM.Text = raporYukseklikMM.ToString();
                 }
             }
 
@@ -669,14 +711,21 @@ namespace ERP.UI.Forms
                     int.TryParse(txtToplamAdet.Text, out int toplamSiparisAdedi) &&
                     int.TryParse(txtPlakaAdedi10cm.Text, out int plakaAdedi10cm))
                 {
-                    // Formül: plaka adedi = yükseklik mm/100 * 10cm plaka adedi * toplam sipariş adedi
-                    decimal hesaplananPlakaAdedi = (decimal)yukseklikMM / 100m * plakaAdedi10cm * toplamSiparisAdedi;
-                    txtReportPlakaAdedi.Text = Math.Round(hesaplananPlakaAdedi, 0, MidpointRounding.AwayFromZero).ToString(CultureInfo.InvariantCulture);
+                    // Çarpılmamış: yükseklik mm/100 * 10cm plaka adedi
+                    decimal carpilmamisPlakaAdedi = (decimal)yukseklikMM / 100m * plakaAdedi10cm;
+                    decimal carpilmamisYuvarlanmis = Math.Round(carpilmamisPlakaAdedi, 0, MidpointRounding.AwayFromZero);
+                    
+                    // Çarpılmış: çarpılmamış * toplam sipariş adedi
+                    decimal carpilmisPlakaAdedi = carpilmamisYuvarlanmis * toplamSiparisAdedi;
+                    
+                    // Gösterim: "çarpılmamış - çarpılmış"
+                    txtReportPlakaAdedi.Text = $"{carpilmamisYuvarlanmis} - {carpilmisPlakaAdedi}";
                 }
                 else if (int.TryParse(txtPlakaAdet.Text, out int plakaAdetFallback) && int.TryParse(txtToplamAdet?.Text, out int toplamAdetFallback))
                 {
                     // Fallback: Eski mantığa geri dön
-                    txtReportPlakaAdedi.Text = (plakaAdetFallback * toplamAdetFallback).ToString();
+                    int carpilmis = plakaAdetFallback * toplamAdetFallback;
+                    txtReportPlakaAdedi.Text = $"{plakaAdetFallback} - {carpilmis}";
                 }
                 else
                 {
@@ -898,6 +947,23 @@ namespace ERP.UI.Forms
                 case 'L': return 12;
                 default: return 0;
             }
+        }
+
+        private string GetHatveLetter(decimal hatveValue)
+        {
+            // Hatve değerlerini harfe çevir: 3.25=H, 4.5=D, 6.5=M, 9=L
+            const decimal tolerance = 0.1m;
+            
+            if (Math.Abs(hatveValue - 3.25m) < tolerance)
+                return "H";
+            else if (Math.Abs(hatveValue - 4.5m) < tolerance)
+                return "D";
+            else if (Math.Abs(hatveValue - 6.5m) < tolerance)
+                return "M";
+            else if (Math.Abs(hatveValue - 9m) < tolerance)
+                return "L";
+            else
+                return hatveValue.ToString("F2", CultureInfo.InvariantCulture); // Eğer tanınmazsa sayısal göster
         }
 
         private decimal CalculatePlakaAgirligi(decimal plakaOlcusuCM, decimal aluminyumKalinligi)
@@ -1297,7 +1363,7 @@ namespace ERP.UI.Forms
                 var data = cuttings.Select(c => new
                 {
                     c.Id,
-                    Hatve = c.Hatve.ToString("F2", CultureInfo.InvariantCulture),
+                    Hatve = GetHatveLetter(c.Hatve),
                     Size = c.Size.ToString("F2", CultureInfo.InvariantCulture),
                     MachineName = c.Machine?.Name ?? "",
                     SerialNumber = c.SerialNo?.SerialNumber ?? "",
@@ -1520,7 +1586,7 @@ namespace ERP.UI.Forms
                     p.Id,
                     Date = p.PressingDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
                     PlateThickness = p.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
-                    Hatve = p.Hatve.ToString("F2", CultureInfo.InvariantCulture),
+                    Hatve = GetHatveLetter(p.Hatve),
                     Size = p.Size.ToString("F2", CultureInfo.InvariantCulture),
                     SerialNumber = p.SerialNo?.SerialNumber ?? "",
                     PressNo = p.PressNo ?? "",
@@ -1739,7 +1805,7 @@ namespace ERP.UI.Forms
                     c.Id,
                     Date = c.ClampingDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
                     OrderNo = order?.TrexOrderNo ?? "",
-                    Hatve = c.Hatve.ToString("F2", CultureInfo.InvariantCulture),
+                    Hatve = GetHatveLetter(c.Hatve),
                     Size = c.Size.ToString("F2", CultureInfo.InvariantCulture),
                     Length = c.Length.ToString("F2", CultureInfo.InvariantCulture),
                     ClampCount = c.ClampCount.ToString(),
@@ -1963,7 +2029,7 @@ namespace ERP.UI.Forms
                     a.Id,
                     Date = a.AssemblyDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
                     OrderNo = order?.TrexOrderNo ?? "",
-                    Hatve = a.Hatve.ToString("F2", CultureInfo.InvariantCulture),
+                    Hatve = GetHatveLetter(a.Hatve),
                     Size = a.Size.ToString("F2", CultureInfo.InvariantCulture),
                     Length = a.Length.ToString("F2", CultureInfo.InvariantCulture),
                     AssemblyCount = a.AssemblyCount.ToString(),

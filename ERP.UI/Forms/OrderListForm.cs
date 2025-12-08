@@ -162,7 +162,7 @@ namespace ERP.UI.Forms
                 _dataGridView.Width = _mainPanel.Width - 60;
                 _dataGridView.Height = _mainPanel.Height - 220;
             };
-
+            
             _mainPanel.Controls.Add(titleLabel);
             _mainPanel.Controls.Add(searchPanel);
             _mainPanel.Controls.Add(_chkTableView);
@@ -340,7 +340,7 @@ namespace ERP.UI.Forms
             }
 
             _dataGridView.AutoGenerateColumns = false;
-
+            
             // Checkbox kolonu (seçim için)
             var checkboxColumn = new DataGridViewCheckBoxColumn
             {
@@ -351,7 +351,7 @@ namespace ERP.UI.Forms
                 ReadOnly = false
             };
             _dataGridView.Columns.Add(checkboxColumn);
-
+            
             // Kolonları ekle
             _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
             {
@@ -453,7 +453,7 @@ namespace ERP.UI.Forms
             _dataGridView.DataBindingComplete += (s, e) =>
             {
                 UpdateActionButtons();
-
+                
                 // Checkbox kolonu dışındaki tüm kolonları ReadOnly yap
                 foreach (DataGridViewColumn column in _dataGridView.Columns)
                 {
@@ -472,9 +472,9 @@ namespace ERP.UI.Forms
                     }
                 }
 
-                // İlk yükleme için butonları güncelle
-                UpdateActionButtons();
-                
+            // İlk yükleme için butonları güncelle
+            UpdateActionButtons();
+
                 // Tüm satırları yeniden çiz (renklendirmenin görünmesi için)
                 _dataGridView.Invalidate();
                 
@@ -637,26 +637,26 @@ namespace ERP.UI.Forms
                     else
                     {
                         // 📋 📄 🗑️ - Diğer durumlarda 3 buton (Üretime Gönder yok)
-                        switch (emojiIndex)
-                        {
-                            case 0: // 📋 Detay
-                                OrderUpdateRequested?.Invoke(this, order.Id);
-                                break;
+                    switch (emojiIndex)
+                    {
+                        case 0: // 📋 Detay
+                            OrderUpdateRequested?.Invoke(this, order.Id);
+                            break;
                             case 1: // 📄 İş Emri Al
                                 OrderGetWorkOrderRequested?.Invoke(this, order.Id);
                                 break;
                             case 2: // 🗑️ Sil
-                                var resultDelete = MessageBox.Show(
-                                    $"Sipariş {order.TrexOrderNo} silinecek. Emin misiniz?",
-                                    "Sipariş Sil",
-                                    MessageBoxButtons.YesNo,
-                                    MessageBoxIcon.Question);
-                                if (resultDelete == DialogResult.Yes)
-                                {
-                                    OrderDeleteRequested?.Invoke(this, order.Id);
-                                }
-                                break;
-                        }
+                            var resultDelete = MessageBox.Show(
+                                $"Sipariş {order.TrexOrderNo} silinecek. Emin misiniz?",
+                                "Sipariş Sil",
+                                MessageBoxButtons.YesNo,
+                                MessageBoxIcon.Question);
+                            if (resultDelete == DialogResult.Yes)
+                            {
+                                OrderDeleteRequested?.Invoke(this, order.Id);
+                            }
+                            break;
+                    }
                     }
                 }
             }
@@ -666,7 +666,7 @@ namespace ERP.UI.Forms
         {
             // Header'a tıklanmışsa işlem yapma
             if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
-
+            
             if (_dataGridView.Tag is List<Order> orders && e.RowIndex < orders.Count)
             {
                 var order = orders[e.RowIndex];
@@ -858,21 +858,21 @@ namespace ERP.UI.Forms
         {
             if (!_isTableView)
             {
-                MessageBox.Show("Toplu iş emri almak için tablo görünümünde olmalısınız.",
+                MessageBox.Show("Toplu iş emri almak için tablo görünümünde olmalısınız.", 
                     "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
             // Seçili satırları al - Checkbox kolonundan oku
             var selectedOrderIds = new List<Guid>();
-
+            
             if (_dataGridView.Columns["IsSelected"] == null)
             {
-                MessageBox.Show("Checkbox kolonu bulunamadı. Lütfen sayfayı yenileyin.",
+                MessageBox.Show("Checkbox kolonu bulunamadı. Lütfen sayfayı yenileyin.", 
                     "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
-
+            
             foreach (DataGridViewRow row in _dataGridView.Rows)
             {
                 if (row.DataBoundItem is OrderRowData rowData && rowData.IsSelected)
@@ -883,7 +883,7 @@ namespace ERP.UI.Forms
 
             if (selectedOrderIds.Count == 0)
             {
-                MessageBox.Show("Lütfen en az bir sipariş seçin.",
+                MessageBox.Show("Lütfen en az bir sipariş seçin.", 
                     "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
@@ -913,7 +913,7 @@ namespace ERP.UI.Forms
         private void DataGridView_CurrentCellDirtyStateChanged(object sender, EventArgs e)
         {
             // Checkbox değiştiğinde commit et
-            if (_dataGridView.IsCurrentCellDirty &&
+            if (_dataGridView.IsCurrentCellDirty && 
                 _dataGridView.CurrentCell is DataGridViewCheckBoxCell)
             {
                 _dataGridView.CommitEdit(DataGridViewDataErrorContexts.Commit);
@@ -923,7 +923,7 @@ namespace ERP.UI.Forms
         private void DataGridView_CellValueChanged(object sender, DataGridViewCellEventArgs e)
         {
             // Checkbox kolonu değiştiğinde
-            if (e.RowIndex >= 0 && e.ColumnIndex >= 0 &&
+            if (e.RowIndex >= 0 && e.ColumnIndex >= 0 && 
                 _dataGridView.Columns[e.ColumnIndex].Name == "IsSelected")
             {
                 // Görsel güncelleme için refresh
