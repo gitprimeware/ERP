@@ -34,6 +34,7 @@ namespace ERP.DAL
                     CreateAssembliesTable(connection);
                     CreateCuttingRequestsTable(connection);
                     CreatePressingRequestsTable(connection);
+                    CreateClampingRequestsTable(connection);
                 }
             }
             catch (Exception ex)
@@ -833,6 +834,45 @@ namespace ERP.DAL
             using (var migrationCommand = new SqlCommand(migrationQuery, connection))
             {
                 migrationCommand.ExecuteNonQuery();
+            }
+        }
+
+        private static void CreateClampingRequestsTable(SqlConnection connection)
+        {
+            var query = @"
+                IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[ClampingRequests]') AND type in (N'U'))
+                BEGIN
+                    CREATE TABLE [dbo].[ClampingRequests] (
+                        [Id] UNIQUEIDENTIFIER PRIMARY KEY,
+                        [OrderId] UNIQUEIDENTIFIER NOT NULL,
+                        [Hatve] DECIMAL(10,2) NOT NULL,
+                        [Size] DECIMAL(10,2) NOT NULL,
+                        [PlateThickness] DECIMAL(10,3) NOT NULL,
+                        [Length] DECIMAL(10,2) NOT NULL,
+                        [SerialNoId] UNIQUEIDENTIFIER NULL,
+                        [PressingId] UNIQUEIDENTIFIER NULL,
+                        [MachineId] UNIQUEIDENTIFIER NULL,
+                        [RequestedClampCount] INT NOT NULL,
+                        [ActualClampCount] INT NULL,
+                        [ResultedClampCount] INT NULL,
+                        [EmployeeId] UNIQUEIDENTIFIER NULL,
+                        [Status] NVARCHAR(50) NOT NULL DEFAULT 'Beklemede',
+                        [RequestDate] DATETIME NOT NULL,
+                        [CompletionDate] DATETIME NULL,
+                        [CreatedDate] DATETIME NOT NULL,
+                        [ModifiedDate] DATETIME NULL,
+                        [IsActive] BIT NOT NULL DEFAULT 1,
+                        FOREIGN KEY ([OrderId]) REFERENCES [Orders]([Id]),
+                        FOREIGN KEY ([SerialNoId]) REFERENCES [SerialNos]([Id]),
+                        FOREIGN KEY ([PressingId]) REFERENCES [Pressings]([Id]),
+                        FOREIGN KEY ([MachineId]) REFERENCES [Machines]([Id]),
+                        FOREIGN KEY ([EmployeeId]) REFERENCES [Employees]([Id])
+                    )
+                END";
+
+            using (var command = new SqlCommand(query, connection))
+            {
+                command.ExecuteNonQuery();
             }
         }
     }

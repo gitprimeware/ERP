@@ -114,6 +114,10 @@ namespace ERP.UI.Forms
             {
                 _contentManager.ShowForm("PressingRequests");
             }
+            else if (formTag == "ClampingRequests")
+            {
+                _contentManager.ShowForm("ClampingRequests");
+            }
             else if (formTag == "RuloStokTakip")
             {
                 _contentManager.ShowForm("RuloStokTakip");

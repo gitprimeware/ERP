@@ -11,14 +11,13 @@ namespace ERP.UI.Forms
 {
     public partial class ClampingDialog : Form
     {
-        private TextBox _txtPlateThickness;
-        private TextBox _txtHatve;
-        private TextBox _txtSize;
+        private ComboBox _cmbPlateThickness;
+        private ComboBox _cmbHatve;
+        private ComboBox _cmbSize;
         private TextBox _txtLength;
         private ComboBox _cmbSerialNo;
         private ComboBox _cmbPressing;
         private ComboBox _cmbMachine;
-        private TextBox _txtClampCount;
         private TextBox _txtUsedPlateCount;
         private ComboBox _cmbEmployee;
         private Button _btnAddEmployee;
@@ -30,6 +29,7 @@ namespace ERP.UI.Forms
         private MachineRepository _machineRepository;
         private PressingRepository _pressingRepository;
         private ClampingRepository _clampingRepository;
+        private ClampingRequestRepository _clampingRequestRepository;
         private OrderRepository _orderRepository;
         private Guid _orderId;
 
@@ -41,6 +41,7 @@ namespace ERP.UI.Forms
             _machineRepository = machineRepository;
             _pressingRepository = pressingRepository;
             _clampingRepository = new ClampingRepository();
+            _clampingRequestRepository = new ClampingRequestRepository();
             _orderRepository = new OrderRepository();
             _orderId = orderId;
             InitializeComponent();
@@ -68,7 +69,7 @@ namespace ERP.UI.Forms
             int controlWidth = 300;
             int spacing = 35;
 
-            // Preslenmiş Plaka Seçimi
+            // Preslenmiş Plaka Seçimi (Filtrelenmiş)
             var lblPressing = new Label
             {
                 Text = "Preslenmiş Plaka:",
@@ -82,14 +83,15 @@ namespace ERP.UI.Forms
                 Width = controlWidth,
                 Height = 30,
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 10F)
+                Font = new Font("Segoe UI", 10F),
+                Enabled = false  // Başlangıçta devre dışı, filtreleme kriterleri girildikten sonra aktif olacak
             };
             _cmbPressing.SelectedIndexChanged += CmbPressing_SelectedIndexChanged;
             this.Controls.Add(lblPressing);
             this.Controls.Add(_cmbPressing);
             yPos += spacing;
 
-            // Plaka Kalınlığı (Readonly)
+            // Plaka Kalınlığı (ComboBox - tablodaki değerlerden)
             var lblPlateThickness = new Label
             {
                 Text = "Plaka Kalınlığı:",
@@ -97,20 +99,20 @@ namespace ERP.UI.Forms
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F)
             };
-            _txtPlateThickness = new TextBox
+            _cmbPlateThickness = new ComboBox
             {
                 Location = new Point(180, yPos - 3),
                 Width = controlWidth,
                 Height = 30,
-                Font = new Font("Segoe UI", 10F),
-                ReadOnly = true,
-                BackColor = Color.LightGray
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 10F)
             };
+            _cmbPlateThickness.SelectedIndexChanged += FilterPressings;
             this.Controls.Add(lblPlateThickness);
-            this.Controls.Add(_txtPlateThickness);
+            this.Controls.Add(_cmbPlateThickness);
             yPos += spacing;
 
-            // Hatve (Readonly)
+            // Hatve (ComboBox - tablodaki değerlerden)
             var lblHatve = new Label
             {
                 Text = "Hatve:",
@@ -118,20 +120,20 @@ namespace ERP.UI.Forms
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F)
             };
-            _txtHatve = new TextBox
+            _cmbHatve = new ComboBox
             {
                 Location = new Point(180, yPos - 3),
                 Width = controlWidth,
                 Height = 30,
-                Font = new Font("Segoe UI", 10F),
-                ReadOnly = true,
-                BackColor = Color.LightGray
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 10F)
             };
+            _cmbHatve.SelectedIndexChanged += FilterPressings;
             this.Controls.Add(lblHatve);
-            this.Controls.Add(_txtHatve);
+            this.Controls.Add(_cmbHatve);
             yPos += spacing;
 
-            // Ölçü (Readonly)
+            // Ölçü (ComboBox - tablodaki değerlerden)
             var lblSize = new Label
             {
                 Text = "Ölçü:",
@@ -139,17 +141,17 @@ namespace ERP.UI.Forms
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F)
             };
-            _txtSize = new TextBox
+            _cmbSize = new ComboBox
             {
                 Location = new Point(180, yPos - 3),
                 Width = controlWidth,
                 Height = 30,
-                Font = new Font("Segoe UI", 10F),
-                ReadOnly = true,
-                BackColor = Color.LightGray
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 10F)
             };
+            _cmbSize.SelectedIndexChanged += FilterPressings;
             this.Controls.Add(lblSize);
-            this.Controls.Add(_txtSize);
+            this.Controls.Add(_cmbSize);
             yPos += spacing;
 
             // Uzunluk
@@ -212,29 +214,10 @@ namespace ERP.UI.Forms
             this.Controls.Add(_cmbMachine);
             yPos += spacing;
 
-            // Kenetleme Adedi
-            var lblClampCount = new Label
-            {
-                Text = "Kenetleme Adedi:",
-                Location = new Point(20, yPos),
-                Width = labelWidth,
-                Font = new Font("Segoe UI", 10F)
-            };
-            _txtClampCount = new TextBox
-            {
-                Location = new Point(180, yPos - 3),
-                Width = controlWidth,
-                Height = 30,
-                Font = new Font("Segoe UI", 10F)
-            };
-            this.Controls.Add(lblClampCount);
-            this.Controls.Add(_txtClampCount);
-            yPos += spacing;
-
-            // Kullanılan Plaka Adedi (Kullanıcı girebilir)
+            // İstenen Kenetleme Adedi (Mühendis tarafından girilecek)
             var lblUsedPlateCount = new Label
             {
-                Text = "Kullanılan Plaka Adedi:",
+                Text = "İstenen Kenetleme Adedi:",
                 Location = new Point(20, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold)
@@ -246,7 +229,6 @@ namespace ERP.UI.Forms
                 Height = 30,
                 Font = new Font("Segoe UI", 10F)
             };
-            _txtUsedPlateCount.TextChanged += TxtUsedPlateCount_TextChanged;
             this.Controls.Add(lblUsedPlateCount);
             this.Controls.Add(_txtUsedPlateCount);
             yPos += spacing;
@@ -331,47 +313,7 @@ namespace ERP.UI.Forms
         {
             try
             {
-                // Preslenmiş plakaları yükle
-                _cmbPressing.Items.Clear();
-                List<Pressing> pressings;
-                
-                // Eğer orderId boşsa, tüm preslenmiş stokları göster
-                if (_orderId == Guid.Empty)
-                {
-                    pressings = _pressingRepository.GetAll();
-                }
-                else
-                {
-                    pressings = _pressingRepository.GetByOrderId(_orderId);
-                }
-                
-                foreach (var pressing in pressings.Where(p => p.PressCount > 0 && p.IsActive))
-                {
-                    // Daha önce kenetlenmiş plaka adedini hesapla
-                    var usedPlateCount = _clampingRepository.GetAll()
-                        .Where(c => c.PressingId == pressing.Id && c.IsActive)
-                        .Sum(c => c.UsedPlateCount);
-                    
-                    var availablePlateCount = pressing.PressCount - usedPlateCount;
-                    
-                    if (availablePlateCount > 0)
-                    {
-                        // Sipariş bilgisini al
-                        var order = pressing.OrderId.HasValue ? _orderRepository.GetById(pressing.OrderId.Value) : null;
-                        string orderInfo = order != null ? $" - {order.TrexOrderNo}" : "";
-                        
-                        _cmbPressing.Items.Add(new 
-                        { 
-                            Id = pressing.Id, 
-                            DisplayText = $"Pres #{pressing.PressingDate:dd.MM.yyyy}{orderInfo} - {pressing.PressCount} adet (Kalan: {availablePlateCount})",
-                            Pressing = pressing
-                        });
-                    }
-                }
-                _cmbPressing.DisplayMember = "DisplayText";
-                _cmbPressing.ValueMember = "Id";
-
-                // Seri No'ları yükle (readonly için)
+                // Seri No'ları yükle
                 _cmbSerialNo.Items.Clear();
                 var serialNos = _serialNoRepository.GetAll();
                 foreach (var serialNo in serialNos)
@@ -393,10 +335,158 @@ namespace ERP.UI.Forms
 
                 // Operatörleri yükle
                 LoadEmployees();
+                
+                // Combo box'ları preslenmiş stok tablosundan doldur
+                LoadFilterComboBoxes();
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Veriler yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void LoadFilterComboBoxes()
+        {
+            try
+            {
+                // Tüm preslenmiş stokları al
+                var allPressings = _pressingRepository.GetAll()
+                    .Where(p => p.PressCount > 0 && p.IsActive)
+                    .ToList();
+
+                // Farklı Hatve değerlerini al
+                var hatveValues = allPressings
+                    .Select(p => p.Hatve)
+                    .Distinct()
+                    .OrderBy(h => h)
+                    .ToList();
+                _cmbHatve.Items.Clear();
+                _cmbHatve.Items.Add(""); // Boş seçenek
+                foreach (var hatve in hatveValues)
+                {
+                    _cmbHatve.Items.Add(hatve.ToString("F2", CultureInfo.InvariantCulture));
+                }
+
+                // Farklı Size değerlerini al
+                var sizeValues = allPressings
+                    .Select(p => p.Size)
+                    .Distinct()
+                    .OrderBy(s => s)
+                    .ToList();
+                _cmbSize.Items.Clear();
+                _cmbSize.Items.Add(""); // Boş seçenek
+                foreach (var size in sizeValues)
+                {
+                    _cmbSize.Items.Add(size.ToString("F1", CultureInfo.InvariantCulture));
+                }
+
+                // Farklı PlateThickness değerlerini al
+                var plateThicknessValues = allPressings
+                    .Select(p => p.PlateThickness)
+                    .Distinct()
+                    .OrderBy(pt => pt)
+                    .ToList();
+                _cmbPlateThickness.Items.Clear();
+                _cmbPlateThickness.Items.Add(""); // Boş seçenek
+                foreach (var pt in plateThicknessValues)
+                {
+                    _cmbPlateThickness.Items.Add(pt.ToString("F3", CultureInfo.InvariantCulture));
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Filtre combo box'ları yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void FilterPressings(object sender, EventArgs e)
+        {
+            try
+            {
+                _cmbPressing.Items.Clear();
+                
+                // Hatve, Ölçü, Plaka Kalınlığı seçildiyse filtreleme yap
+                if (_cmbHatve.SelectedItem == null || string.IsNullOrWhiteSpace(_cmbHatve.SelectedItem.ToString()) ||
+                    _cmbSize.SelectedItem == null || string.IsNullOrWhiteSpace(_cmbSize.SelectedItem.ToString()) ||
+                    _cmbPlateThickness.SelectedItem == null || string.IsNullOrWhiteSpace(_cmbPlateThickness.SelectedItem.ToString()))
+                {
+                    // Filtreleme kriterleri seçilmemiş, preslenmiş stokları gösterme
+                    _cmbPressing.Enabled = false;
+                    return;
+                }
+
+                if (!decimal.TryParse(_cmbHatve.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out decimal hatve) ||
+                    !decimal.TryParse(_cmbSize.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out decimal size) ||
+                    !decimal.TryParse(_cmbPlateThickness.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out decimal plateThickness))
+                {
+                    _cmbPressing.Enabled = false;
+                    return;
+                }
+
+                // TÜM preslenmiş stokları yükle (sadece belirli bir siparişe ait değil)
+                var allPressings = _pressingRepository.GetAll();
+                
+                // Filtreleme: Hatve, Ölçü, Plaka Kalınlığı - tam eşleşme (combo box'dan seçildiği için)
+                var filteredPressings = allPressings.Where(p => 
+                    p.PressCount > 0 && 
+                    p.IsActive &&
+                    Math.Abs(p.Hatve - hatve) < 0.01m &&  // Hatve için küçük tolerance
+                    Math.Abs(p.Size - size) < 0.1m &&    // Size için küçük tolerance
+                    Math.Abs(p.PlateThickness - plateThickness) < 0.001m);  // PlateThickness için küçük tolerance
+                
+                var filteredList = filteredPressings.OrderByDescending(p => p.PressingDate).ToList();
+                
+                if (!filteredList.Any())
+                {
+                    // Filtre kriterlerine uygun preslenmiş stok bulunamadı
+                    // Debug için: tüm preslenmiş stokları listele
+                    System.Diagnostics.Debug.WriteLine($"Filtreleme: Hatve={hatve}, Size={size}, PlateThickness={plateThickness}");
+                    System.Diagnostics.Debug.WriteLine($"Toplam preslenmiş stok sayısı: {allPressings.Count}");
+                    System.Diagnostics.Debug.WriteLine($"Filtreli stok sayısı: {filteredList.Count}");
+                    
+                    // Kullanıcıya bilgi ver (opsiyonel - sadece debug için)
+                    // MessageBox.Show($"Bu kriterlere uygun preslenmiş stok bulunamadı.\n\nHatve: {hatve}\nÖlçü: {size}\nPlaka Kalınlığı: {plateThickness}", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                
+                foreach (var pressing in filteredList)
+                {
+                    // Daha önce kenetlenmiş plaka adedini hesapla (tamamlanmış kenetleme taleplerinden)
+                    var usedPlateCount = _clampingRequestRepository.GetAll()
+                        .Where(cr => cr.PressingId == pressing.Id && cr.IsActive && cr.Status == "Tamamlandı")
+                        .Sum(cr => cr.ActualClampCount ?? cr.RequestedClampCount);
+                    
+                    // Ayrıca eski Clamping kayıtlarından da kullanılanları hesapla (geriye dönük uyumluluk için)
+                    var oldUsedPlateCount = _clampingRepository.GetAll()
+                        .Where(c => c.PressingId == pressing.Id && c.IsActive)
+                        .Sum(c => c.UsedPlateCount);
+                    
+                    var totalUsedCount = usedPlateCount + oldUsedPlateCount;
+                    var availablePlateCount = pressing.PressCount - totalUsedCount;
+                    
+                    if (availablePlateCount > 0)
+                    {
+                        // Sipariş bilgisini al
+                        var order = pressing.OrderId.HasValue ? _orderRepository.GetById(pressing.OrderId.Value) : null;
+                        string orderInfo = order != null ? $" - {order.TrexOrderNo}" : "";
+                        
+                        _cmbPressing.Items.Add(new 
+                        { 
+                            Id = pressing.Id, 
+                            DisplayText = $"Pres #{pressing.PressingDate:dd.MM.yyyy}{orderInfo} - {pressing.PressCount} adet (Kalan: {availablePlateCount})",
+                            Pressing = pressing
+                        });
+                    }
+                }
+                _cmbPressing.DisplayMember = "DisplayText";
+                _cmbPressing.ValueMember = "Id";
+                
+                // Combo box'u aktif et (en az bir öğe varsa)
+                _cmbPressing.Enabled = _cmbPressing.Items.Count > 0;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Preslenmiş stoklar filtrelenirken hata oluştu: " + ex.Message + "\n\nStackTrace: " + ex.StackTrace, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -416,20 +506,7 @@ namespace ERP.UI.Forms
 
                 if (pressing != null)
                 {
-                    // Pres bilgilerini otomatik doldur
-                    _txtPlateThickness.Text = pressing.PlateThickness.ToString("F3", CultureInfo.InvariantCulture);
-                    _txtHatve.Text = pressing.Hatve.ToString("F2", CultureInfo.InvariantCulture);
-                    _txtSize.Text = pressing.Size.ToString("F2", CultureInfo.InvariantCulture);
-                    
-                    // Mevcut kullanılabilir adeti göster (varsayılan olarak)
-                    var usedPlateCount = _clampingRepository.GetAll()
-                        .Where(c => c.PressingId == pressing.Id && c.IsActive)
-                        .Sum(c => c.UsedPlateCount);
-                    
-                    var availablePlateCount = pressing.PressCount - usedPlateCount;
-                    _txtUsedPlateCount.Text = availablePlateCount > 0 ? availablePlateCount.ToString() : "0";
-
-                    // Rulo Seri No'yu doldur
+                    // Rulo Seri No'yu doldur (preslenmiş plakadan)
                     if (pressing.SerialNoId.HasValue)
                     {
                         foreach (var item in _cmbSerialNo.Items)
@@ -573,37 +650,58 @@ namespace ERP.UI.Forms
                 var pressingId = GetSelectedId(_cmbPressing);
                 var pressing = _pressingRepository.GetAll().FirstOrDefault(p => p.Id == pressingId);
 
-                // OrderId'yi preslenmiş plakadan al (eğer yoksa null bırak)
+                // OrderId'yi preslenmiş plakadan al (eğer yoksa mevcut orderId'yi kullan)
                 var orderId = pressing?.OrderId ?? _orderId;
+                if (orderId == Guid.Empty && _orderId != Guid.Empty)
+                    orderId = _orderId;
                 
-                var clamping = new Clamping
+                var clampingRequest = new ClampingRequest
                 {
-                    OrderId = orderId != Guid.Empty ? orderId : (Guid?)null,
+                    OrderId = orderId,
                     PressingId = pressingId,
-                    PlateThickness = pressing.PlateThickness,
-                    Hatve = pressing.Hatve,
-                    Size = pressing.Size,
+                    PlateThickness = decimal.Parse(_cmbPlateThickness.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture),
+                    Hatve = decimal.Parse(_cmbHatve.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture),
+                    Size = decimal.Parse(_cmbSize.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture),
                     Length = decimal.Parse(_txtLength.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
-                    SerialNoId = pressing.SerialNoId,
+                    SerialNoId = pressing?.SerialNoId,
                     MachineId = _cmbMachine.SelectedItem != null ? GetSelectedId(_cmbMachine) : (Guid?)null,
-                    ClampCount = int.Parse(_txtClampCount.Text),
-                    UsedPlateCount = int.Parse(_txtUsedPlateCount.Text),
+                    RequestedClampCount = int.Parse(_txtUsedPlateCount.Text), // İstenen Kenetleme Adedi
                     EmployeeId = _cmbEmployee.SelectedItem != null ? GetSelectedId(_cmbEmployee) : (Guid?)null,
-                    ClampingDate = DateTime.Now
+                    Status = "Beklemede",
+                    RequestDate = DateTime.Now
                 };
 
-                _clampingRepository.Insert(clamping);
+                _clampingRequestRepository.Insert(clampingRequest);
+                MessageBox.Show("Kenetleme talebi başarıyla oluşturuldu!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 this.DialogResult = DialogResult.OK;
                 this.Close();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Kenetleme kaydedilirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Kenetleme talebi oluşturulurken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         private bool ValidateForm()
         {
+            if (_cmbPlateThickness.SelectedItem == null || string.IsNullOrWhiteSpace(_cmbPlateThickness.SelectedItem.ToString()))
+            {
+                MessageBox.Show("Lütfen plaka kalınlığı seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+
+            if (_cmbHatve.SelectedItem == null || string.IsNullOrWhiteSpace(_cmbHatve.SelectedItem.ToString()))
+            {
+                MessageBox.Show("Lütfen hatve seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+
+            if (_cmbSize.SelectedItem == null || string.IsNullOrWhiteSpace(_cmbSize.SelectedItem.ToString()))
+            {
+                MessageBox.Show("Lütfen ölçü seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+
             if (_cmbPressing.SelectedItem == null)
             {
                 MessageBox.Show("Lütfen preslenmiş plaka seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -616,44 +714,38 @@ namespace ERP.UI.Forms
                 return false;
             }
 
-            if (string.IsNullOrWhiteSpace(_txtClampCount.Text) || !int.TryParse(_txtClampCount.Text, out int clampCount) || clampCount <= 0)
+            if (string.IsNullOrWhiteSpace(_txtUsedPlateCount.Text) || !int.TryParse(_txtUsedPlateCount.Text, out int requestedClampCount) || requestedClampCount <= 0)
             {
-                MessageBox.Show("Lütfen geçerli bir kenetleme adedi giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Lütfen geçerli bir istenen kenetleme adedi giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
 
-            if (string.IsNullOrWhiteSpace(_txtUsedPlateCount.Text) || !int.TryParse(_txtUsedPlateCount.Text, out int usedPlateCount) || usedPlateCount <= 0)
-            {
-                MessageBox.Show("Lütfen geçerli bir kullanılan plaka adedi giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return false;
-            }
-
-            if (_cmbPressing.SelectedItem == null)
-                return true;
-
+            // Preslenmiş stok kontrolü
             var pressingId = GetSelectedId(_cmbPressing);
             var pressing = _pressingRepository.GetAll().FirstOrDefault(p => p.Id == pressingId);
             if (pressing != null)
             {
-                var alreadyUsedPlateCount = _clampingRepository.GetAll()
+                // Tamamlanmış kenetleme taleplerinden kullanılanları hesapla
+                var usedPlateCount = _clampingRequestRepository.GetAll()
+                    .Where(cr => cr.PressingId == pressingId && cr.IsActive && cr.Status == "Tamamlandı")
+                    .Sum(cr => cr.ActualClampCount ?? cr.RequestedClampCount);
+                
+                // Eski Clamping kayıtlarından da kullanılanları hesapla
+                var oldUsedPlateCount = _clampingRepository.GetAll()
                     .Where(c => c.PressingId == pressingId && c.IsActive)
                     .Sum(c => c.UsedPlateCount);
                 
-                var availablePlateCount = pressing.PressCount - alreadyUsedPlateCount;
+                var totalUsedCount = usedPlateCount + oldUsedPlateCount;
+                var availablePlateCount = pressing.PressCount - totalUsedCount;
                 
-                if (usedPlateCount > availablePlateCount)
+                if (requestedClampCount > availablePlateCount)
                 {
-                    MessageBox.Show($"Kullanılan plaka adedi kalan preslenmiş plaka adedinden fazla olamaz! (Kalan: {availablePlateCount}, İstenen: {usedPlateCount})", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show($"İstenen kenetleme adedi kalan preslenmiş plaka adedinden fazla olamaz! (Kalan: {availablePlateCount}, İstenen: {requestedClampCount})", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return false;
                 }
             }
 
             return true;
-        }
-
-        private void TxtUsedPlateCount_TextChanged(object sender, EventArgs e)
-        {
-            // Kullanıcı kullanılacak adeti girdiğinde validasyon yapılabilir
         }
 
         private Guid GetSelectedId(ComboBox comboBox)

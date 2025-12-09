@@ -68,6 +68,7 @@ namespace ERP.UI.Forms
         private CuttingRepository _cuttingRepository;
         private CuttingRequestRepository _cuttingRequestRepository;
         private PressingRequestRepository _pressingRequestRepository;
+        private ClampingRequestRepository _clampingRequestRepository;
         private MaterialEntryRepository _materialEntryRepository;
         private PressingRepository _pressingRepository;
         private ClampingRepository _clampingRepository;
@@ -88,6 +89,7 @@ namespace ERP.UI.Forms
             _cuttingRepository = new CuttingRepository();
             _cuttingRequestRepository = new CuttingRequestRepository();
             _pressingRequestRepository = new PressingRequestRepository();
+            _clampingRequestRepository = new ClampingRequestRepository();
             _materialEntryRepository = new MaterialEntryRepository();
             _pressingRepository = new PressingRepository();
             _clampingRepository = new ClampingRepository();
@@ -2060,9 +2062,16 @@ namespace ERP.UI.Forms
                 BackColor = Color.White
             };
 
+            // Onayla butonu (Kenetleme taleplerini onaylamak için)
+            var btnOnayla = ButtonFactory.CreateActionButton("✅ Kenetleme Talebini Onayla", ThemeColors.Success, Color.White, 220, 35);
+            btnOnayla.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnOnayla.Location = new Point(buttonPanel.Width - 220, 5);
+            buttonPanel.Controls.Add(btnOnayla);
+
             // Ekle butonu
             var btnEkle = ButtonFactory.CreateActionButton("➕ Ekle", ThemeColors.Primary, Color.White, 120, 35);
             btnEkle.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnEkle.Location = new Point(buttonPanel.Width - 220 - 130, 5);
             buttonPanel.Controls.Add(btnEkle);
 
             // DataGridView paneli
@@ -2137,6 +2146,7 @@ namespace ERP.UI.Forms
 
             // Event handler
             btnEkle.Click += (s, e) => BtnClampingEkle_Click(dataGridView);
+            btnOnayla.Click += (s, e) => BtnClampingRequestOnayla_Click(dataGridView);
 
             // Verileri yükle
             LoadClampingData(dataGridView);
@@ -2258,6 +2268,162 @@ namespace ERP.UI.Forms
             catch (Exception ex)
             {
                 MessageBox.Show("Kenetleme eklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BtnClampingRequestOnayla_Click(DataGridView dataGridView)
+        {
+            try
+            {
+                var pendingRequests = _clampingRequestRepository.GetPendingRequests()
+                    .Where(r => r.OrderId == _orderId)
+                    .ToList();
+
+                if (!pendingRequests.Any())
+                {
+                    MessageBox.Show("Bu sipariş için bekleyen kenetleme talebi bulunamadı.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                ClampingRequest selectedRequest = null;
+
+                // Eğer tek bir talep varsa direkt seç
+                if (pendingRequests.Count == 1)
+                {
+                    selectedRequest = pendingRequests.First();
+                }
+                else
+                {
+                    // Birden fazla talep varsa seçim dialogu göster
+                    using (var selectDialog = new Form
+                    {
+                        Text = "Kenetleme Talebi Seç",
+                        Width = 800,
+                        Height = 500,
+                        StartPosition = FormStartPosition.CenterParent,
+                        FormBorderStyle = FormBorderStyle.FixedDialog,
+                        MaximizeBox = false
+                    })
+                    {
+                        var dgv = new DataGridView
+                        {
+                            Dock = DockStyle.Fill,
+                            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                            AllowUserToAddRows = false,
+                            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                            MultiSelect = false
+                        };
+
+                        dgv.AutoGenerateColumns = false;
+                        
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Id", DataPropertyName = "Id", HeaderText = "Id", Visible = false });
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Hatve", DataPropertyName = "Hatve", HeaderText = "Hatve" });
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Size", DataPropertyName = "Size", HeaderText = "Ölçü" });
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "RequestedClampCount", DataPropertyName = "RequestedClampCount", HeaderText = "İstenen" });
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "ActualClampCount", DataPropertyName = "ActualClampCount", HeaderText = "Kenetlenecek (Kullanılan)" });
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "ResultedClampCount", DataPropertyName = "ResultedClampCount", HeaderText = "Oluşan" });
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Status", DataPropertyName = "Status", HeaderText = "Durum" });
+
+                        dgv.DataSource = pendingRequests.Select(r => new
+                        {
+                            Id = r.Id,
+                            Hatve = GetHatveLetter(r.Hatve),
+                            Size = r.Size.ToString("F1", CultureInfo.InvariantCulture),
+                            RequestedClampCount = r.RequestedClampCount,
+                            ActualClampCount = r.ActualClampCount?.ToString() ?? "-",
+                            ResultedClampCount = r.ResultedClampCount?.ToString() ?? "-",
+                            Status = r.Status
+                        }).ToList();
+
+                        var btnSelect = new Button
+                        {
+                            Text = "Seç",
+                            DialogResult = DialogResult.OK,
+                            Dock = DockStyle.Bottom,
+                            Height = 40
+                        };
+
+                        selectDialog.Controls.Add(dgv);
+                        selectDialog.Controls.Add(btnSelect);
+                        selectDialog.AcceptButton = btnSelect;
+
+                        if (selectDialog.ShowDialog() == DialogResult.OK && dgv.SelectedRows.Count > 0)
+                        {
+                            var selectedRow = dgv.SelectedRows[0];
+                            if (selectedRow != null && selectedRow.Cells["Id"] != null && selectedRow.Cells["Id"].Value != null)
+                            {
+                                var selectedId = (Guid)selectedRow.Cells["Id"].Value;
+                                selectedRequest = pendingRequests.FirstOrDefault(r => r.Id == selectedId);
+                            }
+                        }
+                    }
+                }
+
+                if (selectedRequest == null)
+                    return;
+
+                // Kenetleme adedi girilmiş mi kontrol et
+                if (!selectedRequest.ActualClampCount.HasValue)
+                {
+                    MessageBox.Show("Lütfen önce kaç tane preslenmiş kenetleneceğini giriniz (Kenetleme Talepleri sayfasından).", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Oluşan adet girilmiş mi kontrol et
+                if (!selectedRequest.ResultedClampCount.HasValue)
+                {
+                    MessageBox.Show("Lütfen önce kaç tane oluştuğunu giriniz (Kenetleme Talepleri sayfasından).", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Onaylama işlemi
+                var result = MessageBox.Show(
+                    $"Kenetleme talebi onaylanacak:\n\n" +
+                    $"İstenen: {selectedRequest.RequestedClampCount} adet\n" +
+                    $"Kenetlenecek (preslenmiş stoktan kullanılan): {selectedRequest.ActualClampCount.Value} adet\n" +
+                    $"Oluşan (kenetlenmiş stoğa eklenecek): {selectedRequest.ResultedClampCount.Value} adet\n\n" +
+                    $"Onaylamak istediğinize emin misiniz?",
+                    "Kenetleme Talebi Onayla",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question);
+
+                if (result != DialogResult.Yes)
+                    return;
+
+                // Preslenmiş stoktan düş (ActualClampCount kadar)
+                // Not: Preslenmiş stok takibi başka bir formda yapılıyor
+
+                // Durumu "Tamamlandı" yap
+                selectedRequest.Status = "Tamamlandı";
+                selectedRequest.CompletionDate = DateTime.Now;
+                _clampingRequestRepository.Update(selectedRequest);
+
+                // Kenetleme kaydı oluştur (Clamping) - ResultedClampCount kenetlenmiş stoğa eklenecek
+                var clamping = new Clamping
+                {
+                    OrderId = selectedRequest.OrderId,
+                    PressingId = selectedRequest.PressingId,
+                    PlateThickness = selectedRequest.PlateThickness,
+                    Hatve = selectedRequest.Hatve,
+                    Size = selectedRequest.Size,
+                    Length = selectedRequest.Length,
+                    SerialNoId = selectedRequest.SerialNoId,
+                    MachineId = selectedRequest.MachineId,
+                    ClampCount = selectedRequest.ResultedClampCount.Value, // Oluşan kenetlenmiş adet
+                    UsedPlateCount = selectedRequest.ActualClampCount.Value, // Kullanılan preslenmiş adet
+                    EmployeeId = selectedRequest.EmployeeId,
+                    ClampingDate = DateTime.Now
+                };
+                _clampingRepository.Insert(clamping);
+
+                MessageBox.Show("Kenetleme talebi onaylandı ve kenetleme kaydı oluşturuldu!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                // Verileri yeniden yükle
+                LoadClampingData(dataGridView);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Kenetleme talebi onaylanırken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
