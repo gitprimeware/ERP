@@ -30,6 +30,7 @@ namespace ERP.UI.Forms
         
         private SerialNoRepository _serialNoRepository;
         private EmployeeRepository _employeeRepository;
+        private PressingRequestRepository _pressingRequestRepository;
         private PressingRepository _pressingRepository;
         private OrderRepository _orderRepository;
         private CuttingRepository _cuttingRepository;
@@ -39,6 +40,7 @@ namespace ERP.UI.Forms
         {
             _serialNoRepository = serialNoRepository;
             _employeeRepository = employeeRepository;
+            _pressingRequestRepository = new PressingRequestRepository();
             _pressingRepository = new PressingRepository();
             _orderRepository = new OrderRepository();
             _cuttingRepository = new CuttingRepository();
@@ -909,37 +911,6 @@ namespace ERP.UI.Forms
                     return;
                 }
 
-                // Ürün kodundan plaka kalınlığını hesapla
-                decimal plateThickness = 0;
-                decimal hatve = 0;
-                decimal size = 0;
-                
-                if (!string.IsNullOrEmpty(order.ProductCode))
-                {
-                    var parts = order.ProductCode.Split('-');
-                    if (parts.Length >= 7)
-                    {
-                        decimal.TryParse(parts[6], NumberStyles.Any, CultureInfo.InvariantCulture, out plateThickness);
-                    }
-                    
-                    // Hatve ve Size'ı ürün kodundan al
-                    if (parts.Length >= 3)
-                    {
-                        string modelProfile = parts[2];
-                        if (modelProfile.Length > 0)
-                        {
-                            char modelLetter = modelProfile[0];
-                            hatve = GetHtave(modelLetter);
-                        }
-                    }
-                    
-                    if (parts.Length >= 4 && int.TryParse(parts[3], out int plakaOlcusuMM))
-                    {
-                        size = plakaOlcusuMM <= 1150 ? plakaOlcusuMM : plakaOlcusuMM / 2;
-                        size = size / 10; // cm
-                    }
-                }
-
                 // Seçilen kesilmiş stoklar için pres kayıtları oluştur
                 bool hasError = false;
                 string errorMessage = "";
@@ -952,10 +923,11 @@ namespace ERP.UI.Forms
 
                     int kullanilacakAdet = selectedCutting.Value;
 
-                    // Bu kesim için zaten kullanılan adeti kontrol et
-                    var usedPlakaAdedi = _pressingRepository.GetAll()
-                        .Where(p => p.CuttingId == cutting.Id && p.IsActive)
-                        .Sum(p => p.PressCount);
+                    // Bu kesim için zaten kullanılan adeti kontrol et (tamamlanmış pres taleplerinden)
+                    // ActualPressCount: kaç tane kesilmiş plaka kullanıldı (kesilmiş stoktan düşecek)
+                    var usedPlakaAdedi = _pressingRequestRepository.GetAll()
+                        .Where(pr => pr.CuttingId == cutting.Id && pr.IsActive && pr.Status == "Tamamlandı")
+                        .Sum(pr => pr.ActualPressCount ?? pr.RequestedPressCount);
                     
                     int kalanPlakaAdedi = cutting.PlakaAdedi - usedPlakaAdedi;
                     
@@ -966,34 +938,74 @@ namespace ERP.UI.Forms
                         continue;
                     }
 
-                    // Pres kaydı oluştur
-                var pressing = new Pressing
-                {
-                    OrderId = _orderId,
-                        PlateThickness = plateThickness > 0 ? plateThickness : cutting.Size, // Varsayılan olarak Size kullan
-                        Hatve = hatve > 0 ? hatve : cutting.Hatve,
-                        Size = size > 0 ? size : cutting.Size,
+                    // Kesilmiş stoktan bilgileri al
+                    decimal hatve = cutting.Hatve;
+                    decimal size = cutting.Size;
+                    
+                    // PlateThickness'i kesilmiş stokun siparişinden al
+                    decimal plateThickness = 0;
+                    if (cutting.OrderId.HasValue)
+                    {
+                        var cuttingOrder = _orderRepository.GetById(cutting.OrderId.Value);
+                        if (cuttingOrder != null && cuttingOrder.LamelThickness.HasValue)
+                        {
+                            plateThickness = cuttingOrder.LamelThickness.Value;
+                        }
+                    }
+                    
+                    // Eğer plateThickness hala 0 ise, mevcut siparişten al
+                    if (plateThickness == 0 && order.LamelThickness.HasValue)
+                    {
+                        plateThickness = order.LamelThickness.Value;
+                    }
+                    
+                    // Eğer hala 0 ise, ürün kodundan al
+                    if (plateThickness == 0 && !string.IsNullOrEmpty(order.ProductCode))
+                    {
+                        var parts = order.ProductCode.Split('-');
+                        if (parts.Length >= 7)
+                        {
+                            decimal.TryParse(parts[6], NumberStyles.Any, CultureInfo.InvariantCulture, out plateThickness);
+                        }
+                    }
+                    
+                    // Son kontrol: eğer hala 0 ise hata ver
+                    if (plateThickness == 0)
+                    {
+                        hasError = true;
+                        errorMessage += $"Kesim #{cutting.CuttingDate:dd.MM.yyyy} için plaka kalınlığı bulunamadı.\n";
+                        continue;
+                    }
+
+                    // Pres talebi oluştur
+                    var pressingRequest = new PressingRequest
+                    {
+                        OrderId = _orderId,
+                        PlateThickness = plateThickness,
+                        Hatve = hatve,
+                        Size = size,
                         SerialNoId = cutting.SerialNoId,
                         CuttingId = cutting.Id,
-                    PressNo = _txtPressNo.Text,
-                    Pressure = decimal.Parse(_txtPressure.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
-                        PressCount = kullanilacakAdet,
+                        RequestedPressCount = kullanilacakAdet,
+                        PressNo = _txtPressNo.Text,
+                        Pressure = decimal.Parse(_txtPressure.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
                         WasteAmount = !string.IsNullOrWhiteSpace(_txtWasteAmount.Text) ? 
                                      decimal.Parse(_txtWasteAmount.Text, NumberStyles.Any, CultureInfo.InvariantCulture) : 0,
-                    EmployeeId = _cmbEmployee.SelectedItem != null ? GetSelectedId(_cmbEmployee) : (Guid?)null,
-                    PressingDate = DateTime.Now
-                };
+                        EmployeeId = _cmbEmployee.SelectedItem != null ? GetSelectedId(_cmbEmployee) : (Guid?)null,
+                        Status = "Beklemede",
+                        RequestDate = DateTime.Now
+                    };
 
-                _pressingRepository.Insert(pressing);
+                    _pressingRequestRepository.Insert(pressingRequest);
                 }
 
                 if (hasError)
                 {
-                    MessageBox.Show("Bazı pres kayıtları oluşturulamadı:\n\n" + errorMessage, "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("Bazı pres talepleri oluşturulamadı:\n\n" + errorMessage, "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
                 else
                 {
-                    MessageBox.Show("Pres kayıtları başarıyla oluşturuldu!", "Başarılı", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show("Pres talepleri başarıyla oluşturuldu!", "Başarılı", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
 
                 this.DialogResult = DialogResult.OK;
@@ -1001,7 +1013,7 @@ namespace ERP.UI.Forms
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Pres kaydedilirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Pres kaydedilirken hata oluştu: " + ex.Message + "\n\nDetay: " + (ex.InnerException?.Message ?? ""), "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

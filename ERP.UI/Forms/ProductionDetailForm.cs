@@ -67,6 +67,7 @@ namespace ERP.UI.Forms
         private OrderRepository _orderRepository;
         private CuttingRepository _cuttingRepository;
         private CuttingRequestRepository _cuttingRequestRepository;
+        private PressingRequestRepository _pressingRequestRepository;
         private MaterialEntryRepository _materialEntryRepository;
         private PressingRepository _pressingRepository;
         private ClampingRepository _clampingRepository;
@@ -86,6 +87,7 @@ namespace ERP.UI.Forms
             _orderRepository = new OrderRepository();
             _cuttingRepository = new CuttingRepository();
             _cuttingRequestRepository = new CuttingRequestRepository();
+            _pressingRequestRepository = new PressingRequestRepository();
             _materialEntryRepository = new MaterialEntryRepository();
             _pressingRepository = new PressingRepository();
             _clampingRepository = new ClampingRepository();
@@ -1492,13 +1494,14 @@ namespace ERP.UI.Forms
                             MultiSelect = false
                         };
 
-                        dgv.Columns.Add("Id", "Id");
-                        dgv.Columns["Id"].Visible = false;
-                        dgv.Columns.Add("Hatve", "Hatve");
-                        dgv.Columns.Add("Size", "Ölçü");
-                        dgv.Columns.Add("RequestedPlateCount", "İstenen");
-                        dgv.Columns.Add("ActualCutCount", "Kesilen");
-                        dgv.Columns.Add("Status", "Durum");
+                        dgv.AutoGenerateColumns = false;
+                        
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Id", DataPropertyName = "Id", HeaderText = "Id", Visible = false });
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Hatve", DataPropertyName = "Hatve", HeaderText = "Hatve" });
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Size", DataPropertyName = "Size", HeaderText = "Ölçü" });
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "RequestedPlateCount", DataPropertyName = "RequestedPlateCount", HeaderText = "İstenen" });
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "ActualCutCount", DataPropertyName = "ActualCutCount", HeaderText = "Kesilen" });
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Status", DataPropertyName = "Status", HeaderText = "Durum" });
 
                         dgv.DataSource = pendingRequests.Select(r => new
                         {
@@ -1524,8 +1527,12 @@ namespace ERP.UI.Forms
 
                         if (selectDialog.ShowDialog() == DialogResult.OK && dgv.SelectedRows.Count > 0)
                         {
-                            var selectedId = (Guid)dgv.SelectedRows[0].Cells["Id"].Value;
-                            selectedRequest = pendingRequests.FirstOrDefault(r => r.Id == selectedId);
+                            var selectedRow = dgv.SelectedRows[0];
+                            if (selectedRow != null && selectedRow.Cells["Id"] != null && selectedRow.Cells["Id"].Value != null)
+                            {
+                                var selectedId = (Guid)selectedRow.Cells["Id"].Value;
+                                selectedRequest = pendingRequests.FirstOrDefault(r => r.Id == selectedId);
+                            }
                         }
                     }
                 }
@@ -1663,9 +1670,16 @@ namespace ERP.UI.Forms
                 BackColor = Color.White
             };
 
+            // Onayla butonu (Pres taleplerini onaylamak için)
+            var btnOnayla = ButtonFactory.CreateActionButton("✅ Pres Talebini Onayla", ThemeColors.Success, Color.White, 200, 35);
+            btnOnayla.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnOnayla.Location = new Point(buttonPanel.Width - 200, 5);
+            buttonPanel.Controls.Add(btnOnayla);
+
             // Ekle butonu
             var btnEkle = ButtonFactory.CreateActionButton("➕ Ekle", ThemeColors.Primary, Color.White, 120, 35);
             btnEkle.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnEkle.Location = new Point(buttonPanel.Width - 200 - 130, 5);
             buttonPanel.Controls.Add(btnEkle);
 
             // DataGridView paneli
@@ -1738,6 +1752,7 @@ namespace ERP.UI.Forms
 
             // Event handler
             btnEkle.Click += (s, e) => BtnPresEkle_Click(dataGridView);
+            btnOnayla.Click += (s, e) => BtnPresTalebiOnayla_Click(dataGridView);
 
             // Verileri yükle
             LoadPresData(dataGridView);
@@ -1832,6 +1847,173 @@ namespace ERP.UI.Forms
             catch (Exception ex)
             {
                 MessageBox.Show("Pres verileri yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BtnPresTalebiOnayla_Click(DataGridView dataGridView)
+        {
+            try
+            {
+                // Bu siparişe ait bekleyen pres taleplerini getir
+                var pendingRequests = _pressingRequestRepository.GetByOrderId(_orderId)
+                    .Where(r => r.Status == "Presde" || r.Status == "Beklemede").ToList();
+
+                if (pendingRequests.Count == 0)
+                {
+                    MessageBox.Show("Bu sipariş için onaylanacak pres talebi bulunmamaktadır.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                // Eğer birden fazla talep varsa, kullanıcıdan seçmesini iste
+                PressingRequest selectedRequest = null;
+                if (pendingRequests.Count == 1)
+                {
+                    selectedRequest = pendingRequests[0];
+                }
+                else
+                {
+                    // Dialog ile seçim yap
+                    using (var selectDialog = new Form
+                    {
+                        Text = "Pres Talebi Seç",
+                        Width = 500,
+                        Height = 400,
+                        StartPosition = FormStartPosition.CenterParent,
+                        FormBorderStyle = FormBorderStyle.FixedDialog,
+                        MaximizeBox = false,
+                        MinimizeBox = false
+                    })
+                    {
+                        var dgv = new DataGridView
+                        {
+                            Dock = DockStyle.Fill,
+                            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                            AllowUserToAddRows = false,
+                            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                            MultiSelect = false
+                        };
+
+                        dgv.AutoGenerateColumns = false;
+                        
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Id", DataPropertyName = "Id", HeaderText = "Id", Visible = false });
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Hatve", DataPropertyName = "Hatve", HeaderText = "Hatve" });
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Size", DataPropertyName = "Size", HeaderText = "Ölçü" });
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "RequestedPressCount", DataPropertyName = "RequestedPressCount", HeaderText = "İstenen" });
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "ActualPressCount", DataPropertyName = "ActualPressCount", HeaderText = "Preslenen (Kullanılan)" });
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "ResultedPressCount", DataPropertyName = "ResultedPressCount", HeaderText = "Oluşan" });
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Status", DataPropertyName = "Status", HeaderText = "Durum" });
+
+                        dgv.DataSource = pendingRequests.Select(r => new
+                        {
+                            Id = r.Id,
+                            Hatve = GetHatveLetter(r.Hatve),
+                            Size = r.Size.ToString("F1", CultureInfo.InvariantCulture),
+                            RequestedPressCount = r.RequestedPressCount,
+                            ActualPressCount = r.ActualPressCount?.ToString() ?? "-",
+                            ResultedPressCount = r.ResultedPressCount?.ToString() ?? "-",
+                            Status = r.Status
+                        }).ToList();
+
+                        var btnSelect = new Button
+                        {
+                            Text = "Seç",
+                            DialogResult = DialogResult.OK,
+                            Dock = DockStyle.Bottom,
+                            Height = 40
+                        };
+
+                        selectDialog.Controls.Add(dgv);
+                        selectDialog.Controls.Add(btnSelect);
+                        selectDialog.AcceptButton = btnSelect;
+
+                        if (selectDialog.ShowDialog() == DialogResult.OK && dgv.SelectedRows.Count > 0)
+                        {
+                            var selectedRow = dgv.SelectedRows[0];
+                            if (selectedRow != null && selectedRow.Cells["Id"] != null && selectedRow.Cells["Id"].Value != null)
+                            {
+                                var selectedId = (Guid)selectedRow.Cells["Id"].Value;
+                                selectedRequest = pendingRequests.FirstOrDefault(r => r.Id == selectedId);
+                            }
+                        }
+                    }
+                }
+
+                if (selectedRequest == null)
+                    return;
+
+                // Pres adedi girilmiş mi kontrol et
+                if (!selectedRequest.ActualPressCount.HasValue)
+                {
+                    MessageBox.Show("Lütfen önce pres adedini giriniz (Pres Talepleri sayfasından).", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Preslenmiş oluşan adet girilmiş mi kontrol et
+                if (!selectedRequest.ResultedPressCount.HasValue)
+                {
+                    MessageBox.Show("Lütfen önce kaç tane preslenmiş oluştuğunu giriniz (Pres Talepleri sayfasından).", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Onaylama işlemi
+                var result = MessageBox.Show(
+                    $"Pres talebi onaylanacak:\n\n" +
+                    $"İstenen: {selectedRequest.RequestedPressCount} adet\n" +
+                    $"Preslenen (kesilmiş stoktan kullanılan): {selectedRequest.ActualPressCount.Value} adet\n" +
+                    $"Oluşan (preslenmiş stoğa eklenecek): {selectedRequest.ResultedPressCount.Value} adet\n\n" +
+                    $"Onaylamak istediğinize emin misiniz?",
+                    "Pres Talebi Onayla",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question);
+
+                if (result != DialogResult.Yes)
+                    return;
+
+                // Kesilmiş stoktan düş (ActualPressCount kadar)
+                if (selectedRequest.CuttingId.HasValue)
+                {
+                    var cutting = _cuttingRepository.GetById(selectedRequest.CuttingId.Value);
+                    if (cutting != null)
+                    {
+                        // Kesilmiş stoktan kullanılan adeti düş
+                        // Not: Kesilmiş stok zaten Pressing kayıtlarından düşülmüş olabilir, 
+                        // bu yüzden sadece kenetleme işlemlerinden düşülmemiş olanları kontrol ediyoruz
+                        // Burada sadece kontrol yapıyoruz, asıl düşme işlemi Preslenmiş stoktakip formunda yapılıyor
+                        // Ama yine de cutting'in PlakaAdedi'sini güncelleyebiliriz (eğer gerekirse)
+                    }
+                }
+
+                // Durumu "Tamamlandı" yap
+                selectedRequest.Status = "Tamamlandı";
+                selectedRequest.CompletionDate = DateTime.Now;
+                _pressingRequestRepository.Update(selectedRequest);
+
+                // Pres kaydı oluştur (Pressing) - ResultedPressCount preslenmiş stoğa eklenecek
+                var pressing = new Pressing
+                {
+                    OrderId = selectedRequest.OrderId,
+                    PlateThickness = selectedRequest.PlateThickness,
+                    Hatve = selectedRequest.Hatve,
+                    Size = selectedRequest.Size,
+                    SerialNoId = selectedRequest.SerialNoId,
+                    CuttingId = selectedRequest.CuttingId,
+                    PressNo = selectedRequest.PressNo,
+                    Pressure = selectedRequest.Pressure,
+                    PressCount = selectedRequest.ResultedPressCount.Value, // Oluşan preslenmiş adet
+                    WasteAmount = selectedRequest.WasteAmount,
+                    EmployeeId = selectedRequest.EmployeeId,
+                    PressingDate = DateTime.Now
+                };
+                _pressingRepository.Insert(pressing);
+
+                MessageBox.Show("Pres talebi onaylandı ve pres kaydı oluşturuldu!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                // Verileri yeniden yükle
+                LoadPresData(dataGridView);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Pres talebi onaylanırken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

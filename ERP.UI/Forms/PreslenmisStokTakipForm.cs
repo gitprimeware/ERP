@@ -138,14 +138,6 @@ namespace ERP.UI.Forms
 
             _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
             {
-                DataPropertyName = "StokUrunler",
-                HeaderText = "Stok Ürünler",
-                Name = "StokUrunler",
-                Width = 200
-            });
-
-            _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
-            {
                 DataPropertyName = "PlakaAdedi",
                 HeaderText = "Plaka Adedi",
                 Name = "PlakaAdedi",
@@ -175,7 +167,6 @@ namespace ERP.UI.Forms
                         stockData.Add(new StockRowData
                         {
                             ModelOlcu = modelCode,
-                            StokUrunler = "",
                             PlakaAdedi = "0"
                         });
                     }
@@ -205,13 +196,9 @@ namespace ERP.UI.Forms
                             return p.PressCount - usedPlateCount;
                         });
 
-                        // Stok ürünler bilgisini oluştur (örnek: "H20 - 50cm x 0.165")
-                        string stokUrunler = GetStokUrunlerInfo(modelPressings, modelCode);
-
                         stockData.Add(new StockRowData
                         {
                             ModelOlcu = modelCode,
-                            StokUrunler = stokUrunler,
                             PlakaAdedi = totalPlakaAdedi > 0 ? totalPlakaAdedi.ToString() : "0"
                         });
                     }
@@ -270,16 +257,6 @@ namespace ERP.UI.Forms
             return $"{modelLetter}{sizeNumber}";
         }
 
-        private string GetStokUrunlerInfo(List<Pressing> pressings, string modelCode)
-        {
-            if (pressings.Count == 0)
-                return "";
-
-            // Pres işlemlerinden örnek bilgileri al
-            var firstPressing = pressings.First();
-            return $"{modelCode} - {firstPressing.Size}cm x {firstPressing.PlateThickness}";
-        }
-
         private void BtnKenetlemeEkle_Click(object sender, EventArgs e)
         {
             try
@@ -303,7 +280,6 @@ namespace ERP.UI.Forms
         private class StockRowData
         {
             public string ModelOlcu { get; set; }
-            public string StokUrunler { get; set; }
             public string PlakaAdedi { get; set; }
         }
     }

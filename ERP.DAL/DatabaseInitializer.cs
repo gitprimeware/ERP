@@ -33,6 +33,7 @@ namespace ERP.DAL
                     CreateClampingsTable(connection);
                     CreateAssembliesTable(connection);
                     CreateCuttingRequestsTable(connection);
+                    CreatePressingRequestsTable(connection);
                 }
             }
             catch (Exception ex)
@@ -770,6 +771,68 @@ namespace ERP.DAL
             using (var command = new SqlCommand(query, connection))
             {
                 command.ExecuteNonQuery();
+            }
+        }
+
+        private static void CreatePressingRequestsTable(SqlConnection connection)
+        {
+            var query = @"
+                IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[PressingRequests]') AND type in (N'U'))
+                BEGIN
+                    CREATE TABLE [dbo].[PressingRequests] (
+                        [Id] UNIQUEIDENTIFIER PRIMARY KEY,
+                        [OrderId] UNIQUEIDENTIFIER NOT NULL,
+                        [Hatve] DECIMAL(10,2) NOT NULL,
+                        [Size] DECIMAL(10,2) NOT NULL,
+                        [PlateThickness] DECIMAL(10,3) NOT NULL,
+                        [SerialNoId] UNIQUEIDENTIFIER NULL,
+                        [CuttingId] UNIQUEIDENTIFIER NULL,
+                        [RequestedPressCount] INT NOT NULL,
+                        [ActualPressCount] INT NULL,
+                        [ResultedPressCount] INT NULL,
+                        [PressNo] NVARCHAR(50) NULL,
+                        [Pressure] DECIMAL(10,2) NOT NULL,
+                        [WasteAmount] DECIMAL(10,2) NOT NULL DEFAULT 0,
+                        [EmployeeId] UNIQUEIDENTIFIER NULL,
+                        [Status] NVARCHAR(50) NOT NULL DEFAULT 'Beklemede',
+                        [RequestDate] DATETIME NOT NULL,
+                        [CompletionDate] DATETIME NULL,
+                        [CreatedDate] DATETIME NOT NULL,
+                        [ModifiedDate] DATETIME NULL,
+                        [IsActive] BIT NOT NULL DEFAULT 1,
+                        FOREIGN KEY ([OrderId]) REFERENCES [Orders]([Id]),
+                        FOREIGN KEY ([SerialNoId]) REFERENCES [SerialNos]([Id]),
+                        FOREIGN KEY ([CuttingId]) REFERENCES [Cuttings]([Id]),
+                        FOREIGN KEY ([EmployeeId]) REFERENCES [Employees]([Id])
+                    )
+                END";
+
+            using (var command = new SqlCommand(query, connection))
+            {
+                command.ExecuteNonQuery();
+            }
+
+            // Mevcut tablolar için migration: ResultedPressCount kolonunu ekle
+            var migrationQuery = @"
+                IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[PressingRequests]') AND type in (N'U'))
+                BEGIN
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[PressingRequests]') AND name = 'ResultedPressCount')
+                    BEGIN
+                        BEGIN TRY
+                            ALTER TABLE [dbo].[PressingRequests]
+                            ADD [ResultedPressCount] INT NULL
+                            
+                            PRINT 'PressingRequests tablosuna ResultedPressCount kolonu eklendi.'
+                        END TRY
+                        BEGIN CATCH
+                            PRINT 'PressingRequests tablosuna ResultedPressCount kolonu eklenirken hata oluştu: ' + ERROR_MESSAGE()
+                        END CATCH
+                    END
+                END";
+
+            using (var migrationCommand = new SqlCommand(migrationQuery, connection))
+            {
+                migrationCommand.ExecuteNonQuery();
             }
         }
     }

@@ -55,6 +55,7 @@ namespace ERP.UI.Services
                 stockItem,
                 productionItem,
                 new MenuItem("📋 Kesim Talepleri", "CuttingRequests", "📋", 5),
+                new MenuItem("📋 Pres Talepleri", "PressingRequests", "📋", 6),
                 consumptionItem,
                 reportsItem,
                 new MenuItem("⚙️ Ayarlar", "Settings", "⚙️", 11)
