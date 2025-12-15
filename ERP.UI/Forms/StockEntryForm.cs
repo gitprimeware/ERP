@@ -8,7 +8,7 @@ using ERP.UI.UI;
 
 namespace ERP.UI.Forms
 {
-    public partial class OrderEntryForm : UserControl
+    public partial class StockEntryForm : UserControl
     {
         private Panel mainPanel;
         private TableLayoutPanel tableLayout;
@@ -26,25 +26,12 @@ namespace ERP.UI.Forms
         private ComboBox cmbLamelThickness;
         private ComboBox cmbProductType;
         private NumericUpDown nudQuantity;
-        private TextBox txtSalesPriceUSD;
-        private TextBox txtTotalPriceUSD;
-        private TextBox txtCurrencyRate;
-        private TextBox txtTotalPriceTL;
-        private DateTimePicker dtpShipmentDate;
         private Button btnSave;
         private Button btnCancel;
-        private Button btnDelete;
-        private Button btnSendToProduction;
-        private Button btnGetWorkOrder;
         private Label lblTitle;
 
         private Guid _orderId = Guid.Empty;
         private bool _isEditMode = false;
-        private bool _isReadOnly = false; // Üretimde veya Muhasebede ise true
-
-        public event EventHandler<Guid> OrderDeleteRequested;
-        public event EventHandler<Guid> OrderSendToProductionRequested;
-        public event EventHandler<Guid> OrderGetWorkOrderRequested;
 
         public Guid OrderId
         {
@@ -57,16 +44,21 @@ namespace ERP.UI.Forms
             }
         }
 
-        public OrderEntryForm() : this(Guid.Empty)
+        public StockEntryForm() : this(Guid.Empty)
         {
         }
 
-        public OrderEntryForm(Guid orderId)
+        public StockEntryForm(Guid orderId)
         {
             _orderId = orderId;
             _isEditMode = orderId != Guid.Empty;
             InitializeComponent();
             InitializeCustomComponents();
+        }
+
+        private void InitializeComponent()
+        {
+            // WinForms Designer için gerekli
         }
 
         private void InitializeCustomComponents()
@@ -93,7 +85,7 @@ namespace ERP.UI.Forms
             // Başlık
             lblTitle = new Label
             {
-                Text = _isEditMode ? "Sipariş Güncelle" : "Yeni Sipariş",
+                Text = _isEditMode ? "Stok Güncelle" : "Yeni Stok Girişi",
                 Font = new Font("Segoe UI", 20F, FontStyle.Bold),
                 ForeColor = ThemeColors.Primary,
                 AutoSize = true,
@@ -151,12 +143,14 @@ namespace ERP.UI.Forms
             // Firma satırı
             AddTableRow("Firma:", CreateCompanyControl(), "+ Yeni Firma Ekle", CreateAddCompanyButton(), row++);
 
-            // Sipariş numaraları
-            AddTableRow("Müşteri Sipariş No:", CreateTextBox(txtCustomerOrderNo = new TextBox()), 
+            // Müşteri Sipariş No (Readonly - "Stok")
+            txtCustomerOrderNo = new TextBox { Text = "Stok", ReadOnly = true, BackColor = ThemeColors.SurfaceDark };
+            AddTableRow("Müşteri Sipariş No:", CreateReadOnlyTextBox(txtCustomerOrderNo), 
                        "Trex Sipariş No:", CreateTextBox(txtTrexOrderNo = new TextBox()), row++);
 
-            // Cihaz adı ve Sipariş tarihi
-            AddTableRow("Cihaz Adı:", CreateTextBox(txtDeviceName = new TextBox()),
+            // Cihaz Adı (Readonly - "Stok") ve Sipariş tarihi
+            txtDeviceName = new TextBox { Text = "Stok", ReadOnly = true, BackColor = ThemeColors.SurfaceDark };
+            AddTableRow("Cihaz Adı:", CreateReadOnlyTextBox(txtDeviceName),
                        "Sipariş Tarihi:", CreateDateTimePicker(dtpOrderDate = new DateTimePicker()), row++);
 
             // Termin tarihi
@@ -175,23 +169,7 @@ namespace ERP.UI.Forms
             AddTableRow("Ürün Türü:", CreateProductTypeCombo(),
                        "Miktar:", CreateQuantityControl(), row++);
 
-            // Satış fiyatı (USD) ve Toplam fiyat (USD)
-            AddTableRow("Satış Fiyatı (USD):", CreateTextBox(txtSalesPriceUSD = new TextBox()),
-                       "Toplam Fiyat (USD):", CreateReadOnlyTextBox(txtTotalPriceUSD = new TextBox()), row++);
-            txtSalesPriceUSD.TextChanged += TxtSalesPriceUSD_TextChanged;
-
-            // Kur ve Toplam fiyat (TL)
-            AddTableRow("Kur:", CreateReadOnlyTextBox(txtCurrencyRate = new TextBox()),
-                       "Toplam Fiyat (TL):", CreateReadOnlyTextBox(txtTotalPriceTL = new TextBox()), row++);
-            txtCurrencyRate.Text = "0,00";
-            txtTotalPriceTL.Text = "0,00";
-            
-            // Kur değiştiğinde TL fiyatını hesapla (sadece gösterim için)
-            // Not: Kur readonly olduğu için bu event çalışmayacak ama yine de ekleyelim
-
-            // Sevk tarihi
-            AddTableRow("Sevk Tarihi:", CreateDisabledDateTimePicker(dtpShipmentDate = new DateTimePicker()),
-                       "", new Panel(), row++);
+            // Fiyat alanları kaldırıldı - stok girişinde gösterilmiyor, arka planda otomatik 0
 
             mainPanel.Resize += (s, e) =>
             {
@@ -341,7 +319,6 @@ namespace ERP.UI.Forms
                 Maximum = 9999,
                 Value = 1
             };
-            nudQuantity.ValueChanged += NudQuantity_ValueChanged;
             return nudQuantity;
         }
 
@@ -373,15 +350,6 @@ namespace ERP.UI.Forms
             return dateTimePicker;
         }
 
-        private Control CreateDisabledDateTimePicker(DateTimePicker dateTimePicker)
-        {
-            dateTimePicker.Height = 30;
-            dateTimePicker.Font = new Font("Segoe UI", 10F);
-            dateTimePicker.Format = DateTimePickerFormat.Short;
-            dateTimePicker.Enabled = false;
-            return dateTimePicker;
-        }
-
         private Panel CreateButtonPanel()
         {
             var panel = new Panel
@@ -391,17 +359,15 @@ namespace ERP.UI.Forms
                 Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top
             };
 
-            // Panel genişliğini başlangıçta ayarla
             if (mainPanel != null)
             {
                 panel.Width = mainPanel.Width - 60;
             }
             else
             {
-                panel.Width = 800; // Varsayılan genişlik
+                panel.Width = 800;
             }
 
-            // Panel genişliğini güncelle
             mainPanel.Resize += (s, e) =>
             {
                 if (mainPanel != null && panel != null)
@@ -411,9 +377,9 @@ namespace ERP.UI.Forms
                 }
             };
 
-            btnSave = ButtonFactory.CreateSuccessButton("Siparişi Tamamla");
+            btnSave = ButtonFactory.CreateSuccessButton("Stok Girişini Tamamla");
             btnSave.Height = 35;
-            btnSave.Width = 140;
+            btnSave.Width = 180;
             btnSave.Anchor = AnchorStyles.None;
             btnSave.Click += BtnSave_Click;
             btnSave.Visible = true;
@@ -428,7 +394,6 @@ namespace ERP.UI.Forms
             panel.Controls.Add(btnSave);
             panel.Controls.Add(btnCancel);
 
-            // Buton konumlarını güncelle
             UpdateButtonPositions(panel);
 
             return panel;
@@ -438,17 +403,13 @@ namespace ERP.UI.Forms
         {
             if (panel == null) return;
 
-            // Panel genişliği yoksa veya çok küçükse, varsayılan genişlik kullan
             int panelWidth = panel.Width > 0 ? panel.Width : 800;
-            
             int rightMargin = 10;
             int buttonSpacing = 10;
             int yPos = 5;
 
-            // Butonları sağdan sola yerleştir
             int currentX = panelWidth - rightMargin;
 
-            // İptal butonu (en sağda)
             if (btnCancel != null && btnCancel.Visible)
             {
                 currentX -= btnCancel.Width;
@@ -456,74 +417,11 @@ namespace ERP.UI.Forms
                 currentX -= buttonSpacing;
             }
 
-            // Siparişi Tamamla butonu
             if (btnSave != null && btnSave.Visible)
             {
                 currentX -= btnSave.Width;
                 btnSave.Location = new Point(currentX, yPos);
-                currentX -= buttonSpacing;
             }
-
-            // İş Emri Al butonu
-            if (btnGetWorkOrder != null && btnGetWorkOrder.Visible)
-            {
-                currentX -= btnGetWorkOrder.Width;
-                btnGetWorkOrder.Location = new Point(currentX, yPos);
-                currentX -= buttonSpacing;
-            }
-
-            // Üretime Gönder butonu
-            if (btnSendToProduction != null && btnSendToProduction.Visible)
-            {
-                currentX -= btnSendToProduction.Width;
-                btnSendToProduction.Location = new Point(currentX, yPos);
-                currentX -= buttonSpacing;
-            }
-
-            // Sil butonu
-            if (btnDelete != null && btnDelete.Visible)
-            {
-                currentX -= btnDelete.Width;
-                btnDelete.Location = new Point(currentX, yPos);
-            }
-        }
-
-        private void BtnDelete_Click(object sender, EventArgs e)
-        {
-            if (_orderId == Guid.Empty) return;
-
-            var result = MessageBox.Show(
-                $"Sipariş {txtTrexOrderNo.Text} silinecek. Emin misiniz?",
-                "Sipariş Sil",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Question);
-
-            if (result == DialogResult.Yes)
-            {
-                OrderDeleteRequested?.Invoke(this, _orderId);
-            }
-        }
-
-        private void BtnSendToProduction_Click(object sender, EventArgs e)
-        {
-            if (_orderId == Guid.Empty) return;
-
-            var result = MessageBox.Show(
-                $"Sipariş {txtTrexOrderNo.Text} üretime gönderilecek. Emin misiniz?",
-                "Üretime Gönder",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Question);
-
-            if (result == DialogResult.Yes)
-            {
-                OrderSendToProductionRequested?.Invoke(this, _orderId);
-            }
-        }
-
-        private void BtnGetWorkOrder_Click(object sender, EventArgs e)
-        {
-            if (_orderId == Guid.Empty) return;
-            OrderGetWorkOrderRequested?.Invoke(this, _orderId);
         }
 
         private void LoadCompanies()
@@ -531,7 +429,7 @@ namespace ERP.UI.Forms
             try
             {
                 cmbCompany.Items.Clear();
-                var companyRepository = new ERP.DAL.Repositories.CompanyRepository();
+                var companyRepository = new CompanyRepository();
                 var companies = companyRepository.GetAll();
                 
                 foreach (var company in companies)
@@ -550,103 +448,38 @@ namespace ERP.UI.Forms
 
         private void GenerateTrexOrderNo()
         {
-            // Boşsa veya yeni siparişse otomatik oluştur
             if (string.IsNullOrWhiteSpace(txtTrexOrderNo.Text) || !_isEditMode)
             {
                 int year = DateTime.Now.Year;
-                int orderNumber = GetNextOrderNumber();
-                txtTrexOrderNo.Text = $"SP-{year}-{orderNumber:0000}";
+                int orderNumber = GetNextStockNumber();
+                txtTrexOrderNo.Text = $"YM-{year}-{orderNumber:0000}";
             }
         }
 
-        private int GetNextOrderNumber()
+        private int GetNextStockNumber()
         {
             try
             {
                 var orderRepository = new OrderRepository();
-                return orderRepository.GetNextOrderNumber(DateTime.Now.Year);
+                return orderRepository.GetNextStockNumber(DateTime.Now.Year);
             }
             catch
             {
-                return 1; // Hata durumunda 1 döndür
+                return 1;
             }
         }
 
         private void SetDefaultDates()
         {
             dtpOrderDate.Value = DateTime.Now;
-            dtpTermDate.Value = DateTime.Now.AddDays(7);
+            dtpTermDate.Value = DateTime.Now;
         }
 
         private void UpdateFormTitle()
         {
             if (lblTitle != null)
             {
-                lblTitle.Text = _isEditMode ? $"Sipariş Güncelle" : "Yeni Sipariş";
-            }
-        }
-
-        private void TxtSalesPriceUSD_TextChanged(object sender, EventArgs e)
-        {
-            CalculateTotalPriceUSD();
-        }
-
-        private void NudQuantity_ValueChanged(object sender, EventArgs e)
-        {
-            CalculateTotalPriceUSD();
-        }
-
-        private void CalculateTotalPriceUSD()
-        {
-            if (decimal.TryParse(txtSalesPriceUSD.Text.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal salesPrice))
-            {
-                decimal quantity = nudQuantity.Value;
-                decimal totalUSD = salesPrice * quantity;
-                txtTotalPriceUSD.Text = totalUSD.ToString("N2") + " USD";
-            }
-            else
-            {
-                txtTotalPriceUSD.Text = "0,00 USD";
-            }
-            
-            // TL fiyatını da hesapla
-            CalculateTotalPriceTL();
-        }
-
-        private void CalculateTotalPriceTL()
-        {
-            try
-            {
-                // Kur'u al
-                if (!decimal.TryParse(txtCurrencyRate.Text.Replace(",", "."), 
-                    System.Globalization.NumberStyles.Any, 
-                    System.Globalization.CultureInfo.InvariantCulture, 
-                    out decimal currencyRate) || currencyRate == 0)
-                {
-                    txtTotalPriceTL.Text = "0,00";
-                    return;
-                }
-
-                // Satış Fiyatı USD'yi al
-                if (!decimal.TryParse(txtSalesPriceUSD.Text.Replace(",", "."), 
-                    System.Globalization.NumberStyles.Any, 
-                    System.Globalization.CultureInfo.InvariantCulture, 
-                    out decimal salesPriceUSD))
-                {
-                    txtTotalPriceTL.Text = "0,00";
-                    return;
-                }
-
-                // Adet'i al
-                decimal quantity = nudQuantity.Value;
-
-                // Toplam Fiyat TL = Satış Fiyatı USD * Kur * Adet
-                decimal totalPriceTL = salesPriceUSD * currencyRate * quantity;
-                txtTotalPriceTL.Text = totalPriceTL.ToString("N2");
-            }
-            catch
-            {
-                txtTotalPriceTL.Text = "0,00";
+                lblTitle.Text = _isEditMode ? "Stok Güncelle" : "Yeni Stok Girişi";
             }
         }
 
@@ -705,9 +538,8 @@ namespace ERP.UI.Forms
                         var newCompany = new ERP.Core.Models.Company { Name = txtName.Text };
                         var companyId = companyRepository.Insert(newCompany);
                         
-                        LoadCompanies(); // Tüm firmaları yeniden yükle
+                        LoadCompanies();
                         
-                        // Yeni eklenen firmayı seç
                         foreach (var item in cmbCompany.Items)
                         {
                             var idProperty = item.GetType().GetProperty("Id");
@@ -748,50 +580,11 @@ namespace ERP.UI.Forms
                 return false;
             }
 
-            if (string.IsNullOrWhiteSpace(txtCustomerOrderNo.Text))
-            {
-                MessageBox.Show("Müşteri sipariş numarası boş olamaz!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                txtCustomerOrderNo.Focus();
-                return false;
-            }
-
             return true;
         }
 
         private void BtnSave_Click(object sender, EventArgs e)
         {
-            // Readonly modda kaydetme yapılamaz (Sevkiyata Hazır hariç)
-            if (_isReadOnly)
-            {
-                var orderRepository = new OrderRepository();
-                var currentOrder = orderRepository.GetById(_orderId);
-                
-                if (currentOrder != null && (currentOrder.Status == "Üretimde" || currentOrder.Status == "Muhasebede"))
-                {
-                    MessageBox.Show("Bu sipariş üretimde veya muhasebede olduğu için güncellenemez!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                // Sevkiyata Hazır durumunda sadece sevk tarihi güncellenebilir
-                if (currentOrder != null && currentOrder.Status == "Sevkiyata Hazır")
-                {
-                    try
-                    {
-                        currentOrder.ShipmentDate = dtpShipmentDate.Value;
-                        // Sevk tarihi seçildiğinde durumu "Sevk Edildi" olarak güncelle
-                        currentOrder.Status = "Sevk Edildi";
-                        orderRepository.Update(currentOrder);
-                        MessageBox.Show("Sevk tarihi güncellendi ve sipariş 'Sevk Edildi' durumuna getirildi!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        return;
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show("Sevk tarihi güncellenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        return;
-                    }
-                }
-            }
-
             if (!ValidateForm())
                 return;
 
@@ -803,8 +596,8 @@ namespace ERP.UI.Forms
                 if (_isEditMode)
                 {
                     orderRepository.Update(order);
-                    UpdateFormTitle(); // Buton metnini güncelle
-                    MessageBox.Show("Sipariş tamamlandı!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    UpdateFormTitle();
+                    MessageBox.Show("Stok girişi tamamlandı!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 else
                 {
@@ -812,21 +605,12 @@ namespace ERP.UI.Forms
                     _orderId = orderId;
                     _isEditMode = true;
                     UpdateFormTitle();
-                    // Buton konumlarını güncelle
-                    if (btnSave != null)
-                    {
-                        var buttonPanel = btnSave.Parent as Panel;
-                        if (buttonPanel != null)
-                        {
-                            UpdateButtonPositions(buttonPanel);
-                        }
-                    }
-                    MessageBox.Show("Sipariş tamamlandı!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show("Stok girişi tamamlandı!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Sipariş kaydedilirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Stok girişi kaydedilirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -835,16 +619,21 @@ namespace ERP.UI.Forms
             var order = new ERP.Core.Models.Order
             {
                 Id = _orderId != Guid.Empty ? _orderId : Guid.NewGuid(),
-                CustomerOrderNo = txtCustomerOrderNo.Text.Trim(),
+                CustomerOrderNo = "Stok", // Her zaman "Stok"
                 TrexOrderNo = txtTrexOrderNo.Text.Trim(),
-                DeviceName = string.IsNullOrWhiteSpace(txtDeviceName.Text) ? null : txtDeviceName.Text.Trim(),
+                DeviceName = "Stok", // Her zaman "Stok"
                 OrderDate = dtpOrderDate.Value,
                 TermDate = dtpTermDate.Value,
                 ProductCode = string.IsNullOrWhiteSpace(txtProductCode.Text) ? null : txtProductCode.Text.Trim(),
                 BypassSize = string.IsNullOrWhiteSpace(txtBypassSize.Text) ? null : txtBypassSize.Text.Trim(),
                 BypassType = string.IsNullOrWhiteSpace(txtBypassType.Text) ? null : txtBypassType.Text.Trim(),
                 ProductType = cmbProductType.SelectedItem?.ToString(),
-                Quantity = (int)nudQuantity.Value
+                Quantity = (int)nudQuantity.Value,
+                SalesPrice = 0, // Otomatik 0
+                TotalPrice = 0, // Otomatik 0
+                CurrencyRate = 0, // Otomatik 0
+                IsStockOrder = true, // Her zaman true
+                Status = "Üretimde" // Stok girişi direkt üretime gönderilir
             };
 
             // CompanyId
@@ -857,11 +646,10 @@ namespace ERP.UI.Forms
                 }
             }
 
-            // LamelThickness
+            // LamelThickness - Değeri olduğu gibi kaydet (değişiklik yok)
             if (cmbLamelThickness.SelectedItem != null)
             {
                 var thicknessStr = cmbLamelThickness.SelectedItem.ToString();
-                // Nokta ve virgül sorununu çözmek için InvariantCulture kullan
                 thicknessStr = thicknessStr.Replace(",", ".");
                 if (decimal.TryParse(thicknessStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal thickness))
                 {
@@ -869,82 +657,22 @@ namespace ERP.UI.Forms
                 }
             }
 
-            // SalesPrice
-            if (decimal.TryParse(txtSalesPriceUSD.Text.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal salesPrice))
-            {
-                order.SalesPrice = salesPrice;
-            }
-
-            // TotalPrice
-            if (decimal.TryParse(txtTotalPriceUSD.Text.Replace(" USD", "").Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal totalPrice))
-            {
-                order.TotalPrice = totalPrice;
-            }
-
-            // CurrencyRate
-            if (decimal.TryParse(txtCurrencyRate.Text.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal rate))
-            {
-                order.CurrencyRate = rate;
-            }
-
-            // ShipmentDate
-            if (dtpShipmentDate.Enabled && dtpShipmentDate.Value != null)
-            {
-                order.ShipmentDate = dtpShipmentDate.Value;
-            }
-
-            // Status
-            if (!_isEditMode)
-            {
-                // Yeni sipariş için "Yeni" status
-                order.Status = "Yeni";
-            }
-            else
-            {
-                // Update modunda mevcut status'u veritabanından al ve koru
-                // Eğer sevk tarihi girildiyse ve status "Sevkiyata Hazır" ise "Sevk Edildi" yap
-                var orderRepository = new OrderRepository();
-                var currentOrder = orderRepository.GetById(_orderId);
-                if (currentOrder != null)
-                {
-                    // Sevkiyata Hazır durumunda sevk tarihi girildiyse "Sevk Edildi" yap
-                    if (currentOrder.Status == "Sevkiyata Hazır" && dtpShipmentDate.Enabled && dtpShipmentDate.Value != null)
-                    {
-                        order.Status = "Sevk Edildi";
-                    }
-                    else
-                    {
-                        // Diğer durumlarda mevcut status'u koru
-                        order.Status = currentOrder.Status;
-                    }
-                }
-            }
-
-            // IsStockOrder - Siparişler için her zaman false (stok ayrı ekrandan giriliyor)
-            order.IsStockOrder = false;
-
             return order;
         }
-
 
         private void BtnCancel_Click(object sender, EventArgs e)
         {
             // Formu temizle
             cmbCompany.SelectedIndex = -1;
-            txtCustomerOrderNo.Clear();
-            txtDeviceName.Clear();
             dtpOrderDate.Value = DateTime.Now;
-            dtpTermDate.Value = DateTime.Now.AddDays(7);
+            dtpTermDate.Value = DateTime.Now;
             txtProductCode.Clear();
             txtBypassSize.Clear();
             txtBypassType.Clear();
             cmbLamelThickness.SelectedIndex = -1;
             cmbProductType.SelectedIndex = -1;
             nudQuantity.Value = 1;
-            txtSalesPriceUSD.Clear();
-            txtTotalPriceUSD.Text = "0,00 USD";
-            txtCurrencyRate.Text = "0,00";
-            txtTotalPriceTL.Text = "0,00";
+            GenerateTrexOrderNo(); // Yeni numara oluştur
         }
 
         public void LoadOrderData(Guid orderId)
@@ -956,32 +684,14 @@ namespace ERP.UI.Forms
 
                 if (order == null)
                 {
-                    MessageBox.Show("Sipariş bulunamadı!", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show("Stok girişi bulunamadı!", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;
                 }
 
                 _orderId = order.Id;
                 _isEditMode = true;
                 
-                // Üretimde veya Muhasebede ise readonly yap
-                // Sevkiyata Hazır ise sadece sevk tarihi editable
-                _isReadOnly = order.Status == "Üretimde" || order.Status == "Muhasebede";
-                bool isReadyForShipment = order.Status == "Sevkiyata Hazır";
-                
                 UpdateFormTitle();
-                SetFormReadOnly(_isReadOnly, isReadyForShipment);
-                
-                // Buton görünürlüklerini güncelle
-                if (btnDelete != null) btnDelete.Visible = _isEditMode && !_isReadOnly;
-                if (btnSendToProduction != null) btnSendToProduction.Visible = _isEditMode && !_isReadOnly;
-                if (btnGetWorkOrder != null) btnGetWorkOrder.Visible = _isEditMode;
-                
-                // Buton pozisyonlarını güncelle
-                var buttonPanel = btnSave?.Parent as Panel;
-                if (buttonPanel != null)
-                {
-                    UpdateButtonPositions(buttonPanel);
-                }
 
                 // Company seç
                 LoadCompanies();
@@ -995,24 +705,22 @@ namespace ERP.UI.Forms
                     }
                 }
 
-                txtCustomerOrderNo.Text = order.CustomerOrderNo;
                 txtTrexOrderNo.Text = order.TrexOrderNo;
-                txtDeviceName.Text = order.DeviceName ?? "";
                 dtpOrderDate.Value = order.OrderDate;
                 dtpTermDate.Value = order.TermDate;
                 txtProductCode.Text = order.ProductCode ?? "";
                 txtBypassSize.Text = order.BypassSize ?? "";
                 txtBypassType.Text = order.BypassType ?? "";
 
+                // LamelThickness - Değeri olduğu gibi göster
                 if (order.LamelThickness.HasValue)
                 {
-                    // ComboBox'taki değerlerle decimal karşılaştırması yap
+                    string thicknessStr = order.LamelThickness.Value.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
+                    
                     for (int i = 0; i < cmbLamelThickness.Items.Count; i++)
                     {
                         var itemValue = cmbLamelThickness.Items[i].ToString();
-                        // Decimal karşılaştırması yap (InvariantCulture kullan)
-                        if (decimal.TryParse(itemValue.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal itemDecimal) && 
-                            itemDecimal == order.LamelThickness.Value)
+                        if (itemValue.Replace(",", ".") == thicknessStr)
                         {
                             cmbLamelThickness.SelectedIndex = i;
                             break;
@@ -1033,114 +741,13 @@ namespace ERP.UI.Forms
                 }
 
                 nudQuantity.Value = order.Quantity;
-                txtSalesPriceUSD.Text = order.SalesPrice?.ToString("N2") ?? "0,00";
-                CalculateTotalPriceUSD();
-                txtCurrencyRate.Text = order.CurrencyRate?.ToString("N4") ?? "0,00";
-                
-                // Toplam fiyat TL'yi hesapla ve göster
-                CalculateTotalPriceTL();
-
-                if (order.ShipmentDate.HasValue)
-                {
-                    dtpShipmentDate.Value = order.ShipmentDate.Value;
-                }
-
-                // IsStockOrder - Artık gösterilmiyor (stok ayrı ekrandan giriliyor)
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Sipariş yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void SetFormReadOnly(bool readOnly, bool isReadyForShipment = false)
-        {
-            // Sevkiyata Hazır durumunda sadece sevk tarihi editable
-            if (isReadyForShipment)
-            {
-                // Tüm alanları readonly yap
-                if (cmbCompany != null)
-                {
-                    cmbCompany.Enabled = false;
-                    cmbCompany.BackColor = ThemeColors.SurfaceDark;
-                }
-                if (btnAddCompany != null) btnAddCompany.Enabled = false;
-                if (txtCustomerOrderNo != null) txtCustomerOrderNo.ReadOnly = true;
-                // txtTrexOrderNo readonly olmasın - düzeltilebilsin
-                if (txtDeviceName != null) txtDeviceName.ReadOnly = true;
-                if (dtpOrderDate != null) dtpOrderDate.Enabled = false;
-                if (dtpTermDate != null) dtpTermDate.Enabled = false;
-                if (btnProductCode != null) btnProductCode.Enabled = false;
-                if (txtProductCode != null) txtProductCode.ReadOnly = true;
-                if (txtBypassSize != null) txtBypassSize.ReadOnly = true;
-                if (txtBypassType != null) txtBypassType.ReadOnly = true;
-                if (cmbLamelThickness != null)
-                {
-                    cmbLamelThickness.Enabled = false;
-                    cmbLamelThickness.BackColor = ThemeColors.SurfaceDark;
-                }
-                if (cmbProductType != null)
-                {
-                    cmbProductType.Enabled = false;
-                    cmbProductType.BackColor = ThemeColors.SurfaceDark;
-                }
-                if (nudQuantity != null) nudQuantity.Enabled = false;
-                if (txtSalesPriceUSD != null) txtSalesPriceUSD.ReadOnly = true;
-                
-                // Sadece sevk tarihi editable
-                if (dtpShipmentDate != null) dtpShipmentDate.Enabled = true;
-                
-                // Kaydet butonu görünür (sevk tarihi güncellemek için)
-                if (btnSave != null) btnSave.Visible = true;
-                
-                // Başlık güncelle
-                if (lblTitle != null)
-                {
-                    lblTitle.Text = "Sipariş Detayları - Sevkiyata Hazır (Sadece Sevk Tarihi Düzenlenebilir)";
-                    lblTitle.ForeColor = ThemeColors.Info;
-                }
-                
-                return;
-            }
-            
-            // Normal readonly modu (Üretimde veya Muhasebede)
-            if (cmbCompany != null)
-            {
-                cmbCompany.Enabled = !readOnly;
-                cmbCompany.BackColor = readOnly ? ThemeColors.SurfaceDark : Color.White;
-            }
-            if (btnAddCompany != null) btnAddCompany.Enabled = !readOnly;
-            if (txtCustomerOrderNo != null) txtCustomerOrderNo.ReadOnly = readOnly;
-            if (txtDeviceName != null) txtDeviceName.ReadOnly = readOnly;
-            if (dtpOrderDate != null) dtpOrderDate.Enabled = !readOnly;
-            if (dtpTermDate != null) dtpTermDate.Enabled = !readOnly;
-            if (btnProductCode != null) btnProductCode.Enabled = !readOnly;
-            if (txtProductCode != null) txtProductCode.ReadOnly = readOnly;
-            if (txtBypassSize != null) txtBypassSize.ReadOnly = readOnly;
-            if (txtBypassType != null) txtBypassType.ReadOnly = readOnly;
-            if (cmbLamelThickness != null)
-            {
-                cmbLamelThickness.Enabled = !readOnly;
-                cmbLamelThickness.BackColor = readOnly ? ThemeColors.SurfaceDark : Color.White;
-            }
-            if (cmbProductType != null)
-            {
-                cmbProductType.Enabled = !readOnly;
-                cmbProductType.BackColor = readOnly ? ThemeColors.SurfaceDark : Color.White;
-            }
-            if (nudQuantity != null) nudQuantity.Enabled = !readOnly;
-            if (txtSalesPriceUSD != null) txtSalesPriceUSD.ReadOnly = readOnly;
-            if (dtpShipmentDate != null) dtpShipmentDate.Enabled = !readOnly;
-            
-            // Kaydet butonunu gizle
-            if (btnSave != null) btnSave.Visible = !readOnly;
-            
-            // Başlık güncelle
-            if (lblTitle != null && readOnly)
-            {
-                lblTitle.Text = "Sipariş Detayları (Sadece Görüntüleme)";
-                lblTitle.ForeColor = ThemeColors.Warning;
+                MessageBox.Show("Stok girişi yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }
 }
+
+

@@ -24,6 +24,8 @@ namespace ERP.UI.Services
             var orderEntryItem = new MenuItem("📝 Sipariş Girişi", "OrderEntry", "📝", 2);
             orderEntryItem.AddSubMenuItem(new MenuItem("📋 Siparişleri Görüntüle", "OrderList", "📋", 1));
             orderEntryItem.AddSubMenuItem(new MenuItem("➕ Yeni Sipariş", "OrderCreate", "➕", 2));
+            
+            var stockEntryItem = new MenuItem("📦 Stok Girişi", "StockEntry", "📦", 2);
 
             var productionItem = new MenuItem("🏭 Üretim Planlama", "Production", "🏭", 5);
             productionItem.AddSubMenuItem(new MenuItem("📋 Üretim Ayrıntı", "Production", "📋", 1));
@@ -51,12 +53,14 @@ namespace ERP.UI.Services
             {
                 new MenuItem("🏠 Ana Sayfa", "Home", "🏠", 1),
                 orderEntryItem,
+                stockEntryItem,
                 new MenuItem("💰 Muhasebe", "Accounting", "💰", 3),
                 stockItem,
                 productionItem,
                 new MenuItem("📋 Kesim Talepleri", "CuttingRequests", "📋", 5),
                 new MenuItem("📋 Pres Talepleri", "PressingRequests", "📋", 6),
                 new MenuItem("📋 Kenetleme Talepleri", "ClampingRequests", "📋", 7),
+                new MenuItem("📋 Montaj Talepleri", "AssemblyRequests", "📋", 8),
                 consumptionItem,
                 reportsItem,
                 new MenuItem("⚙️ Ayarlar", "Settings", "⚙️", 11)

@@ -979,22 +979,22 @@ namespace ERP.UI.Forms
 
                     // Pres talebi oluştur
                     var pressingRequest = new PressingRequest
-                    {
-                        OrderId = _orderId,
+                {
+                    OrderId = _orderId,
                         PlateThickness = plateThickness,
                         Hatve = hatve,
                         Size = size,
                         SerialNoId = cutting.SerialNoId,
                         CuttingId = cutting.Id,
                         RequestedPressCount = kullanilacakAdet,
-                        PressNo = _txtPressNo.Text,
-                        Pressure = decimal.Parse(_txtPressure.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
+                    PressNo = _txtPressNo.Text,
+                    Pressure = decimal.Parse(_txtPressure.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
                         WasteAmount = !string.IsNullOrWhiteSpace(_txtWasteAmount.Text) ? 
                                      decimal.Parse(_txtWasteAmount.Text, NumberStyles.Any, CultureInfo.InvariantCulture) : 0,
-                        EmployeeId = _cmbEmployee.SelectedItem != null ? GetSelectedId(_cmbEmployee) : (Guid?)null,
+                    EmployeeId = _cmbEmployee.SelectedItem != null ? GetSelectedId(_cmbEmployee) : (Guid?)null,
                         Status = "Beklemede",
                         RequestDate = DateTime.Now
-                    };
+                };
 
                     _pressingRequestRepository.Insert(pressingRequest);
                 }

@@ -121,7 +121,7 @@ namespace ERP.UI.Forms
                 Name = "ActualPressCount",
                 Width = 150,
                 Text = "Gir",
-                UseColumnTextForButtonValue = true
+                UseColumnTextForButtonValue = false // Dinamik buton metni için false
             };
             colActualPressCount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             _dataGridView.Columns.Add(colActualPressCount);
@@ -133,7 +133,7 @@ namespace ERP.UI.Forms
                 Name = "ResultedPressCount",
                 Width = 180,
                 Text = "Gir",
-                UseColumnTextForButtonValue = true
+                UseColumnTextForButtonValue = false // Dinamik buton metni için false
             };
             colResultedPressCount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             _dataGridView.Columns.Add(colResultedPressCount);
@@ -165,6 +165,9 @@ namespace ERP.UI.Forms
 
             // CellClick event'i - buton kolonuna tıklandığında dialog aç
             _dataGridView.CellClick += DataGridView_CellClick;
+            
+            // CellFormatting event'i - buton metnini dinamik olarak ayarla
+            _dataGridView.CellFormatting += DataGridView_CellFormatting;
 
             // Event handler
             btnYenile.Click += (s, e) => LoadData();
@@ -237,6 +240,61 @@ namespace ERP.UI.Forms
             catch (Exception ex)
             {
                 MessageBox.Show("Pres talepleri yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void DataGridView_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (e.RowIndex >= 0)
+            {
+                var columnName = _dataGridView.Columns[e.ColumnIndex].Name;
+                var row = _dataGridView.Rows[e.RowIndex];
+                
+                if (row.DataBoundItem != null)
+                {
+                    var item = row.DataBoundItem;
+                    
+                    // ActualPressCount buton kolonu için
+                    if (columnName == "ActualPressCount")
+                    {
+                        var actualPressCountProperty = item.GetType().GetProperty("ActualPressCount");
+                        if (actualPressCountProperty != null)
+                        {
+                            var actualPressCountValue = actualPressCountProperty.GetValue(item)?.ToString();
+                            
+                            if (!string.IsNullOrWhiteSpace(actualPressCountValue))
+                            {
+                                e.Value = $"Girildi ({actualPressCountValue})";
+                                e.FormattingApplied = true;
+                            }
+                            else
+                            {
+                                e.Value = "Gir";
+                                e.FormattingApplied = true;
+                            }
+                        }
+                    }
+                    // ResultedPressCount buton kolonu için
+                    else if (columnName == "ResultedPressCount")
+                    {
+                        var resultedPressCountProperty = item.GetType().GetProperty("ResultedPressCount");
+                        if (resultedPressCountProperty != null)
+                        {
+                            var resultedPressCountValue = resultedPressCountProperty.GetValue(item)?.ToString();
+                            
+                            if (!string.IsNullOrWhiteSpace(resultedPressCountValue))
+                            {
+                                e.Value = $"Girildi ({resultedPressCountValue})";
+                                e.FormattingApplied = true;
+                            }
+                            else
+                            {
+                                e.Value = "Gir";
+                                e.FormattingApplied = true;
+                            }
+                        }
+                    }
+                }
             }
         }
 

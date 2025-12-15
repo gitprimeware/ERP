@@ -31,6 +31,12 @@ namespace ERP.UI.Services
                 return new OrderEntryForm(orderId);
             }
 
+            // StockEntryForm için özel işlem
+            if (metadata.FormType == typeof(StockEntryForm) && orderId != Guid.Empty)
+            {
+                return new StockEntryForm(orderId);
+            }
+
             // AccountingEntryForm için özel işlem
             if (metadata.FormType == typeof(AccountingEntryForm) && orderId != Guid.Empty)
             {
@@ -62,6 +68,7 @@ namespace ERP.UI.Services
             RegisterForm("OrderList", typeof(OrderListForm), "Siparişleri Görüntüle");
             RegisterForm("OrderCreate", typeof(OrderEntryForm), "Yeni Sipariş");
             RegisterForm("OrderEntry", typeof(OrderEntryForm), "Sipariş Girişi"); // Backward compatibility
+            RegisterForm("StockEntry", typeof(StockEntryForm), "Stok Girişi");
             RegisterForm("Accounting", typeof(AccountingForm), "Muhasebe");
             RegisterForm("AccountingEntry", typeof(AccountingEntryForm), "Muhasebe İşlemi");
             RegisterForm("Production", typeof(ProductionListForm), "Üretim");
@@ -69,6 +76,7 @@ namespace ERP.UI.Services
             RegisterForm("CuttingRequests", typeof(CuttingRequestsForm), "Kesim Talepleri");
             RegisterForm("PressingRequests", typeof(PressingRequestsForm), "Pres Talepleri");
             RegisterForm("ClampingRequests", typeof(ClampingRequestsForm), "Kenetleme Talepleri");
+            RegisterForm("AssemblyRequests", typeof(AssemblyRequestsForm), "Montaj Talepleri");
             RegisterForm("RuloStokTakip", typeof(RuloStokTakipForm), "Rulo Stok Takip");
             RegisterForm("KesilmisStokTakip", typeof(KesilmisStokTakipForm), "Kesilmiş Stok Takip");
             RegisterForm("PreslenmisStokTakip", typeof(PreslenmisStokTakipForm), "Preslenmiş Stok Takip");

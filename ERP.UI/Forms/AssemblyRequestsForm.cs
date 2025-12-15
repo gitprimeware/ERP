@@ -10,18 +10,18 @@ using ERP.UI.UI;
 
 namespace ERP.UI.Forms
 {
-    public partial class ClampingRequestsForm : UserControl
+    public partial class AssemblyRequestsForm : UserControl
     {
         private Panel _mainPanel;
         private DataGridView _dataGridView;
-        private ClampingRequestRepository _clampingRequestRepository;
-        private PressingRepository _pressingRepository;
+        private AssemblyRequestRepository _assemblyRequestRepository;
+        private ClampingRepository _clampingRepository;
         private OrderRepository _orderRepository;
 
-        public ClampingRequestsForm()
+        public AssemblyRequestsForm()
         {
-            _clampingRequestRepository = new ClampingRequestRepository();
-            _pressingRepository = new PressingRepository();
+            _assemblyRequestRepository = new AssemblyRequestRepository();
+            _clampingRepository = new ClampingRepository();
             _orderRepository = new OrderRepository();
             InitializeCustomComponents();
         }
@@ -49,7 +49,7 @@ namespace ERP.UI.Forms
             // Başlık
             var titleLabel = new Label
             {
-                Text = "📋 Kenetleme Talepleri",
+                Text = "📋 Montaj Talepleri",
                 Font = new Font("Segoe UI", 18F, FontStyle.Bold),
                 ForeColor = ThemeColors.Primary,
                 AutoSize = true,
@@ -106,38 +106,38 @@ namespace ERP.UI.Forms
             };
             _dataGridView.Columns.Add(colId);
             
-            AddClampingRequestColumn("Hatve", "Hatve", 80);
-            AddClampingRequestColumn("Size", "Ölçü", 80);
-            AddClampingRequestColumn("PlateThickness", "Plaka Kalınlığı", 120);
-            AddClampingRequestColumn("Length", "Uzunluk", 100);
-            AddClampingRequestColumn("SerialNumber", "Rulo Seri No", 120);
-            AddClampingRequestColumn("RequestedClampCount", "İstenen Kenetleme", 150);
+            AddAssemblyRequestColumn("Hatve", "Hatve", 80);
+            AddAssemblyRequestColumn("Size", "Ölçü", 80);
+            AddAssemblyRequestColumn("PlateThickness", "Plaka Kalınlığı", 120);
+            AddAssemblyRequestColumn("Length", "Uzunluk", 100);
+            AddAssemblyRequestColumn("SerialNumber", "Rulo Seri No", 120);
+            AddAssemblyRequestColumn("RequestedAssemblyCount", "İstenen Montaj", 150);
             
-            // Kaç Tane Preslenmiş Kenetleneceği - buton kolonu
+            // Kaç Tane Kenet Kullanıldı - buton kolonu
             var colActualClampCount = new DataGridViewButtonColumn
             {
-                HeaderText = "Kaç Tane Preslenmiş Kenetleneceği",
+                HeaderText = "Kaç Tane Kenet Kullanıldı",
                 Name = "ActualClampCount",
-                Width = 200,
+                Width = 180,
                 Text = "Gir",
                 UseColumnTextForButtonValue = false // Dinamik buton metni için false
             };
             colActualClampCount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             _dataGridView.Columns.Add(colActualClampCount);
             
-            // Kaç Tane Oluştu - buton kolonu
-            var colResultedClampCount = new DataGridViewButtonColumn
+            // Kaç Tane Montaj Oluştu - buton kolonu
+            var colResultedAssemblyCount = new DataGridViewButtonColumn
             {
-                HeaderText = "Kaç Tane Oluştu",
-                Name = "ResultedClampCount",
-                Width = 150,
+                HeaderText = "Kaç Tane Montaj Oluştu",
+                Name = "ResultedAssemblyCount",
+                Width = 180,
                 Text = "Gir",
                 UseColumnTextForButtonValue = false // Dinamik buton metni için false
             };
-            colResultedClampCount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            _dataGridView.Columns.Add(colResultedClampCount);
+            colResultedAssemblyCount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            _dataGridView.Columns.Add(colResultedAssemblyCount);
             
-            AddClampingRequestColumn("Status", "Durum", 100);
+            AddAssemblyRequestColumn("Status", "Durum", 100);
 
             // Stil ayarları
             _dataGridView.ColumnHeadersVisible = true;
@@ -186,7 +186,7 @@ namespace ERP.UI.Forms
             _mainPanel.BringToFront();
         }
 
-        private void AddClampingRequestColumn(string dataPropertyName, string headerText, int width)
+        private void AddAssemblyRequestColumn(string dataPropertyName, string headerText, int width)
         {
             var column = new DataGridViewTextBoxColumn
             {
@@ -205,7 +205,7 @@ namespace ERP.UI.Forms
         {
             try
             {
-                var requests = _clampingRequestRepository.GetPendingRequests();
+                var requests = _assemblyRequestRepository.GetPendingRequests();
                 
                 var data = requests.Select(r =>
                 {
@@ -217,9 +217,9 @@ namespace ERP.UI.Forms
                         PlateThickness = r.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
                         Length = r.Length.ToString("F2", CultureInfo.InvariantCulture),
                         SerialNumber = r.SerialNo?.SerialNumber ?? "",
-                        RequestedClampCount = r.RequestedClampCount.ToString(),
+                        RequestedAssemblyCount = r.RequestedAssemblyCount.ToString(),
                         ActualClampCount = r.ActualClampCount.HasValue ? r.ActualClampCount.Value.ToString() : "",
-                        ResultedClampCount = r.ResultedClampCount.HasValue ? r.ResultedClampCount.Value.ToString() : "",
+                        ResultedAssemblyCount = r.ResultedAssemblyCount.HasValue ? r.ResultedAssemblyCount.Value.ToString() : "",
                         Status = r.Status
                     };
                 }).ToList();
@@ -234,7 +234,7 @@ namespace ERP.UI.Forms
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Kenetleme talepleri yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Montaj talepleri yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -269,17 +269,17 @@ namespace ERP.UI.Forms
                             }
                         }
                     }
-                    // ResultedClampCount buton kolonu için
-                    else if (columnName == "ResultedClampCount")
+                    // ResultedAssemblyCount buton kolonu için
+                    else if (columnName == "ResultedAssemblyCount")
                     {
-                        var resultedClampCountProperty = item.GetType().GetProperty("ResultedClampCount");
-                        if (resultedClampCountProperty != null)
+                        var resultedAssemblyCountProperty = item.GetType().GetProperty("ResultedAssemblyCount");
+                        if (resultedAssemblyCountProperty != null)
                         {
-                            var resultedClampCountValue = resultedClampCountProperty.GetValue(item)?.ToString();
+                            var resultedAssemblyCountValue = resultedAssemblyCountProperty.GetValue(item)?.ToString();
                             
-                            if (!string.IsNullOrWhiteSpace(resultedClampCountValue))
+                            if (!string.IsNullOrWhiteSpace(resultedAssemblyCountValue))
                             {
-                                e.Value = $"Girildi ({resultedClampCountValue})";
+                                e.Value = $"Girildi ({resultedAssemblyCountValue})";
                                 e.FormattingApplied = true;
                             }
                             else
@@ -299,7 +299,7 @@ namespace ERP.UI.Forms
                 return;
 
             var columnName = _dataGridView.Columns[e.ColumnIndex].Name;
-            if (columnName != "ActualClampCount" && columnName != "ResultedClampCount")
+            if (columnName != "ActualClampCount" && columnName != "ResultedAssemblyCount")
                 return;
 
             try
@@ -320,7 +320,7 @@ namespace ERP.UI.Forms
                 if (requestId == Guid.Empty)
                     return;
 
-                var request = _clampingRequestRepository.GetById(requestId);
+                var request = _assemblyRequestRepository.GetById(requestId);
                 if (request == null)
                     return;
 
@@ -331,34 +331,34 @@ namespace ERP.UI.Forms
                     if (actualClampCount.HasValue)
                     {
                         request.ActualClampCount = actualClampCount.Value;
-                        request.Status = "Kenetmede";
-                        _clampingRequestRepository.Update(request);
+                        request.Status = "Montajda";
+                        _assemblyRequestRepository.Update(request);
                         LoadData();
                     }
                 }
-                else if (columnName == "ResultedClampCount")
+                else if (columnName == "ResultedAssemblyCount")
                 {
-                    int? resultedClampCount = ShowResultedClampCountDialog(request);
-                    if (resultedClampCount.HasValue)
+                    int? resultedAssemblyCount = ShowResultedAssemblyCountDialog(request);
+                    if (resultedAssemblyCount.HasValue)
                     {
-                        request.ResultedClampCount = resultedClampCount.Value;
-                        request.Status = "Kenetmede";
-                        _clampingRequestRepository.Update(request);
+                        request.ResultedAssemblyCount = resultedAssemblyCount.Value;
+                        request.Status = "Montajda";
+                        _assemblyRequestRepository.Update(request);
                         LoadData();
                     }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Kenetleme adedi girilirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Montaj adedi girilirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        private int? ShowActualClampCountDialog(ClampingRequest request)
+        private int? ShowActualClampCountDialog(AssemblyRequest request)
         {
             using (var dialog = new Form
             {
-                Text = "Kaç Tane Preslenmiş Kenetleneceği",
+                Text = "Kaç Tane Kenet Kullanıldı",
                 Width = 400,
                 Height = 200,
                 StartPosition = FormStartPosition.CenterParent,
@@ -370,7 +370,7 @@ namespace ERP.UI.Forms
             {
                 var lblInfo = new Label
                 {
-                    Text = $"İstenen Kenetleme: {request.RequestedClampCount} adet\n\nKaç tane preslenmiş kenetlenecek?",
+                    Text = $"İstenen Montaj: {request.RequestedAssemblyCount} adet\n\nKaç tane kenet kullanıldı?",
                     Location = new Point(20, 20),
                     Width = 350,
                     Height = 60,
@@ -380,7 +380,7 @@ namespace ERP.UI.Forms
 
                 var lblAdet = new Label
                 {
-                    Text = "Kenetlenecek Adet:",
+                    Text = "Kullanılan Kenet Adedi:",
                     Location = new Point(20, 90),
                     AutoSize = true,
                     Font = new Font("Segoe UI", 10F)
@@ -392,7 +392,7 @@ namespace ERP.UI.Forms
                     Width = 200,
                     Minimum = 0,
                     Maximum = 999999,
-                    Value = request.ActualClampCount ?? request.RequestedClampCount,
+                    Value = request.ActualClampCount ?? request.RequestedAssemblyCount,
                     DecimalPlaces = 0,
                     Font = new Font("Segoe UI", 10F)
                 };
@@ -434,11 +434,11 @@ namespace ERP.UI.Forms
             return null;
         }
 
-        private int? ShowResultedClampCountDialog(ClampingRequest request)
+        private int? ShowResultedAssemblyCountDialog(AssemblyRequest request)
         {
             using (var dialog = new Form
             {
-                Text = "Kaç Tane Oluştu",
+                Text = "Kaç Tane Montaj Oluştu",
                 Width = 400,
                 Height = 200,
                 StartPosition = FormStartPosition.CenterParent,
@@ -450,7 +450,7 @@ namespace ERP.UI.Forms
             {
                 var lblInfo = new Label
                 {
-                    Text = $"Kenetlenecek: {request.ActualClampCount?.ToString() ?? "-"} adet\n\nKaç tane kenetlenmiş oluştu?",
+                    Text = $"İstenen Montaj: {request.RequestedAssemblyCount} adet\n\nKaç tane montaj oluştu?",
                     Location = new Point(20, 20),
                     Width = 350,
                     Height = 60,
@@ -460,7 +460,7 @@ namespace ERP.UI.Forms
 
                 var lblAdet = new Label
                 {
-                    Text = "Oluşan Adet:",
+                    Text = "Oluşan Montaj Adedi:",
                     Location = new Point(20, 90),
                     AutoSize = true,
                     Font = new Font("Segoe UI", 10F)
@@ -472,7 +472,7 @@ namespace ERP.UI.Forms
                     Width = 200,
                     Minimum = 0,
                     Maximum = 999999,
-                    Value = request.ResultedClampCount ?? (request.ActualClampCount ?? 0),
+                    Value = request.ResultedAssemblyCount ?? request.RequestedAssemblyCount,
                     DecimalPlaces = 0,
                     Font = new Font("Segoe UI", 10F)
                 };
@@ -516,8 +516,7 @@ namespace ERP.UI.Forms
 
         private string GetHatveLetter(decimal hatveValue)
         {
-            const decimal tolerance = 0.1m;
-            
+            decimal tolerance = 0.1m;
             if (Math.Abs(hatveValue - 3.25m) < tolerance)
                 return "H";
             else if (Math.Abs(hatveValue - 4.5m) < tolerance)

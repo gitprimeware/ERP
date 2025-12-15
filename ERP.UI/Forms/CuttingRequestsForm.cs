@@ -122,7 +122,7 @@ namespace ERP.UI.Forms
                 Name = "ActualCutCount",
                 Width = 150,
                 Text = "Gir",
-                UseColumnTextForButtonValue = true
+                UseColumnTextForButtonValue = false // Dinamik buton metni için false
             };
             colActualCutCount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             _dataGridView.Columns.Add(colActualCutCount);
@@ -165,6 +165,9 @@ namespace ERP.UI.Forms
 
             // CellClick event'i - buton kolonuna tıklandığında dialog aç
             _dataGridView.CellClick += DataGridView_CellClick;
+            
+            // CellFormatting event'i - buton metnini dinamik olarak ayarla
+            _dataGridView.CellFormatting += DataGridView_CellFormatting;
             
             // CellValueChanged event'i - rulo bitti durumunu değiştirdiğinde kaydet
             _dataGridView.CellValueChanged += DataGridView_CellValueChanged;
@@ -282,6 +285,36 @@ namespace ERP.UI.Forms
             catch (Exception ex)
             {
                 MessageBox.Show("Kesim talepleri yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void DataGridView_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            // Sadece ActualCutCount buton kolonu için
+            if (_dataGridView.Columns[e.ColumnIndex].Name == "ActualCutCount" && e.RowIndex >= 0)
+            {
+                var row = _dataGridView.Rows[e.RowIndex];
+                if (row.DataBoundItem != null)
+                {
+                    var item = row.DataBoundItem;
+                    var actualCutCountProperty = item.GetType().GetProperty("ActualCutCount");
+                    if (actualCutCountProperty != null)
+                    {
+                        var actualCutCountValue = actualCutCountProperty.GetValue(item)?.ToString();
+                        
+                        // Eğer değer varsa "Girildi (X)" göster, yoksa "Gir" göster
+                        if (!string.IsNullOrWhiteSpace(actualCutCountValue))
+                        {
+                            e.Value = $"Girildi ({actualCutCountValue})";
+                            e.FormattingApplied = true;
+                        }
+                        else
+                        {
+                            e.Value = "Gir";
+                            e.FormattingApplied = true;
+                        }
+                    }
+                }
             }
         }
 

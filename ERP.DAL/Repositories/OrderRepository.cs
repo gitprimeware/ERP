@@ -178,6 +178,22 @@ namespace ERP.DAL.Repositories
             }
         }
 
+        public int GetNextStockNumber(int year)
+        {
+            using (var connection = DatabaseHelper.GetConnection())
+            {
+                connection.Open();
+                var query = "SELECT COUNT(*) + 1 FROM Orders WHERE YEAR(OrderDate) = @Year AND IsActive = 1 AND IsStockOrder = 1";
+                
+                using (var command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@Year", year);
+                    var result = command.ExecuteScalar();
+                    return result != null ? Convert.ToInt32(result) : 1;
+                }
+            }
+        }
+
         private void AddOrderParameters(SqlCommand command, Order order)
         {
             command.Parameters.AddWithValue("@Id", order.Id);

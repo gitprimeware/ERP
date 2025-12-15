@@ -69,6 +69,7 @@ namespace ERP.UI.Forms
         private CuttingRequestRepository _cuttingRequestRepository;
         private PressingRequestRepository _pressingRequestRepository;
         private ClampingRequestRepository _clampingRequestRepository;
+        private AssemblyRequestRepository _assemblyRequestRepository;
         private MaterialEntryRepository _materialEntryRepository;
         private PressingRepository _pressingRepository;
         private ClampingRepository _clampingRepository;
@@ -90,6 +91,7 @@ namespace ERP.UI.Forms
             _cuttingRequestRepository = new CuttingRequestRepository();
             _pressingRequestRepository = new PressingRequestRepository();
             _clampingRequestRepository = new ClampingRequestRepository();
+            _assemblyRequestRepository = new AssemblyRequestRepository();
             _materialEntryRepository = new MaterialEntryRepository();
             _pressingRepository = new PressingRepository();
             _clampingRepository = new ClampingRepository();
@@ -2451,9 +2453,16 @@ namespace ERP.UI.Forms
                 BackColor = Color.White
             };
 
+            // Onayla butonu (Montaj taleplerini onaylamak için)
+            var btnOnayla = ButtonFactory.CreateActionButton("✅ Montaj Talebini Onayla", ThemeColors.Success, Color.White, 220, 35);
+            btnOnayla.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnOnayla.Location = new Point(buttonPanel.Width - 220, 5);
+            buttonPanel.Controls.Add(btnOnayla);
+
             // Ekle butonu
             var btnEkle = ButtonFactory.CreateActionButton("➕ Ekle", ThemeColors.Primary, Color.White, 120, 35);
             btnEkle.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnEkle.Location = new Point(buttonPanel.Width - 220 - 130, 5);
             buttonPanel.Controls.Add(btnEkle);
 
             // DataGridView paneli
@@ -2527,6 +2536,7 @@ namespace ERP.UI.Forms
 
             // Event handler
             btnEkle.Click += (s, e) => BtnAssemblyEkle_Click(dataGridView);
+            btnOnayla.Click += (s, e) => BtnAssemblyRequestOnayla_Click(dataGridView);
 
             // Verileri yükle
             LoadAssemblyData(dataGridView);
@@ -2600,7 +2610,7 @@ namespace ERP.UI.Forms
         {
             try
             {
-                using (var dialog = new AssemblyDialog(_employeeRepository, _orderId))
+                using (var dialog = new AssemblyDialog(_serialNoRepository, _employeeRepository, _machineRepository, _orderId))
                 {
                     if (dialog.ShowDialog() == DialogResult.OK)
                     {
@@ -2612,6 +2622,159 @@ namespace ERP.UI.Forms
             catch (Exception ex)
             {
                 MessageBox.Show("Montaj eklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BtnAssemblyRequestOnayla_Click(DataGridView dataGridView)
+        {
+            try
+            {
+                // Bu siparişe ait bekleyen montaj taleplerini getir
+                // Sadece bu sipariş için oluşturulmuş talepleri göster (nerede oluşturulduysa orada göster)
+                var pendingRequests = _assemblyRequestRepository.GetAll()
+                    .Where(r => r.OrderId == _orderId && (r.Status == "Montajda" || r.Status == "Beklemede")).ToList();
+
+                if (pendingRequests.Count == 0)
+                {
+                    MessageBox.Show("Bu sipariş için onaylanacak montaj talebi bulunmamaktadır.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                // Eğer birden fazla talep varsa, kullanıcıdan seçmesini iste
+                AssemblyRequest selectedRequest = null;
+                if (pendingRequests.Count == 1)
+                {
+                    selectedRequest = pendingRequests.First();
+                }
+                else
+                {
+                    // Dialog ile seçim yap
+                    using (var selectDialog = new Form
+                    {
+                        Text = "Montaj Talebi Seç",
+                        Width = 800,
+                        Height = 500,
+                        StartPosition = FormStartPosition.CenterParent,
+                        FormBorderStyle = FormBorderStyle.FixedDialog,
+                        MaximizeBox = false
+                    })
+                    {
+                        var dgv = new DataGridView
+                        {
+                            Dock = DockStyle.Fill,
+                            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                            AllowUserToAddRows = false,
+                            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                            MultiSelect = false
+                        };
+
+                        dgv.AutoGenerateColumns = false;
+                        
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Id", DataPropertyName = "Id", HeaderText = "Id", Visible = false });
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Hatve", DataPropertyName = "Hatve", HeaderText = "Hatve" });
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Size", DataPropertyName = "Size", HeaderText = "Ölçü" });
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "RequestedAssemblyCount", DataPropertyName = "RequestedAssemblyCount", HeaderText = "İstenen" });
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "ActualClampCount", DataPropertyName = "ActualClampCount", HeaderText = "Kullanılan Kenet" });
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "ResultedAssemblyCount", DataPropertyName = "ResultedAssemblyCount", HeaderText = "Oluşan Montaj" });
+                        dgv.Columns.Add(new DataGridViewTextBoxColumn { Name = "Status", DataPropertyName = "Status", HeaderText = "Durum" });
+
+                        dgv.DataSource = pendingRequests.Select(r => new
+                        {
+                            Id = r.Id,
+                            Hatve = GetHatveLetter(r.Hatve),
+                            Size = r.Size.ToString("F1", CultureInfo.InvariantCulture),
+                            RequestedAssemblyCount = r.RequestedAssemblyCount,
+                            ActualClampCount = r.ActualClampCount?.ToString() ?? "-",
+                            ResultedAssemblyCount = r.ResultedAssemblyCount?.ToString() ?? "-",
+                            Status = r.Status
+                        }).ToList();
+
+                        var btnSelect = new Button
+                        {
+                            Text = "Seç",
+                            DialogResult = DialogResult.OK,
+                            Dock = DockStyle.Bottom,
+                            Height = 40
+                        };
+
+                        selectDialog.Controls.Add(dgv);
+                        selectDialog.Controls.Add(btnSelect);
+                        selectDialog.AcceptButton = btnSelect;
+
+                        if (selectDialog.ShowDialog() == DialogResult.OK && dgv.SelectedRows.Count > 0)
+                        {
+                            var selectedRow = dgv.SelectedRows[0];
+                            if (selectedRow != null && selectedRow.Cells["Id"] != null && selectedRow.Cells["Id"].Value != null)
+                            {
+                                var selectedId = (Guid)selectedRow.Cells["Id"].Value;
+                                selectedRequest = pendingRequests.FirstOrDefault(r => r.Id == selectedId);
+                            }
+                        }
+                    }
+                }
+
+                if (selectedRequest == null)
+                    return;
+
+                // Kenet adedi girilmiş mi kontrol et
+                if (!selectedRequest.ActualClampCount.HasValue)
+                {
+                    MessageBox.Show("Lütfen önce kaç tane kenet kullanıldığını giriniz (Montaj Talepleri sayfasından).", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Oluşan montaj adedi girilmiş mi kontrol et
+                if (!selectedRequest.ResultedAssemblyCount.HasValue)
+                {
+                    MessageBox.Show("Lütfen önce kaç tane montaj oluştuğunu giriniz (Montaj Talepleri sayfasından).", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Onaylama işlemi
+                var result = MessageBox.Show(
+                    $"Montaj talebi onaylanacak:\n\n" +
+                    $"İstenen: {selectedRequest.RequestedAssemblyCount} adet\n" +
+                    $"Kullanılan Kenet (kenetlenmiş stoktan): {selectedRequest.ActualClampCount.Value} adet\n" +
+                    $"Oluşan Montaj (montajlanmış stoğa): {selectedRequest.ResultedAssemblyCount.Value} adet\n\n" +
+                    $"Onaylamak istediğinize emin misiniz?",
+                    "Montaj Talebi Onayla",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question);
+
+                if (result != DialogResult.Yes)
+                    return;
+
+                // Durumu "Tamamlandı" yap
+                selectedRequest.Status = "Tamamlandı";
+                selectedRequest.CompletionDate = DateTime.Now;
+                _assemblyRequestRepository.Update(selectedRequest);
+
+                // Montaj kaydı oluştur (Assembly) - ResultedAssemblyCount montajlanmış stoğa eklenecek
+                var assembly = new Assembly
+                {
+                    OrderId = selectedRequest.OrderId,
+                    ClampingId = selectedRequest.ClampingId,
+                    PlateThickness = selectedRequest.PlateThickness,
+                    Hatve = selectedRequest.Hatve,
+                    Size = selectedRequest.Size,
+                    Length = selectedRequest.Length,
+                    SerialNoId = selectedRequest.SerialNoId,
+                    MachineId = selectedRequest.MachineId,
+                    AssemblyCount = selectedRequest.ResultedAssemblyCount.Value, // Oluşan montaj adedi
+                    UsedClampCount = selectedRequest.ActualClampCount.Value, // Kullanılan kenet adedi
+                    EmployeeId = selectedRequest.EmployeeId,
+                    AssemblyDate = DateTime.Now
+                };
+                _assemblyRepository.Insert(assembly);
+
+                MessageBox.Show("Montaj talebi onaylandı ve montaj kaydı oluşturuldu!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                // Verileri yeniden yükle
+                LoadAssemblyData(dataGridView);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Montaj talebi onaylanırken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

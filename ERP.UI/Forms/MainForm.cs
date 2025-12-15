@@ -97,6 +97,10 @@ namespace ERP.UI.Forms
             {
                 _contentManager.ShowForm("OrderCreate");
             }
+            else if (formTag == "StockEntry")
+            {
+                _contentManager.ShowForm("StockEntry");
+            }
             else if (formTag == "Accounting")
             {
                 _contentManager.ShowForm("Accounting");
@@ -117,6 +121,10 @@ namespace ERP.UI.Forms
             else if (formTag == "ClampingRequests")
             {
                 _contentManager.ShowForm("ClampingRequests");
+            }
+            else if (formTag == "AssemblyRequests")
+            {
+                _contentManager.ShowForm("AssemblyRequests");
             }
             else if (formTag == "RuloStokTakip")
             {
