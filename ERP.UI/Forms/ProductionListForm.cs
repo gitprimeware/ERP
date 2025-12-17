@@ -18,6 +18,7 @@ namespace ERP.UI.Forms
         private CheckBox _chkTableView;
         private OrderRepository _orderRepository;
         private CompanyRepository _companyRepository;
+        private AssemblyRepository _assemblyRepository;
         private bool _isTableView = true; // Default tablo görünümü
         private ToolTip _actionToolTip;
         private string _currentToolTipText = "";
@@ -42,6 +43,7 @@ namespace ERP.UI.Forms
         {
             _orderRepository = new OrderRepository();
             _companyRepository = new CompanyRepository();
+            _assemblyRepository = new AssemblyRepository();
             _actionToolTip = new ToolTip();
             _actionToolTip.IsBalloon = false;
             _actionToolTip.ShowAlways = false;
@@ -300,35 +302,15 @@ namespace ERP.UI.Forms
                     plakaOlcusu = roundedPlakaOlcusu.ToString(); // MM cinsinden göster
                 }
 
-                // Yükseklik: Rapor formülüne göre
+                // Yükseklik: Direkt yüksekliği göster (kapak çıkarmadan)
                 // Yükseklik <= 1800 ise Yükseklik, > 1800 ise Yükseklik/2
-                // Sonra kapak değeri çıkarılır
                 if (parts.Length >= 5 && int.TryParse(parts[4], out int yukseklikMM))
                 {
                     // Yükseklik com hesaplama
                     int yukseklikCom = yukseklikMM <= 1800 ? yukseklikMM : yukseklikMM / 2;
                     
-                    // Kapak değeri
-                    int kapakDegeri = 16; // Varsayılan
-                    if (parts.Length >= 6)
-                    {
-                        string kapakStr = parts[5];
-                        if (kapakStr == "030" || kapakStr == "002")
-                            kapakDegeri = 16; // (30+2)/2 = 16
-                        else if (kapakStr == "016")
-                            kapakDegeri = 16;
-                        else if (int.TryParse(kapakStr, out int kapakVal))
-                        {
-                            if (kapakVal == 30 || kapakVal == 2)
-                                kapakDegeri = 16;
-                            else
-                                kapakDegeri = kapakVal;
-                        }
-                    }
-                    
-                    // Rapor yükseklik = Yükseklik com - Kapak
-                    int raporYukseklik = yukseklikCom - kapakDegeri;
-                    yukseklik = raporYukseklik.ToString();
+                    // Direkt yüksekliği göster (kapak çıkarmadan)
+                    yukseklik = yukseklikCom.ToString();
                 }
 
                 // Kapak: 030 -> 30
@@ -396,8 +378,8 @@ namespace ERP.UI.Forms
                 _dataGridView.CellPainting -= DataGridView_CellPainting;
 
                 // DataSource'u sıfırla ve kolonları temizle
-                _dataGridView.DataSource = null;
-                _dataGridView.Columns.Clear();
+            _dataGridView.DataSource = null;
+            _dataGridView.Columns.Clear();
                 _dataGridView.Rows.Clear();
                 _dataGridView.Tag = null;
 
@@ -408,53 +390,53 @@ namespace ERP.UI.Forms
                 // Application.DoEvents() çağırarak UI'ın güncellenmesini sağla
                 Application.DoEvents();
 
-                if (orders.Count == 0)
-                {
-                    return;
-                }
+            if (orders.Count == 0)
+            {
+                return;
+            }
 
-                _dataGridView.AutoGenerateColumns = false;
+            _dataGridView.AutoGenerateColumns = false;
 
                 // Kolonları ekle - İstenen sıraya göre
-                _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
-                {
-                    DataPropertyName = "TrexOrderNo",
-                    HeaderText = "Trex Sipariş No",
-                    Name = "TrexOrderNo",
+            _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "TrexOrderNo",
+                HeaderText = "Trex Sipariş No",
+                Name = "TrexOrderNo",
                     Width = 150,
                     SortMode = DataGridViewColumnSortMode.Programmatic
-                });
+            });
 
-                var companyColumn = new DataGridViewTextBoxColumn
-                {
-                    DataPropertyName = "CompanyName",
-                    HeaderText = "Firma",
-                    Name = "CompanyName",
+            var companyColumn = new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "CompanyName",
+                HeaderText = "Firma",
+                Name = "CompanyName",
                     Width = 200,
                     SortMode = DataGridViewColumnSortMode.Programmatic
-                };
-                _dataGridView.Columns.Add(companyColumn);
+            };
+            _dataGridView.Columns.Add(companyColumn);
 
-                _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
-                {
-                    DataPropertyName = "ProductCode",
-                    HeaderText = "Ürün Kodu",
-                    Name = "ProductCode",
+            _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "ProductCode",
+                HeaderText = "Ürün Kodu",
+                Name = "ProductCode",
                     Width = 200,
                     SortMode = DataGridViewColumnSortMode.Programmatic
-                });
+            });
 
-                _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
-                {
+            _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+            {
                     DataPropertyName = "Hatve",
                     HeaderText = "Hatve",
                     Name = "Hatve",
                     Width = 100,
                     SortMode = DataGridViewColumnSortMode.Programmatic
-                });
+            });
 
-                _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
-                {
+            _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+            {
                     DataPropertyName = "PlakaOlcusu",
                     HeaderText = "Plaka Ölçüsü",
                     Name = "PlakaOlcusu",
@@ -508,41 +490,41 @@ namespace ERP.UI.Forms
                 });
 
                 // İşlemler kolonu (emoji butonları)
-                var actionsColumn = new DataGridViewButtonColumn
-                {
-                    HeaderText = "İşlemler",
-                    Name = "Actions",
+            var actionsColumn = new DataGridViewButtonColumn
+            {
+                HeaderText = "İşlemler",
+                Name = "Actions",
                     Width = 220,
-                    Text = "",
-                    UseColumnTextForButtonValue = false
-                };
-                _dataGridView.Columns.Add(actionsColumn);
+                Text = "",
+                UseColumnTextForButtonValue = false
+            };
+            _dataGridView.Columns.Add(actionsColumn);
 
                 // DataSource için özel bir liste oluştur - Ürün kodundan parse edilen değerlerle
                 var dataSource = orders.Select(o => 
                 {
                     var parsedData = ParseProductCodeForTable(o.ProductCode);
                     return new
-                    {
-                        o.Id,
-                        o.TrexOrderNo,
-                        CompanyName = o.Company?.Name ?? "",
-                        o.ProductCode,
+            {
+                o.Id,
+                o.TrexOrderNo,
+                CompanyName = o.Company?.Name ?? "",
+                o.ProductCode,
                         Hatve = parsedData.Hatve,
                         PlakaOlcusu = parsedData.PlakaOlcusu,
                         Yukseklik = parsedData.Yukseklik,
                         Kapak = parsedData.Kapak,
                         Profil = parsedData.Profil,
                         LamelThickness = o.LamelThickness.HasValue ? o.LamelThickness.Value.ToString("0.000", System.Globalization.CultureInfo.GetCultureInfo("tr-TR")) : "",
-                        o.Quantity,
-                        o.Status,
+                o.Quantity,
+                o.Status,
                         IsInProduction = o.Status == "Üretimde",
                         IsStockOrder = o.IsStockOrder
                     };
-                }).ToList();
+            }).ToList();
 
-                _dataGridView.Tag = orders; // Orijinal order listesini sakla
-                
+            _dataGridView.Tag = orders; // Orijinal order listesini sakla
+
                 // DataSource'u ayarla
                 _dataGridView.DataSource = dataSource;
 
@@ -552,7 +534,7 @@ namespace ERP.UI.Forms
                 _dataGridView.RowPrePaint += DataGridView_RowPrePaint;
                 _dataGridView.CellPainting += DataGridView_CellPainting;
 
-                // Stil ayarları
+            // Stil ayarları
                 _dataGridView.BackgroundColor = Color.White;
                 _dataGridView.DefaultCellStyle.SelectionBackColor = Color.FromArgb(220, ThemeColors.Primary.R, ThemeColors.Primary.G, ThemeColors.Primary.B);
                 _dataGridView.GridColor = Color.FromArgb(230, 230, 230);
@@ -560,11 +542,11 @@ namespace ERP.UI.Forms
                 _dataGridView.ColumnHeadersVisible = true; // Başlıklar görünür olmalı
                 _dataGridView.ColumnHeadersHeight = 40;
                 _dataGridView.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
-                _dataGridView.ColumnHeadersDefaultCellStyle.BackColor = ThemeColors.Primary;
-                _dataGridView.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
-                _dataGridView.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            _dataGridView.ColumnHeadersDefaultCellStyle.BackColor = ThemeColors.Primary;
+            _dataGridView.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            _dataGridView.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
                 _dataGridView.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-                _dataGridView.EnableHeadersVisualStyles = false;
+            _dataGridView.EnableHeadersVisualStyles = false;
                 _dataGridView.RowHeadersVisible = false;
                 _dataGridView.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
                 _dataGridView.BorderStyle = BorderStyle.None;
@@ -572,11 +554,11 @@ namespace ERP.UI.Forms
                 // Sütun filtre panelini güncelle
                 UpdateColumnFilterPanel();
 
-                // Buton kolonu stil
+            // Buton kolonu stil
                 if (_dataGridView.Columns["Actions"] != null)
                 {
                     _dataGridView.Columns["Actions"].DefaultCellStyle.Font = new Font("Segoe UI", 10F);
-                    _dataGridView.Columns["Actions"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            _dataGridView.Columns["Actions"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
                     _dataGridView.Columns["Actions"].DefaultCellStyle.Padding = new Padding(2, 2, 2, 2);
                 }
                 
@@ -704,7 +686,7 @@ namespace ERP.UI.Forms
                                 ProductionReportRequested?.Invoke(this, order.Id);
                                 break;
                             case 1: // 📋 Ayrıntı
-                                ProductionDetailRequested?.Invoke(this, order.Id);
+                        ProductionDetailRequested?.Invoke(this, order.Id);
                                 break;
                         }
                     }
@@ -957,8 +939,9 @@ namespace ERP.UI.Forms
             if (row == null) return;
 
             string status = "";
+            Guid orderId = Guid.Empty;
 
-            // Status'u al - önce DataBoundItem'dan
+            // Status'u ve OrderId'yi al - önce DataBoundItem'dan
             if (row.DataBoundItem != null)
             {
                 var rowData = row.DataBoundItem;
@@ -968,26 +951,40 @@ namespace ERP.UI.Forms
                     status = statusProperty.GetValue(rowData)?.ToString() ?? "";
                 }
 
+                var idProperty = rowData.GetType().GetProperty("Id");
+                if (idProperty != null)
+                {
+                    orderId = (Guid)idProperty.GetValue(rowData);
+                }
+
                 // Tag'dan da deneyelim (Order listesi)
                 if (string.IsNullOrEmpty(status) && _dataGridView.Tag is List<Order> orders)
                 {
-                    var idProperty = rowData.GetType().GetProperty("Id");
-                    if (idProperty != null)
+                    var order = orders.FirstOrDefault(o => o.Id == orderId);
+                    if (order != null)
                     {
-                        var orderId = (Guid)idProperty.GetValue(rowData);
-                        var order = orders.FirstOrDefault(o => o.Id == orderId);
-                        if (order != null)
-                        {
-                            status = order.Status ?? "";
-                        }
+                        status = order.Status ?? "";
                     }
                 }
             }
 
             Color rowColor = Color.White;
 
+            // Montaj işlemi tamamlanmış mı kontrol et
+            bool hasCompletedAssembly = false;
+            if (orderId != Guid.Empty)
+            {
+                var assemblies = _assemblyRepository.GetByOrderId(orderId);
+                hasCompletedAssembly = assemblies.Any(a => a.IsActive);
+            }
+
+            // Montaj tamamlanmışsa yeşil renk (sevkiyata hazır)
+            if (hasCompletedAssembly)
+            {
+                rowColor = Color.FromArgb(120, 76, 175, 80); // Yeşil
+            }
             // Sadece "Üretimde" durumu için mavi renklendirme (hafif saydam - Alpha değeri 120)
-            if (status == "Üretimde")
+            else if (status == "Üretimde")
             {
                 rowColor = Color.FromArgb(120, 33, 150, 243); // Mavi
             }
@@ -1097,6 +1094,7 @@ namespace ERP.UI.Forms
 
                 // Status'u al
                 string status = "";
+                Guid orderId = Guid.Empty;
                 if (row.DataBoundItem != null)
                 {
                     var rowData = row.DataBoundItem;
@@ -1105,16 +1103,38 @@ namespace ERP.UI.Forms
                     {
                         status = statusProperty.GetValue(rowData)?.ToString() ?? "";
                     }
+                    
+                    var idProperty = rowData.GetType().GetProperty("Id");
+                    if (idProperty != null)
+                    {
+                        orderId = (Guid)idProperty.GetValue(rowData);
+                    }
                 }
 
                 if (string.IsNullOrEmpty(status) && orders != null && e.RowIndex < orders.Count)
                 {
                     status = orders[e.RowIndex].Status ?? "";
+                    if (orderId == Guid.Empty)
+                    {
+                        orderId = orders[e.RowIndex].Id;
+                    }
                 }
 
-                // Satır rengini status'tan belirle - Sadece "Üretimde" durumu için mavi
+                // Montaj işlemi tamamlanmış mı kontrol et
+                bool hasCompletedAssembly = false;
+                if (orderId != Guid.Empty)
+                {
+                    var assemblies = _assemblyRepository.GetByOrderId(orderId);
+                    hasCompletedAssembly = assemblies.Any(a => a.IsActive);
+                }
+
+                // Satır rengini belirle - Montaj tamamlanmışsa yeşil, üretimde ise mavi
                 Color rowBgColor = Color.White;
-                if (status == "Üretimde")
+                if (hasCompletedAssembly)
+                {
+                    rowBgColor = Color.FromArgb(120, 76, 175, 80); // Yeşil
+                }
+                else if (status == "Üretimde")
                 {
                     rowBgColor = Color.FromArgb(120, 33, 150, 243); // Mavi
                 }

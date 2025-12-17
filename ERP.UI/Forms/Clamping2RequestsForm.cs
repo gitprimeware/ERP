@@ -10,18 +10,18 @@ using ERP.UI.UI;
 
 namespace ERP.UI.Forms
 {
-    public partial class PressingRequestsForm : UserControl
+    public partial class Clamping2RequestsForm : UserControl
     {
         private Panel _mainPanel;
         private DataGridView _dataGridView;
-        private PressingRequestRepository _pressingRequestRepository;
-        private PressingRepository _pressingRepository;
+        private Clamping2RequestRepository _clamping2RequestRepository;
+        private ClampingRepository _clampingRepository;
         private OrderRepository _orderRepository;
 
-        public PressingRequestsForm()
+        public Clamping2RequestsForm()
         {
-            _pressingRequestRepository = new PressingRequestRepository();
-            _pressingRepository = new PressingRepository();
+            _clamping2RequestRepository = new Clamping2RequestRepository();
+            _clampingRepository = new ClampingRepository();
             _orderRepository = new OrderRepository();
             InitializeCustomComponents();
         }
@@ -49,7 +49,7 @@ namespace ERP.UI.Forms
             // Başlık
             var titleLabel = new Label
             {
-                Text = "📋 Pres Talepleri",
+                Text = "📋 Kenetleme 2 Talepleri",
                 Font = new Font("Segoe UI", 18F, FontStyle.Bold),
                 ForeColor = ThemeColors.Primary,
                 AutoSize = true,
@@ -95,42 +95,50 @@ namespace ERP.UI.Forms
             };
 
             // Kolonları ekle
-            // Id kolonu kaldırıldı (görünür değil, sadece veri erişimi için LoadData'da tutuluyor)
-            
-            AddPressingRequestColumn("Hatve", "Hatve", 80);
-            AddPressingRequestColumn("Size", "Ölçü", 80);
-            AddPressingRequestColumn("PlateThickness", "Plaka Kalınlığı", 120);
-            AddPressingRequestColumn("SerialNumber", "Rulo Seri No", 120);
-            AddPressingRequestColumn("PressNo", "Pres No", 100);
-            AddPressingRequestColumn("Pressure", "Basınç", 100);
-            AddPressingRequestColumn("RequestedPressCount", "İstenen Pres", 120);
-            
-            // Kaç Tane Preslendiği - buton kolonu
-            var colActualPressCount = new DataGridViewButtonColumn
+            // Id kolonu (gizli)
+            var colId = new DataGridViewTextBoxColumn
             {
-                HeaderText = "Kaç Tane Preslendiği",
-                Name = "ActualPressCount",
-                Width = 150,
-                Text = "Gir",
-                UseColumnTextForButtonValue = false // Dinamik buton metni için false
+                DataPropertyName = "Id",
+                HeaderText = "Id",
+                Name = "Id",
+                Width = 0,
+                Visible = false
             };
-            colActualPressCount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            _dataGridView.Columns.Add(colActualPressCount);
+            _dataGridView.Columns.Add(colId);
             
-            // Kaç Tane Preslenmiş Oluştu - buton kolonu
-            var colResultedPressCount = new DataGridViewButtonColumn
+            AddClamping2RequestColumn("Hatve", "Hatve", 80);
+            AddClamping2RequestColumn("PlateThickness", "Lamel Kalınlığı", 120);
+            AddClamping2RequestColumn("ResultedSize", "Sonuç Ölçü", 100);
+            AddClamping2RequestColumn("ResultedLength", "Sonuç Uzunluk", 120);
+            AddClamping2RequestColumn("FirstClampingInfo", "İlk Ürün", 150);
+            AddClamping2RequestColumn("SecondClampingInfo", "İkinci Ürün", 150);
+            AddClamping2RequestColumn("RequestedCount", "İstenen Adet", 120);
+            
+            // Kaç Tane Kullanıldı - buton kolonu
+            var colActualCount = new DataGridViewButtonColumn
             {
-                HeaderText = "Kaç Tane Preslenmiş Oluştu",
-                Name = "ResultedPressCount",
+                HeaderText = "Kaç Tane Kullanıldı",
+                Name = "ActualCount",
                 Width = 180,
                 Text = "Gir",
                 UseColumnTextForButtonValue = false // Dinamik buton metni için false
             };
-            colResultedPressCount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            _dataGridView.Columns.Add(colResultedPressCount);
+            colActualCount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            _dataGridView.Columns.Add(colActualCount);
             
-            AddPressingRequestColumn("WasteAmount", "Hurda Miktarı", 120);
-            AddPressingRequestColumn("Status", "Durum", 100);
+            // Kaç Tane Oluştu - buton kolonu
+            var colResultedCount = new DataGridViewButtonColumn
+            {
+                HeaderText = "Kaç Tane Oluştu",
+                Name = "ResultedCount",
+                Width = 150,
+                Text = "Gir",
+                UseColumnTextForButtonValue = false // Dinamik buton metni için false
+            };
+            colResultedCount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            _dataGridView.Columns.Add(colResultedCount);
+            
+            AddClamping2RequestColumn("Status", "Durum", 100);
 
             // Stil ayarları
             _dataGridView.ColumnHeadersVisible = true;
@@ -179,7 +187,7 @@ namespace ERP.UI.Forms
             _mainPanel.BringToFront();
         }
 
-        private void AddPressingRequestColumn(string dataPropertyName, string headerText, int width)
+        private void AddClamping2RequestColumn(string dataPropertyName, string headerText, int width)
         {
             var column = new DataGridViewTextBoxColumn
             {
@@ -198,24 +206,28 @@ namespace ERP.UI.Forms
         {
             try
             {
-                var requests = _pressingRequestRepository.GetPendingRequests();
-                var orders = _orderRepository.GetAll();
+                var requests = _clamping2RequestRepository.GetPendingRequests();
                 
                 var data = requests.Select(r =>
                 {
+                    var firstClamping = r.FirstClampingId.HasValue ? _clampingRepository.GetById(r.FirstClampingId.Value) : null;
+                    var secondClamping = r.SecondClampingId.HasValue ? _clampingRepository.GetById(r.SecondClampingId.Value) : null;
+                    
+                    string firstInfo = firstClamping != null ? $"{firstClamping.Size:F2} x {firstClamping.Length:F2}" : "";
+                    string secondInfo = secondClamping != null ? $"{secondClamping.Size:F2} x {secondClamping.Length:F2}" : "";
+                    
                     return new
                     {
                         Id = r.Id,
                         Hatve = GetHatveLetter(r.Hatve),
-                        Size = r.Size.ToString("F1", CultureInfo.InvariantCulture),
                         PlateThickness = r.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
-                        SerialNumber = r.SerialNo?.SerialNumber ?? "",
-                        PressNo = r.PressNo ?? "",
-                        Pressure = r.Pressure.ToString("F2", CultureInfo.InvariantCulture),
-                        RequestedPressCount = r.RequestedPressCount.ToString(),
-                        ActualPressCount = r.ActualPressCount.HasValue ? r.ActualPressCount.Value.ToString() : "",
-                        ResultedPressCount = r.ResultedPressCount.HasValue ? r.ResultedPressCount.Value.ToString() : "",
-                        WasteAmount = r.WasteAmount.ToString("F2", CultureInfo.InvariantCulture),
+                        ResultedSize = r.ResultedSize.ToString("F2", CultureInfo.InvariantCulture),
+                        ResultedLength = r.ResultedLength.ToString("F2", CultureInfo.InvariantCulture),
+                        FirstClampingInfo = firstInfo,
+                        SecondClampingInfo = secondInfo,
+                        RequestedCount = r.RequestedCount.ToString(),
+                        ActualCount = r.ActualCount.HasValue ? r.ActualCount.Value.ToString() : "",
+                        ResultedCount = r.ResultedCount.HasValue ? r.ResultedCount.Value.ToString() : "",
                         Status = r.Status
                     };
                 }).ToList();
@@ -230,7 +242,7 @@ namespace ERP.UI.Forms
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Pres talepleri yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Kenetleme 2 talepleri yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -245,17 +257,17 @@ namespace ERP.UI.Forms
                 {
                     var item = row.DataBoundItem;
                     
-                    // ActualPressCount buton kolonu için
-                    if (columnName == "ActualPressCount")
+                    // ActualCount buton kolonu için
+                    if (columnName == "ActualCount")
                     {
-                        var actualPressCountProperty = item.GetType().GetProperty("ActualPressCount");
-                        if (actualPressCountProperty != null)
+                        var actualCountProperty = item.GetType().GetProperty("ActualCount");
+                        if (actualCountProperty != null)
                         {
-                            var actualPressCountValue = actualPressCountProperty.GetValue(item)?.ToString();
+                            var actualCountValue = actualCountProperty.GetValue(item)?.ToString();
                             
-                            if (!string.IsNullOrWhiteSpace(actualPressCountValue))
+                            if (!string.IsNullOrWhiteSpace(actualCountValue))
                             {
-                                e.Value = $"Girildi ({actualPressCountValue})";
+                                e.Value = $"Girildi ({actualCountValue})";
                                 e.FormattingApplied = true;
                             }
                             else
@@ -265,17 +277,17 @@ namespace ERP.UI.Forms
                             }
                         }
                     }
-                    // ResultedPressCount buton kolonu için
-                    else if (columnName == "ResultedPressCount")
+                    // ResultedCount buton kolonu için
+                    else if (columnName == "ResultedCount")
                     {
-                        var resultedPressCountProperty = item.GetType().GetProperty("ResultedPressCount");
-                        if (resultedPressCountProperty != null)
+                        var resultedCountProperty = item.GetType().GetProperty("ResultedCount");
+                        if (resultedCountProperty != null)
                         {
-                            var resultedPressCountValue = resultedPressCountProperty.GetValue(item)?.ToString();
+                            var resultedCountValue = resultedCountProperty.GetValue(item)?.ToString();
                             
-                            if (!string.IsNullOrWhiteSpace(resultedPressCountValue))
+                            if (!string.IsNullOrWhiteSpace(resultedCountValue))
                             {
-                                e.Value = $"Girildi ({resultedPressCountValue})";
+                                e.Value = $"Girildi ({resultedCountValue})";
                                 e.FormattingApplied = true;
                             }
                             else
@@ -291,12 +303,11 @@ namespace ERP.UI.Forms
 
         private void DataGridView_CellClick(object sender, DataGridViewCellEventArgs e)
         {
-            // Sadece "Kaç Tane Preslendiği" buton kolonuna tıklandığında dialog aç
             if (e.RowIndex < 0 || e.ColumnIndex < 0)
                 return;
 
             var columnName = _dataGridView.Columns[e.ColumnIndex].Name;
-            if (columnName != "ActualPressCount" && columnName != "ResultedPressCount")
+            if (columnName != "ActualCount" && columnName != "ResultedCount")
                 return;
 
             try
@@ -317,214 +328,182 @@ namespace ERP.UI.Forms
                 if (requestId == Guid.Empty)
                     return;
 
-                var request = _pressingRequestRepository.GetById(requestId);
+                var request = _clamping2RequestRepository.GetById(requestId);
                 if (request == null)
                     return;
 
                 // Dialog aç
-                if (columnName == "ActualPressCount")
+                if (columnName == "ActualCount")
                 {
-                    int? actualPressCount = ShowActualPressCountDialog(request);
-                    if (actualPressCount.HasValue)
+                    int? actualCount = ShowActualCountDialog(request);
+                    if (actualCount.HasValue)
                     {
-                        request.ActualPressCount = actualPressCount.Value;
-                        request.Status = "Presde"; // İşçi pres adedini girdiğinde durum "Presde" olur
-                        _pressingRequestRepository.Update(request);
-                        LoadData(); // Verileri yeniden yükle
+                        request.ActualCount = actualCount.Value;
+                        request.Status = "Kenetmede";
+                        _clamping2RequestRepository.Update(request);
+                        LoadData();
                     }
                 }
-                else if (columnName == "ResultedPressCount")
+                else if (columnName == "ResultedCount")
                 {
-                    int? resultedPressCount = ShowResultedPressCountDialog(request);
-                    if (resultedPressCount.HasValue)
+                    int? resultedCount = ShowResultedCountDialog(request);
+                    if (resultedCount.HasValue)
                     {
-                        request.ResultedPressCount = resultedPressCount.Value;
-                        request.Status = "Presde";
-                        _pressingRequestRepository.Update(request);
-                        LoadData(); // Verileri yeniden yükle
+                        request.ResultedCount = resultedCount.Value;
+                        request.Status = "Kenetmede";
+                        _clamping2RequestRepository.Update(request);
+                        LoadData();
                     }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Pres adedi girilirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Değer girilirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        private int? ShowActualPressCountDialog(PressingRequest request)
+        private int? ShowActualCountDialog(Clamping2Request request)
         {
             using (var dialog = new Form
             {
-                Text = "Kaç Tane Preslendiği",
-                Width = 400,
+                Text = "Kaç Tane Kullanıldı",
+                Width = 350,
                 Height = 200,
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false,
-                MinimizeBox = false,
-                BackColor = ThemeColors.Background
+                MinimizeBox = false
             })
             {
                 var lblInfo = new Label
                 {
-                    Text = $"İstenen Pres: {request.RequestedPressCount} adet\n\nKaç tane preslendi?",
+                    Text = $"İstenen Adet: {request.RequestedCount}",
                     Location = new Point(20, 20),
-                    Width = 350,
-                    Height = 60,
-                    AutoSize = false,
-                    Font = new Font("Segoe UI", 10F)
-                };
-
-                var lblAdet = new Label
-                {
-                    Text = "Preslenen Adet:",
-                    Location = new Point(20, 90),
                     AutoSize = true,
                     Font = new Font("Segoe UI", 10F)
                 };
 
-                var txtAdet = new NumericUpDown
+                var lblCount = new Label
                 {
-                    Location = new Point(150, 87),
-                    Width = 200,
+                    Text = "Kullanılan Adet:",
+                    Location = new Point(20, 60),
+                    AutoSize = true,
+                    Font = new Font("Segoe UI", 10F)
+                };
+
+                var txtCount = new NumericUpDown
+                {
+                    Location = new Point(150, 57),
+                    Width = 150,
                     Minimum = 0,
                     Maximum = 999999,
-                    Value = request.ActualPressCount ?? request.RequestedPressCount,
-                    DecimalPlaces = 0,
-                    Font = new Font("Segoe UI", 10F)
+                    Value = request.ActualCount ?? request.RequestedCount
                 };
 
                 var btnOk = new Button
                 {
-                    Text = "Tamam",
+                    Text = "Kaydet",
                     DialogResult = DialogResult.OK,
-                    Location = new Point(200, 130),
-                    Width = 80,
-                    BackColor = ThemeColors.Success,
-                    ForeColor = Color.White,
-                    FlatStyle = FlatStyle.Flat
+                    Location = new Point(150, 110),
+                    Width = 80
                 };
-                btnOk.FlatAppearance.BorderSize = 0;
 
                 var btnCancel = new Button
                 {
                     Text = "İptal",
                     DialogResult = DialogResult.Cancel,
-                    Location = new Point(290, 130),
-                    Width = 80,
-                    BackColor = ThemeColors.Secondary,
-                    ForeColor = Color.White,
-                    FlatStyle = FlatStyle.Flat
+                    Location = new Point(240, 110),
+                    Width = 80
                 };
-                btnCancel.FlatAppearance.BorderSize = 0;
 
-                dialog.Controls.AddRange(new Control[] { lblInfo, lblAdet, txtAdet, btnOk, btnCancel });
+                dialog.Controls.AddRange(new Control[] { lblInfo, lblCount, txtCount, btnOk, btnCancel });
                 dialog.AcceptButton = btnOk;
                 dialog.CancelButton = btnCancel;
 
                 if (dialog.ShowDialog() == DialogResult.OK)
                 {
-                    return (int)txtAdet.Value;
+                    return (int)txtCount.Value;
                 }
             }
-
             return null;
         }
 
-        private int? ShowResultedPressCountDialog(PressingRequest request)
+        private int? ShowResultedCountDialog(Clamping2Request request)
         {
             using (var dialog = new Form
             {
-                Text = "Kaç Tane Preslenmiş Oluştu",
-                Width = 400,
+                Text = "Kaç Tane Oluştu",
+                Width = 350,
                 Height = 200,
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false,
-                MinimizeBox = false,
-                BackColor = ThemeColors.Background
+                MinimizeBox = false
             })
             {
                 var lblInfo = new Label
                 {
-                    Text = $"Preslenen: {request.ActualPressCount?.ToString() ?? "-"} adet\n\nKaç tane preslenmiş oluştu?",
+                    Text = $"Kullanılan Adet: {request.ActualCount ?? request.RequestedCount}",
                     Location = new Point(20, 20),
-                    Width = 350,
-                    Height = 60,
-                    AutoSize = false,
+                    AutoSize = true,
                     Font = new Font("Segoe UI", 10F)
                 };
 
-                var lblAdet = new Label
+                var lblCount = new Label
                 {
                     Text = "Oluşan Adet:",
-                    Location = new Point(20, 90),
+                    Location = new Point(20, 60),
                     AutoSize = true,
                     Font = new Font("Segoe UI", 10F)
                 };
 
-                var txtAdet = new NumericUpDown
+                var txtCount = new NumericUpDown
                 {
-                    Location = new Point(150, 87),
-                    Width = 200,
+                    Location = new Point(150, 57),
+                    Width = 150,
                     Minimum = 0,
                     Maximum = 999999,
-                    Value = request.ResultedPressCount ?? (request.ActualPressCount ?? 0),
-                    DecimalPlaces = 0,
-                    Font = new Font("Segoe UI", 10F)
+                    Value = request.ResultedCount ?? 0
                 };
 
                 var btnOk = new Button
                 {
-                    Text = "Tamam",
+                    Text = "Kaydet",
                     DialogResult = DialogResult.OK,
-                    Location = new Point(200, 130),
-                    Width = 80,
-                    BackColor = ThemeColors.Success,
-                    ForeColor = Color.White,
-                    FlatStyle = FlatStyle.Flat
+                    Location = new Point(150, 110),
+                    Width = 80
                 };
-                btnOk.FlatAppearance.BorderSize = 0;
 
                 var btnCancel = new Button
                 {
                     Text = "İptal",
                     DialogResult = DialogResult.Cancel,
-                    Location = new Point(290, 130),
-                    Width = 80,
-                    BackColor = ThemeColors.Secondary,
-                    ForeColor = Color.White,
-                    FlatStyle = FlatStyle.Flat
+                    Location = new Point(240, 110),
+                    Width = 80
                 };
-                btnCancel.FlatAppearance.BorderSize = 0;
 
-                dialog.Controls.AddRange(new Control[] { lblInfo, lblAdet, txtAdet, btnOk, btnCancel });
+                dialog.Controls.AddRange(new Control[] { lblInfo, lblCount, txtCount, btnOk, btnCancel });
                 dialog.AcceptButton = btnOk;
                 dialog.CancelButton = btnCancel;
 
                 if (dialog.ShowDialog() == DialogResult.OK)
                 {
-                    return (int)txtAdet.Value;
+                    return (int)txtCount.Value;
                 }
             }
-
             return null;
         }
 
-        private string GetHatveLetter(decimal hatveValue)
+        private string GetHatveLetter(decimal hatve)
         {
-            const decimal tolerance = 0.1m;
-            
-            if (Math.Abs(hatveValue - 3.25m) < tolerance)
-                return "H";
-            else if (Math.Abs(hatveValue - 4.5m) < tolerance)
-                return "D";
-            else if (Math.Abs(hatveValue - 6.5m) < tolerance)
-                return "M";
-            else if (Math.Abs(hatveValue - 9m) < tolerance)
-                return "L";
-            else
-                return hatveValue.ToString("F2", CultureInfo.InvariantCulture);
+            // Hatve değerine göre harf döndür
+            if (hatve == 2.5m) return "A";
+            if (hatve == 3.0m) return "B";
+            if (hatve == 3.5m) return "C";
+            if (hatve == 4.0m) return "D";
+            if (hatve == 4.5m) return "E";
+            if (hatve == 5.0m) return "F";
+            return hatve.ToString("F2", CultureInfo.InvariantCulture);
         }
     }
 }

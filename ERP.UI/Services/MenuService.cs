@@ -24,7 +24,7 @@ namespace ERP.UI.Services
             var orderEntryItem = new MenuItem("📝 Sipariş Girişi", "OrderEntry", "📝", 2);
             orderEntryItem.AddSubMenuItem(new MenuItem("📋 Siparişleri Görüntüle", "OrderList", "📋", 1));
             orderEntryItem.AddSubMenuItem(new MenuItem("➕ Yeni Sipariş", "OrderCreate", "➕", 2));
-            
+
             var stockEntryItem = new MenuItem("📦 Stok Girişi", "StockEntry", "📦", 2);
 
             var productionItem = new MenuItem("🏭 Üretim Planlama", "Production", "🏭", 5);
@@ -33,8 +33,6 @@ namespace ERP.UI.Services
             productionItem.AddSubMenuItem(new MenuItem("✂️ Kesilmiş Stok Takip", "KesilmisStokTakip", "✂️", 3));
             productionItem.AddSubMenuItem(new MenuItem("📦 Preslenmiş Stok Takip", "PreslenmisStokTakip", "📦", 4));
             productionItem.AddSubMenuItem(new MenuItem("🔗 Kenetlenmiş Stok Takip", "KenetlenmisStokTakip", "🔗", 5));
-            productionItem.AddSubMenuItem(new MenuItem("📐 Formül", "ProductionFormul", "📐", 6));
-            productionItem.AddSubMenuItem(new MenuItem("📄 Rapor", "ProductionReport", "📄", 7));
 
             var consumptionItem = new MenuItem("⚡ Sarfiyat", "Consumption", "⚡", 6);
 
@@ -60,7 +58,8 @@ namespace ERP.UI.Services
                 new MenuItem("📋 Kesim Talepleri", "CuttingRequests", "📋", 5),
                 new MenuItem("📋 Pres Talepleri", "PressingRequests", "📋", 6),
                 new MenuItem("📋 Kenetleme Talepleri", "ClampingRequests", "📋", 7),
-                new MenuItem("📋 Montaj Talepleri", "AssemblyRequests", "📋", 8),
+                new MenuItem("📋 Kenetleme 2 Talepleri", "Clamping2Requests", "📋", 8),
+                new MenuItem("📋 Montaj Talepleri", "AssemblyRequests", "📋", 9),
                 consumptionItem,
                 reportsItem,
                 new MenuItem("⚙️ Ayarlar", "Settings", "⚙️", 11)

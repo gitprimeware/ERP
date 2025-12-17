@@ -36,6 +36,7 @@ namespace ERP.DAL
                     CreatePressingRequestsTable(connection);
                     CreateClampingRequestsTable(connection);
                     CreateAssemblyRequestsTable(connection);
+                    CreateClamping2RequestsTable(connection);
                 }
             }
             catch (Exception ex)
@@ -941,6 +942,45 @@ namespace ERP.DAL
                         FOREIGN KEY ([OrderId]) REFERENCES [Orders]([Id]),
                         FOREIGN KEY ([SerialNoId]) REFERENCES [SerialNos]([Id]),
                         FOREIGN KEY ([ClampingId]) REFERENCES [Clampings]([Id]),
+                        FOREIGN KEY ([MachineId]) REFERENCES [Machines]([Id]),
+                        FOREIGN KEY ([EmployeeId]) REFERENCES [Employees]([Id])
+                    )
+                END";
+
+            using (var command = new SqlCommand(query, connection))
+            {
+                command.ExecuteNonQuery();
+            }
+        }
+
+        private static void CreateClamping2RequestsTable(SqlConnection connection)
+        {
+            var query = @"
+                IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Clamping2Requests]') AND type in (N'U'))
+                BEGIN
+                    CREATE TABLE [dbo].[Clamping2Requests] (
+                        [Id] UNIQUEIDENTIFIER PRIMARY KEY,
+                        [OrderId] UNIQUEIDENTIFIER NULL,
+                        [Hatve] DECIMAL(10,2) NOT NULL,
+                        [PlateThickness] DECIMAL(10,3) NOT NULL,
+                        [FirstClampingId] UNIQUEIDENTIFIER NULL,
+                        [SecondClampingId] UNIQUEIDENTIFIER NULL,
+                        [ResultedSize] DECIMAL(10,2) NOT NULL,
+                        [ResultedLength] DECIMAL(10,2) NOT NULL,
+                        [MachineId] UNIQUEIDENTIFIER NULL,
+                        [RequestedCount] INT NOT NULL,
+                        [ActualCount] INT NULL,
+                        [ResultedCount] INT NULL,
+                        [EmployeeId] UNIQUEIDENTIFIER NULL,
+                        [Status] NVARCHAR(50) NOT NULL DEFAULT 'Beklemede',
+                        [RequestDate] DATETIME NOT NULL,
+                        [CompletionDate] DATETIME NULL,
+                        [CreatedDate] DATETIME NOT NULL,
+                        [ModifiedDate] DATETIME NULL,
+                        [IsActive] BIT NOT NULL DEFAULT 1,
+                        FOREIGN KEY ([OrderId]) REFERENCES [Orders]([Id]),
+                        FOREIGN KEY ([FirstClampingId]) REFERENCES [Clampings]([Id]),
+                        FOREIGN KEY ([SecondClampingId]) REFERENCES [Clampings]([Id]),
                         FOREIGN KEY ([MachineId]) REFERENCES [Machines]([Id]),
                         FOREIGN KEY ([EmployeeId]) REFERENCES [Employees]([Id])
                     )

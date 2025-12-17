@@ -70,6 +70,7 @@ namespace ERP.UI.Forms
         private PressingRequestRepository _pressingRequestRepository;
         private ClampingRequestRepository _clampingRequestRepository;
         private AssemblyRequestRepository _assemblyRequestRepository;
+        private Clamping2RequestRepository _clamping2RequestRepository;
         private MaterialEntryRepository _materialEntryRepository;
         private PressingRepository _pressingRepository;
         private ClampingRepository _clampingRepository;
@@ -92,6 +93,7 @@ namespace ERP.UI.Forms
             _pressingRequestRepository = new PressingRequestRepository();
             _clampingRequestRepository = new ClampingRequestRepository();
             _assemblyRequestRepository = new AssemblyRequestRepository();
+            _clamping2RequestRepository = new Clamping2RequestRepository();
             _materialEntryRepository = new MaterialEntryRepository();
             _pressingRepository = new PressingRepository();
             _clampingRepository = new ClampingRepository();
@@ -1235,6 +1237,13 @@ namespace ERP.UI.Forms
             tabKenetleme.UseVisualStyleBackColor = false;
             CreateClampingTab(tabKenetleme);
             cuttingTabControl.TabPages.Add(tabKenetleme);
+
+            var tabKenetleme2 = new TabPage("🔗 Kenetleme 2");
+            tabKenetleme2.Padding = new Padding(20);
+            tabKenetleme2.BackColor = Color.White;
+            tabKenetleme2.UseVisualStyleBackColor = false;
+            CreateClamping2Tab(tabKenetleme2);
+            cuttingTabControl.TabPages.Add(tabKenetleme2);
 
             var tabMontaj = new TabPage("🔩 Montaj");
             tabMontaj.Padding = new Padding(20);
@@ -2610,6 +2619,14 @@ namespace ERP.UI.Forms
         {
             try
             {
+                // YM (stok) ürünleri için montaj işlemi yapılamaz
+                var order = _orderRepository.GetById(_orderId);
+                if (order != null && order.IsStockOrder)
+                {
+                    MessageBox.Show("Stok (YM) ürünleri için montaj işlemi yapılamaz!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
                 using (var dialog = new AssemblyDialog(_serialNoRepository, _employeeRepository, _machineRepository, _orderId))
                 {
                     if (dialog.ShowDialog() == DialogResult.OK)
@@ -2775,6 +2792,438 @@ namespace ERP.UI.Forms
             catch (Exception ex)
             {
                 MessageBox.Show("Montaj talebi onaylanırken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void CreateClamping2Tab(TabPage tab)
+        {
+            // Ana panel - TableLayoutPanel kullan
+            var mainPanel = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 2,
+                BackColor = Color.White,
+                Padding = new Padding(20)
+            };
+            mainPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            mainPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F)); // Buton paneli için sabit yükseklik
+            mainPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F)); // Grid paneli için kalan alan
+
+            // Buton paneli - Üstte
+            var buttonPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Height = 50,
+                Padding = new Padding(0, 5, 20, 5),
+                BackColor = Color.White
+            };
+
+            // Onayla butonu (Kenetleme 2 taleplerini onaylamak için)
+            var btnOnayla = ButtonFactory.CreateActionButton("✅ Kenetleme 2 Talebini Onayla", ThemeColors.Success, Color.White, 250, 35);
+            btnOnayla.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnOnayla.Location = new Point(buttonPanel.Width - 250, 5);
+            buttonPanel.Controls.Add(btnOnayla);
+
+            // Kenetle butonu (Birleştirme)
+            var btnKenetle = ButtonFactory.CreateActionButton("🔗 Kenetle", ThemeColors.Primary, Color.White, 120, 35);
+            btnKenetle.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnKenetle.Location = new Point(buttonPanel.Width - 250 - 130, 5);
+            buttonPanel.Controls.Add(btnKenetle);
+
+            // Bölme butonu
+            var btnBolme = ButtonFactory.CreateActionButton("✂️ Bölme", ThemeColors.Info, Color.White, 120, 35);
+            btnBolme.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnBolme.Location = new Point(buttonPanel.Width - 250 - 130 - 130, 5);
+            buttonPanel.Controls.Add(btnBolme);
+
+            // DataGridView paneli
+            var gridPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(0),
+                BackColor = Color.White
+            };
+
+            // DataGridView
+            var dataGridView = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                ReadOnly = true,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                MultiSelect = false,
+                BackgroundColor = Color.White,
+                BorderStyle = BorderStyle.None,
+                AutoGenerateColumns = false,
+                ColumnHeadersVisible = true,
+                RowHeadersVisible = false,
+                GridColor = Color.White,
+                CellBorderStyle = DataGridViewCellBorderStyle.None
+            };
+
+            // Kolonları ekle
+            AddClamping2Column(dataGridView, "Date", "Tarih", 120);
+            AddClamping2Column(dataGridView, "OrderNo", "Sipariş No", 100);
+            AddClamping2Column(dataGridView, "Hatve", "Hatve", 80);
+            AddClamping2Column(dataGridView, "PlateThickness", "Lamel Kalınlığı", 120);
+            AddClamping2Column(dataGridView, "ResultedSize", "Sonuç Ölçü", 100);
+            AddClamping2Column(dataGridView, "ResultedLength", "Sonuç Uzunluk", 120);
+            AddClamping2Column(dataGridView, "FirstClampingInfo", "İlk Ürün", 150);
+            AddClamping2Column(dataGridView, "SecondClampingInfo", "İkinci Ürün", 150);
+            AddClamping2Column(dataGridView, "Count", "Adet", 100);
+            AddClamping2Column(dataGridView, "EmployeeName", "Operatör", 150);
+
+            // Stil ayarları
+            dataGridView.ColumnHeadersVisible = true;
+            dataGridView.RowHeadersVisible = false;
+            dataGridView.EnableHeadersVisualStyles = false;
+            dataGridView.ColumnHeadersHeight = 40;
+            dataGridView.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            dataGridView.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
+            
+            dataGridView.ColumnHeadersDefaultCellStyle.BackColor = ThemeColors.Primary;
+            dataGridView.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            dataGridView.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            dataGridView.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dataGridView.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.False;
+
+            dataGridView.DefaultCellStyle.BackColor = Color.White;
+            dataGridView.BackgroundColor = Color.White;
+            dataGridView.DefaultCellStyle.ForeColor = ThemeColors.TextPrimary;
+            dataGridView.DefaultCellStyle.SelectionBackColor = ThemeColors.Primary;
+            dataGridView.DefaultCellStyle.SelectionForeColor = Color.White;
+            dataGridView.DefaultCellStyle.Font = new Font("Segoe UI", 9F);
+
+            gridPanel.Controls.Add(dataGridView);
+            
+            // TableLayoutPanel'e ekle
+            mainPanel.Controls.Add(buttonPanel, 0, 0);
+            mainPanel.Controls.Add(gridPanel, 0, 1);
+            
+            tab.Controls.Add(mainPanel);
+
+            // Event handler
+            btnKenetle.Click += (s, e) => BtnClamping2Kenetle_Click(dataGridView);
+            btnBolme.Click += (s, e) => BtnClamping2Bolme_Click(dataGridView);
+            btnOnayla.Click += (s, e) => BtnClamping2RequestOnayla_Click(dataGridView);
+
+            // Verileri yükle
+            LoadClamping2Data(dataGridView);
+        }
+
+        private void AddClamping2Column(DataGridView dgv, string dataPropertyName, string headerText, int width)
+        {
+            var column = new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = dataPropertyName,
+                HeaderText = headerText,
+                Name = dataPropertyName,
+                Width = width,
+                Visible = true,
+                ReadOnly = true
+            };
+            dgv.Columns.Add(column);
+        }
+
+        private void LoadClamping2Data(DataGridView dataGridView)
+        {
+            try
+            {
+                var clamping2Requests = _clamping2RequestRepository.GetByOrderId(_orderId);
+                var order = _orderRepository.GetById(_orderId);
+                
+                var data = clamping2Requests.Select(cr2 =>
+                {
+                    var firstClamping = cr2.FirstClampingId.HasValue ? _clampingRepository.GetById(cr2.FirstClampingId.Value) : null;
+                    var secondClamping = cr2.SecondClampingId.HasValue ? _clampingRepository.GetById(cr2.SecondClampingId.Value) : null;
+                    
+                    string firstInfo = firstClamping != null ? $"{firstClamping.Size:F2} x {firstClamping.Length:F2}" : "";
+                    string secondInfo = secondClamping != null ? $"{secondClamping.Size:F2} x {secondClamping.Length:F2}" : "";
+                    
+                    return new
+                    {
+                        cr2.Id,
+                        Date = cr2.RequestDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
+                        OrderNo = order?.TrexOrderNo ?? "",
+                        Hatve = GetHatveLetter(cr2.Hatve),
+                        PlateThickness = cr2.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
+                        ResultedSize = cr2.ResultedSize.ToString("F2", CultureInfo.InvariantCulture),
+                        ResultedLength = cr2.ResultedLength.ToString("F2", CultureInfo.InvariantCulture),
+                        FirstClampingInfo = firstInfo,
+                        SecondClampingInfo = secondInfo,
+                        Count = cr2.ResultedCount?.ToString() ?? cr2.ActualCount?.ToString() ?? cr2.RequestedCount.ToString(),
+                        EmployeeName = cr2.Employee != null ? $"{cr2.Employee.FirstName} {cr2.Employee.LastName}" : ""
+                    };
+                }).ToList();
+
+                // DataSource'u null yap (kolonlar kaybolmasın diye)
+                dataGridView.DataSource = null;
+                
+                // Kolonların var olduğundan emin ol
+                if (dataGridView.Columns.Count == 0)
+                {
+                    AddClamping2Column(dataGridView, "Date", "Tarih", 120);
+                    AddClamping2Column(dataGridView, "OrderNo", "Sipariş No", 100);
+                    AddClamping2Column(dataGridView, "Hatve", "Hatve", 80);
+                    AddClamping2Column(dataGridView, "PlateThickness", "Lamel Kalınlığı", 120);
+                    AddClamping2Column(dataGridView, "ResultedSize", "Sonuç Ölçü", 100);
+                    AddClamping2Column(dataGridView, "ResultedLength", "Sonuç Uzunluk", 120);
+                    AddClamping2Column(dataGridView, "FirstClampingInfo", "İlk Ürün", 150);
+                    AddClamping2Column(dataGridView, "SecondClampingInfo", "İkinci Ürün", 150);
+                    AddClamping2Column(dataGridView, "Count", "Adet", 100);
+                    AddClamping2Column(dataGridView, "EmployeeName", "Operatör", 150);
+                }
+
+                dataGridView.DataSource = data;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Kenetleme 2 verileri yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BtnClamping2Kenetle_Click(DataGridView dataGridView)
+        {
+            try
+            {
+                using (var dialog = new Clamping2Dialog(_employeeRepository, _machineRepository, _orderId))
+                {
+                    if (dialog.ShowDialog() == DialogResult.OK)
+                    {
+                        // Verileri yeniden yükle
+                        LoadClamping2Data(dataGridView);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Kenetleme 2 eklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BtnClamping2Bolme_Click(DataGridView dataGridView)
+        {
+            try
+            {
+                using (var dialog = new DivideDialog(_employeeRepository, _machineRepository, _orderId))
+                {
+                    if (dialog.ShowDialog() == DialogResult.OK)
+                    {
+                        // Verileri yeniden yükle
+                        LoadClamping2Data(dataGridView);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Bölme işlemi eklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BtnClamping2RequestOnayla_Click(DataGridView dataGridView)
+        {
+            try
+            {
+                // Bu siparişe ait bekleyen kenetleme 2 taleplerini getir
+                var pendingRequests = _clamping2RequestRepository.GetAll()
+                    .Where(r => r.OrderId == _orderId && (r.Status == "Kenetmede" || r.Status == "Beklemede")).ToList();
+
+                if (pendingRequests.Count == 0)
+                {
+                    MessageBox.Show("Bu sipariş için onaylanacak kenetleme 2 talebi bulunmamaktadır.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                // Eğer birden fazla talep varsa, kullanıcıdan seçmesini iste
+                Clamping2Request selectedRequest = null;
+                if (pendingRequests.Count == 1)
+                {
+                    // Veritabanından güncel halini çek
+                    selectedRequest = _clamping2RequestRepository.GetById(pendingRequests.First().Id);
+                }
+                else
+                {
+                    // Çoklu seçim dialogu (basit bir form)
+                    using (var selectDialog = new Form
+                    {
+                        Text = "Kenetleme 2 Talebi Seç",
+                        Width = 500,
+                        Height = 400,
+                        StartPosition = FormStartPosition.CenterParent,
+                        FormBorderStyle = FormBorderStyle.FixedDialog,
+                        MaximizeBox = false,
+                        MinimizeBox = false
+                    })
+                    {
+                        var listBox = new ListBox
+                        {
+                            Dock = DockStyle.Fill,
+                            Font = new Font("Segoe UI", 10F)
+                        };
+
+                        foreach (var req in pendingRequests)
+                        {
+                            var firstClampItem = req.FirstClampingId.HasValue ? _clampingRepository.GetById(req.FirstClampingId.Value) : null;
+                            var secondClampItem = req.SecondClampingId.HasValue ? _clampingRepository.GetById(req.SecondClampingId.Value) : null;
+                            string firstInfo = firstClampItem != null ? $"{firstClampItem.Size:F2} x {firstClampItem.Length:F2}" : "";
+                            string secondInfo = secondClampItem != null ? $"{secondClampItem.Size:F2} x {secondClampItem.Length:F2}" : "";
+                            listBox.Items.Add(new { Request = req, Display = $"Sonuç: {req.ResultedSize:F2} x {req.ResultedLength:F2} (İlk: {firstInfo}, İkinci: {secondInfo})" });
+                        }
+                        listBox.DisplayMember = "Display";
+                        listBox.ValueMember = "Request";
+
+                        var btnSelect = new Button
+                        {
+                            Text = "Seç",
+                            DialogResult = DialogResult.OK,
+                            Dock = DockStyle.Bottom,
+                            Height = 40
+                        };
+
+                        selectDialog.Controls.Add(listBox);
+                        selectDialog.Controls.Add(btnSelect);
+                        selectDialog.AcceptButton = btnSelect;
+
+                        if (selectDialog.ShowDialog() == DialogResult.OK && listBox.SelectedItem != null)
+                        {
+                            var selectedItem = listBox.SelectedItem.GetType().GetProperty("Request").GetValue(listBox.SelectedItem);
+                            var tempRequest = selectedItem as Clamping2Request;
+                            if (tempRequest != null)
+                            {
+                                // Veritabanından güncel halini çek
+                                selectedRequest = _clamping2RequestRepository.GetById(tempRequest.Id);
+                            }
+                        }
+                        else
+                        {
+                            return;
+                        }
+                    }
+                }
+
+                if (selectedRequest == null)
+                    return;
+
+                // ActualCount ve ResultedCount kontrolü
+                if (!selectedRequest.ActualCount.HasValue)
+                {
+                    MessageBox.Show("Lütfen önce 'Kaç Tane Kullanıldı' değerini girin!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                if (!selectedRequest.ResultedCount.HasValue)
+                {
+                    MessageBox.Show("Lütfen önce 'Kaç Tane Oluştu' değerini girin!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Kenetleme 2 kaydı oluştur (Clamping tablosuna ekle)
+                var firstClamping = selectedRequest.FirstClampingId.HasValue ? _clampingRepository.GetById(selectedRequest.FirstClampingId.Value) : null;
+
+                if (firstClamping == null)
+                {
+                    MessageBox.Show("Seçilen kenetlenmiş ürün bulunamadı!", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                // Bölme işlemi mi kontrol et (SecondClampingId null ise bölme)
+                bool isDivideOperation = !selectedRequest.SecondClampingId.HasValue;
+                Clamping secondClamping = null;
+                
+                if (!isDivideOperation)
+                {
+                    // Birleştirme işlemi - ikinci ürün zorunlu
+                    secondClamping = _clampingRepository.GetById(selectedRequest.SecondClampingId.Value);
+                    if (secondClamping == null)
+                    {
+                        MessageBox.Show("Seçilen ikinci kenetlenmiş ürün bulunamadı!", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+                }
+
+                if (isDivideOperation)
+                {
+                    // Bölme işlemi: Hem ilk hem ikinci uzunluk stoğa eklenecek
+                    var originalLength = firstClamping.Length;
+                    var firstLength = selectedRequest.ResultedLength; // İlk uzunluk
+                    var secondLength = originalLength - firstLength; // İkinci uzunluk
+
+                    // İlk uzunluk stoğa ekle
+                    var firstClampingResult = new Clamping
+                    {
+                        OrderId = _orderId,
+                        PlateThickness = selectedRequest.PlateThickness,
+                        Hatve = selectedRequest.Hatve,
+                        Size = selectedRequest.ResultedSize,
+                        Length = firstLength,
+                        ClampCount = selectedRequest.ResultedCount.Value,
+                        UsedPlateCount = selectedRequest.ActualCount.Value, // Bir kenetlenmiş ürün kullanıldı
+                        MachineId = selectedRequest.MachineId,
+                        EmployeeId = selectedRequest.EmployeeId,
+                        ClampingDate = DateTime.Now
+                    };
+
+                    _clampingRepository.Insert(firstClampingResult);
+
+                    // İkinci uzunluk stoğa ekle
+                    var secondClampingResult = new Clamping
+                    {
+                        OrderId = _orderId,
+                        PlateThickness = selectedRequest.PlateThickness,
+                        Hatve = selectedRequest.Hatve,
+                        Size = selectedRequest.ResultedSize,
+                        Length = secondLength,
+                        ClampCount = selectedRequest.ResultedCount.Value,
+                        UsedPlateCount = selectedRequest.ActualCount.Value, // Bir kenetlenmiş ürün kullanıldı
+                        MachineId = selectedRequest.MachineId,
+                        EmployeeId = selectedRequest.EmployeeId,
+                        ClampingDate = DateTime.Now
+                    };
+
+                    _clampingRepository.Insert(secondClampingResult);
+
+                    // Orijinal ürünün stoktan düşürülmesi: ActualCount kadar kullanıldı
+                    // Bu mantık zaten Clamping2Request'lerden hesaplanıyor, burada ekstra bir işlem gerekmez
+                }
+                else
+                {
+                    // Birleştirme işlemi: Tek bir kenetlenmiş ürün oluşur
+                    var newClamping = new Clamping
+                    {
+                        OrderId = _orderId,
+                        PlateThickness = selectedRequest.PlateThickness,
+                        Hatve = selectedRequest.Hatve,
+                        Size = selectedRequest.ResultedSize,
+                        Length = selectedRequest.ResultedLength,
+                        ClampCount = selectedRequest.ResultedCount.Value,
+                        UsedPlateCount = selectedRequest.ActualCount.Value * 2, // İki kenetlenmiş ürün kullanıldı
+                        MachineId = selectedRequest.MachineId,
+                        EmployeeId = selectedRequest.EmployeeId,
+                        ClampingDate = DateTime.Now
+                    };
+
+                    _clampingRepository.Insert(newClamping);
+
+                    // İlk ve ikinci kenetlenmiş ürünlerden stok düşürme: ActualCount kadar kullanıldı
+                    // Bu mantık zaten Clamping2Request'lerden hesaplanıyor, burada ekstra bir işlem gerekmez
+                }
+
+                // Talebi tamamlandı olarak işaretle
+                selectedRequest.Status = "Tamamlandı";
+                selectedRequest.CompletionDate = DateTime.Now;
+                _clamping2RequestRepository.Update(selectedRequest);
+
+                MessageBox.Show("Kenetleme 2 talebi başarıyla onaylandı!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                // Verileri yeniden yükle
+                LoadClamping2Data(dataGridView);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Kenetleme 2 talebi onaylanırken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

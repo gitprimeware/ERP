@@ -95,16 +95,7 @@ namespace ERP.UI.Forms
             };
 
             // Kolonları ekle
-            // Id kolonu (gizli, veri erişimi için gerekli)
-            var colId = new DataGridViewTextBoxColumn
-            {
-                DataPropertyName = "Id",
-                HeaderText = "Id",
-                Name = "Id",
-                Width = 0,
-                Visible = false
-            };
-            _dataGridView.Columns.Add(colId);
+            // Id kolonu kaldırıldı (görünür değil, sadece veri erişimi için LoadData'da tutuluyor)
             
             AddCuttingRequestColumn("Hatve", "Hatve", 80);
             AddCuttingRequestColumn("Size", "Ölçü", 80);

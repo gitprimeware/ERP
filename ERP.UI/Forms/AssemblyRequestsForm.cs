@@ -17,12 +17,14 @@ namespace ERP.UI.Forms
         private AssemblyRequestRepository _assemblyRequestRepository;
         private ClampingRepository _clampingRepository;
         private OrderRepository _orderRepository;
+        private ClampingRequestRepository _clampingRequestRepository;
 
         public AssemblyRequestsForm()
         {
             _assemblyRequestRepository = new AssemblyRequestRepository();
             _clampingRepository = new ClampingRepository();
             _orderRepository = new OrderRepository();
+            _clampingRequestRepository = new ClampingRequestRepository();
             InitializeCustomComponents();
         }
 
@@ -106,36 +108,29 @@ namespace ERP.UI.Forms
             };
             _dataGridView.Columns.Add(colId);
             
+            AddAssemblyRequestColumn("TermDate", "Termin Tarihi", 120);
+            AddAssemblyRequestColumn("TrexOrderNo", "Trex Kodu", 120);
             AddAssemblyRequestColumn("Hatve", "Hatve", 80);
             AddAssemblyRequestColumn("Size", "Ölçü", 80);
-            AddAssemblyRequestColumn("PlateThickness", "Plaka Kalınlığı", 120);
             AddAssemblyRequestColumn("Length", "Uzunluk", 100);
-            AddAssemblyRequestColumn("SerialNumber", "Rulo Seri No", 120);
-            AddAssemblyRequestColumn("RequestedAssemblyCount", "İstenen Montaj", 150);
+            AddAssemblyRequestColumn("Quantity", "Adet", 80);
+            AddAssemblyRequestColumn("KapakTipi", "Kapak Tipi", 100);
+            AddAssemblyRequestColumn("ProfilTipi", "Profil Tipi", 100);
+            AddAssemblyRequestColumn("Customer", "Müşteri", 150);
+            AddAssemblyRequestColumn("EmployeeName", "Operatör", 150);
+            AddAssemblyRequestColumn("MontajlanacakKenet", "Montajlanacak Kenet", 150);
+            AddAssemblyRequestColumn("OlusanMontaj", "Oluşan Montaj", 130);
             
-            // Kaç Tane Kenet Kullanıldı - buton kolonu
-            var colActualClampCount = new DataGridViewButtonColumn
+            // Montaj Tamamlandı checkbox kolonu
+            var colMontajTamamlandi = new DataGridViewCheckBoxColumn
             {
-                HeaderText = "Kaç Tane Kenet Kullanıldı",
-                Name = "ActualClampCount",
-                Width = 180,
-                Text = "Gir",
-                UseColumnTextForButtonValue = false // Dinamik buton metni için false
+                HeaderText = "Montaj Tamamlandı",
+                Name = "MontajTamamlandi",
+                Width = 150,
+                ReadOnly = false
             };
-            colActualClampCount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            _dataGridView.Columns.Add(colActualClampCount);
-            
-            // Kaç Tane Montaj Oluştu - buton kolonu
-            var colResultedAssemblyCount = new DataGridViewButtonColumn
-            {
-                HeaderText = "Kaç Tane Montaj Oluştu",
-                Name = "ResultedAssemblyCount",
-                Width = 180,
-                Text = "Gir",
-                UseColumnTextForButtonValue = false // Dinamik buton metni için false
-            };
-            colResultedAssemblyCount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            _dataGridView.Columns.Add(colResultedAssemblyCount);
+            colMontajTamamlandi.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            _dataGridView.Columns.Add(colMontajTamamlandi);
             
             AddAssemblyRequestColumn("Status", "Durum", 100);
 
@@ -161,11 +156,11 @@ namespace ERP.UI.Forms
             _dataGridView.DefaultCellStyle.Font = new Font("Segoe UI", 9F);
             _dataGridView.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
 
-            // CellClick event'i - buton kolonuna tıklandığında dialog aç
-            _dataGridView.CellClick += DataGridView_CellClick;
+            // CellValueChanged event'i - checkbox değiştiğinde onaylama yap
+            _dataGridView.CellValueChanged += DataGridView_CellValueChanged;
             
-            // CellFormatting event'i - buton metnini dinamik olarak ayarla
-            _dataGridView.CellFormatting += DataGridView_CellFormatting;
+            // CurrentCellDirtyStateChanged event'i - checkbox değişikliklerini hemen commit et
+            _dataGridView.CurrentCellDirtyStateChanged += DataGridView_CurrentCellDirtyStateChanged;
 
             // Event handler
             btnYenile.Click += (s, e) => LoadData();
@@ -209,17 +204,65 @@ namespace ERP.UI.Forms
                 
                 var data = requests.Select(r =>
                 {
+                    var order = r.OrderId.HasValue ? _orderRepository.GetById(r.OrderId.Value) : null;
+                    
+                    // Montajlanacak kenet sayısı (RequestedAssemblyCount'tan gelecek)
+                    int montajlanacakKenet = r.RequestedAssemblyCount;
+                    
+                    // Oluşan montaj sipariş adedinden gelecek
+                    int olusanMontaj = order?.Quantity ?? 0;
+                    
+                    // Kapak Tipi ve Profil Tipi parse et
+                    string kapakTipi = "";
+                    string profilTipi = "";
+                    if (order != null && !string.IsNullOrEmpty(order.ProductCode))
+                    {
+                        var parts = order.ProductCode.Split('-');
+                        if (parts.Length >= 3)
+                        {
+                            string modelProfile = parts[2];
+                            if (modelProfile.Length >= 2)
+                            {
+                                profilTipi = modelProfile[1].ToString().ToUpper();
+                            }
+                        }
+                        
+                        // Kapak tipi: 5. parça (030 -> 30)
+                        if (parts.Length >= 6)
+                        {
+                            string kapakStr = parts[5];
+                            if (kapakStr == "030")
+                                kapakTipi = "30";
+                            else if (kapakStr == "002")
+                                kapakTipi = "2";
+                            else if (kapakStr == "016")
+                                kapakTipi = "16";
+                            else if (int.TryParse(kapakStr, out int kapakValue))
+                                kapakTipi = kapakValue.ToString();
+                            else
+                                kapakTipi = kapakStr;
+                        }
+                    }
+                    
+                    // Uzunluk CM olarak saklanıyor, MM olarak göstermek için 10 ile çarp
+                    decimal lengthMM = r.Length * 10.0m;
+                    
                     return new
                     {
                         Id = r.Id,
+                        TermDate = order?.TermDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture) ?? "",
+                        TrexOrderNo = order?.TrexOrderNo ?? "",
                         Hatve = GetHatveLetter(r.Hatve),
-                        Size = r.Size.ToString("F1", CultureInfo.InvariantCulture),
-                        PlateThickness = r.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
-                        Length = r.Length.ToString("F2", CultureInfo.InvariantCulture),
-                        SerialNumber = r.SerialNo?.SerialNumber ?? "",
-                        RequestedAssemblyCount = r.RequestedAssemblyCount.ToString(),
-                        ActualClampCount = r.ActualClampCount.HasValue ? r.ActualClampCount.Value.ToString() : "",
-                        ResultedAssemblyCount = r.ResultedAssemblyCount.HasValue ? r.ResultedAssemblyCount.Value.ToString() : "",
+                        Size = r.Size.ToString("F2", CultureInfo.InvariantCulture),
+                        Length = lengthMM.ToString("F2", CultureInfo.InvariantCulture),
+                        Quantity = order?.Quantity.ToString() ?? "",
+                        KapakTipi = kapakTipi,
+                        ProfilTipi = profilTipi,
+                        Customer = order?.Company?.Name ?? "",
+                        EmployeeName = r.Employee != null ? $"{r.Employee.FirstName} {r.Employee.LastName}" : "",
+                        MontajlanacakKenet = montajlanacakKenet.ToString(),
+                        OlusanMontaj = olusanMontaj.ToString(),
+                        MontajTamamlandi = r.Status == "Tamamlandı",
                         Status = r.Status
                     };
                 }).ToList();
@@ -238,68 +281,21 @@ namespace ERP.UI.Forms
             }
         }
 
-        private void DataGridView_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+        private void DataGridView_CurrentCellDirtyStateChanged(object sender, EventArgs e)
         {
-            if (e.RowIndex >= 0)
+            if (_dataGridView.IsCurrentCellDirty)
             {
-                var columnName = _dataGridView.Columns[e.ColumnIndex].Name;
-                var row = _dataGridView.Rows[e.RowIndex];
-                
-                if (row.DataBoundItem != null)
-                {
-                    var item = row.DataBoundItem;
-                    
-                    // ActualClampCount buton kolonu için
-                    if (columnName == "ActualClampCount")
-                    {
-                        var actualClampCountProperty = item.GetType().GetProperty("ActualClampCount");
-                        if (actualClampCountProperty != null)
-                        {
-                            var actualClampCountValue = actualClampCountProperty.GetValue(item)?.ToString();
-                            
-                            if (!string.IsNullOrWhiteSpace(actualClampCountValue))
-                            {
-                                e.Value = $"Girildi ({actualClampCountValue})";
-                                e.FormattingApplied = true;
-                            }
-                            else
-                            {
-                                e.Value = "Gir";
-                                e.FormattingApplied = true;
-                            }
-                        }
-                    }
-                    // ResultedAssemblyCount buton kolonu için
-                    else if (columnName == "ResultedAssemblyCount")
-                    {
-                        var resultedAssemblyCountProperty = item.GetType().GetProperty("ResultedAssemblyCount");
-                        if (resultedAssemblyCountProperty != null)
-                        {
-                            var resultedAssemblyCountValue = resultedAssemblyCountProperty.GetValue(item)?.ToString();
-                            
-                            if (!string.IsNullOrWhiteSpace(resultedAssemblyCountValue))
-                            {
-                                e.Value = $"Girildi ({resultedAssemblyCountValue})";
-                                e.FormattingApplied = true;
-                            }
-                            else
-                            {
-                                e.Value = "Gir";
-                                e.FormattingApplied = true;
-                            }
-                        }
-                    }
-                }
+                _dataGridView.CommitEdit(DataGridViewDataErrorContexts.Commit);
             }
         }
 
-        private void DataGridView_CellClick(object sender, DataGridViewCellEventArgs e)
+        private void DataGridView_CellValueChanged(object sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0 || e.ColumnIndex < 0)
                 return;
 
             var columnName = _dataGridView.Columns[e.ColumnIndex].Name;
-            if (columnName != "ActualClampCount" && columnName != "ResultedAssemblyCount")
+            if (columnName != "MontajTamamlandi")
                 return;
 
             try
@@ -324,194 +320,101 @@ namespace ERP.UI.Forms
                 if (request == null)
                     return;
 
-                // Dialog aç
-                if (columnName == "ActualClampCount")
+                // Checkbox değerini kontrol et
+                bool montajTamamlandi = false;
+                if (row.Cells["MontajTamamlandi"].Value != null)
                 {
-                    int? actualClampCount = ShowActualClampCountDialog(request);
-                    if (actualClampCount.HasValue)
-                    {
-                        request.ActualClampCount = actualClampCount.Value;
-                        request.Status = "Montajda";
-                        _assemblyRequestRepository.Update(request);
-                        LoadData();
-                    }
+                    montajTamamlandi = (bool)row.Cells["MontajTamamlandi"].Value;
                 }
-                else if (columnName == "ResultedAssemblyCount")
+
+                if (montajTamamlandi)
                 {
-                    int? resultedAssemblyCount = ShowResultedAssemblyCountDialog(request);
-                    if (resultedAssemblyCount.HasValue)
-                    {
-                        request.ResultedAssemblyCount = resultedAssemblyCount.Value;
-                        request.Status = "Montajda";
-                        _assemblyRequestRepository.Update(request);
-                        LoadData();
-                    }
+                    // Onaylama işlemi
+                    OnaylaMontajTalebi(request);
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Montaj adedi girilirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Montaj onaylanırken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                LoadData(); // Hata durumunda veriyi yeniden yükle
             }
         }
 
-        private int? ShowActualClampCountDialog(AssemblyRequest request)
+        private void OnaylaMontajTalebi(AssemblyRequest request)
         {
-            using (var dialog = new Form
+            try
             {
-                Text = "Kaç Tane Kenet Kullanıldı",
-                Width = 400,
-                Height = 200,
-                StartPosition = FormStartPosition.CenterParent,
-                FormBorderStyle = FormBorderStyle.FixedDialog,
-                MaximizeBox = false,
-                MinimizeBox = false,
-                BackColor = ThemeColors.Background
-            })
-            {
-                var lblInfo = new Label
-                {
-                    Text = $"İstenen Montaj: {request.RequestedAssemblyCount} adet\n\nKaç tane kenet kullanıldı?",
-                    Location = new Point(20, 20),
-                    Width = 350,
-                    Height = 60,
-                    AutoSize = false,
-                    Font = new Font("Segoe UI", 10F)
-                };
+                // Montajlanacak kenet sayısı (RequestedAssemblyCount'tan gelecek)
+                int montajlanacakKenet = request.RequestedAssemblyCount;
 
-                var lblAdet = new Label
-                {
-                    Text = "Kullanılan Kenet Adedi:",
-                    Location = new Point(20, 90),
-                    AutoSize = true,
-                    Font = new Font("Segoe UI", 10F)
-                };
+                // Oluşan montaj sipariş adedinden gelecek
+                var order = request.OrderId.HasValue ? _orderRepository.GetById(request.OrderId.Value) : null;
+                int olusanMontaj = order?.Quantity ?? 0;
 
-                var txtAdet = new NumericUpDown
+                if (olusanMontaj == 0)
                 {
-                    Location = new Point(150, 87),
-                    Width = 200,
-                    Minimum = 0,
-                    Maximum = 999999,
-                    Value = request.ActualClampCount ?? request.RequestedAssemblyCount,
-                    DecimalPlaces = 0,
-                    Font = new Font("Segoe UI", 10F)
-                };
-
-                var btnOk = new Button
-                {
-                    Text = "Tamam",
-                    DialogResult = DialogResult.OK,
-                    Location = new Point(200, 130),
-                    Width = 80,
-                    BackColor = ThemeColors.Success,
-                    ForeColor = Color.White,
-                    FlatStyle = FlatStyle.Flat
-                };
-                btnOk.FlatAppearance.BorderSize = 0;
-
-                var btnCancel = new Button
-                {
-                    Text = "İptal",
-                    DialogResult = DialogResult.Cancel,
-                    Location = new Point(290, 130),
-                    Width = 80,
-                    BackColor = ThemeColors.Secondary,
-                    ForeColor = Color.White,
-                    FlatStyle = FlatStyle.Flat
-                };
-                btnCancel.FlatAppearance.BorderSize = 0;
-
-                dialog.Controls.AddRange(new Control[] { lblInfo, lblAdet, txtAdet, btnOk, btnCancel });
-                dialog.AcceptButton = btnOk;
-                dialog.CancelButton = btnCancel;
-
-                if (dialog.ShowDialog() == DialogResult.OK)
-                {
-                    return (int)txtAdet.Value;
+                    MessageBox.Show("Sipariş adedi bulunamadı. Montaj talebi onaylanamaz!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    LoadData(); // Checkbox'ı geri al
+                    return;
                 }
-            }
 
-            return null;
-        }
+                // ActualClampCount ve ResultedAssemblyCount değerlerini set et
+                request.ActualClampCount = montajlanacakKenet;
+                request.ResultedAssemblyCount = olusanMontaj;
 
-        private int? ShowResultedAssemblyCountDialog(AssemblyRequest request)
-        {
-            using (var dialog = new Form
-            {
-                Text = "Kaç Tane Montaj Oluştu",
-                Width = 400,
-                Height = 200,
-                StartPosition = FormStartPosition.CenterParent,
-                FormBorderStyle = FormBorderStyle.FixedDialog,
-                MaximizeBox = false,
-                MinimizeBox = false,
-                BackColor = ThemeColors.Background
-            })
-            {
-                var lblInfo = new Label
+                // Onaylama mesajı
+                var result = MessageBox.Show(
+                    $"Montaj talebi onaylanacak:\n\n" +
+                    $"Montajlanacak Kenet (kenetlenmiş stoktan): {montajlanacakKenet} adet\n" +
+                    $"Oluşan Montaj (montajlanmış stoğa): {olusanMontaj} adet\n\n" +
+                    $"Onaylamak istediğinize emin misiniz?",
+                    "Montaj Talebi Onayla",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question);
+
+                if (result != DialogResult.Yes)
                 {
-                    Text = $"İstenen Montaj: {request.RequestedAssemblyCount} adet\n\nKaç tane montaj oluştu?",
-                    Location = new Point(20, 20),
-                    Width = 350,
-                    Height = 60,
-                    AutoSize = false,
-                    Font = new Font("Segoe UI", 10F)
-                };
-
-                var lblAdet = new Label
-                {
-                    Text = "Oluşan Montaj Adedi:",
-                    Location = new Point(20, 90),
-                    AutoSize = true,
-                    Font = new Font("Segoe UI", 10F)
-                };
-
-                var txtAdet = new NumericUpDown
-                {
-                    Location = new Point(150, 87),
-                    Width = 200,
-                    Minimum = 0,
-                    Maximum = 999999,
-                    Value = request.ResultedAssemblyCount ?? request.RequestedAssemblyCount,
-                    DecimalPlaces = 0,
-                    Font = new Font("Segoe UI", 10F)
-                };
-
-                var btnOk = new Button
-                {
-                    Text = "Tamam",
-                    DialogResult = DialogResult.OK,
-                    Location = new Point(200, 130),
-                    Width = 80,
-                    BackColor = ThemeColors.Success,
-                    ForeColor = Color.White,
-                    FlatStyle = FlatStyle.Flat
-                };
-                btnOk.FlatAppearance.BorderSize = 0;
-
-                var btnCancel = new Button
-                {
-                    Text = "İptal",
-                    DialogResult = DialogResult.Cancel,
-                    Location = new Point(290, 130),
-                    Width = 80,
-                    BackColor = ThemeColors.Secondary,
-                    ForeColor = Color.White,
-                    FlatStyle = FlatStyle.Flat
-                };
-                btnCancel.FlatAppearance.BorderSize = 0;
-
-                dialog.Controls.AddRange(new Control[] { lblInfo, lblAdet, txtAdet, btnOk, btnCancel });
-                dialog.AcceptButton = btnOk;
-                dialog.CancelButton = btnCancel;
-
-                if (dialog.ShowDialog() == DialogResult.OK)
-                {
-                    return (int)txtAdet.Value;
+                    // Kullanıcı iptal etti, checkbox'ı geri al
+                    LoadData();
+                    return;
                 }
-            }
 
-            return null;
+                // Durumu "Tamamlandı" yap
+                request.Status = "Tamamlandı";
+                request.CompletionDate = DateTime.Now;
+                _assemblyRequestRepository.Update(request);
+
+                // Montaj kaydı oluştur (Assembly) - ResultedAssemblyCount montajlanmış stoğa eklenecek
+                var assembly = new Assembly
+                {
+                    OrderId = request.OrderId,
+                    ClampingId = request.ClampingId,
+                    PlateThickness = request.PlateThickness,
+                    Hatve = request.Hatve,
+                    Size = request.Size,
+                    Length = request.Length,
+                    SerialNoId = request.SerialNoId,
+                    MachineId = request.MachineId,
+                    AssemblyCount = olusanMontaj, // Oluşan montaj adedi
+                    UsedClampCount = montajlanacakKenet, // Montajlanacak kenet adedi
+                    EmployeeId = request.EmployeeId,
+                    AssemblyDate = DateTime.Now
+                };
+                
+                // AssemblyRepository'yi kullanarak kaydet
+                var assemblyRepository = new AssemblyRepository();
+                assemblyRepository.Insert(assembly);
+
+                MessageBox.Show("Montaj talebi onaylandı ve montaj kaydı oluşturuldu!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                // Verileri yeniden yükle
+                LoadData();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Montaj talebi onaylanırken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                LoadData(); // Hata durumunda veriyi yeniden yükle
+            }
         }
 
         private string GetHatveLetter(decimal hatveValue)

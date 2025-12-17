@@ -69,13 +69,13 @@ namespace ERP.UI.Forms
             int controlWidth = 300;
             int spacing = 35;
 
-            // Kenetlenmiş Plaka Seçimi (Filtrelenmiş)
+            // Kenetlenmiş Plaka Seçimi (Önce seçilecek, sonra değerler otomatik gelecek)
             var lblClamping = new Label
             {
                 Text = "Kenetlenmiş Plaka:",
                 Location = new Point(20, yPos),
                 Width = labelWidth,
-                Font = new Font("Segoe UI", 10F)
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold)
             };
             _cmbClamping = new ComboBox
             {
@@ -83,15 +83,14 @@ namespace ERP.UI.Forms
                 Width = controlWidth,
                 Height = 30,
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 10F),
-                Enabled = false  // Başlangıçta devre dışı, filtreleme kriterleri girildikten sonra aktif olacak
+                Font = new Font("Segoe UI", 10F)
             };
             _cmbClamping.SelectedIndexChanged += CmbClamping_SelectedIndexChanged;
             this.Controls.Add(lblClamping);
             this.Controls.Add(_cmbClamping);
             yPos += spacing;
 
-            // Plaka Kalınlığı (ComboBox - tablodaki değerlerden)
+            // Plaka Kalınlığı (ReadOnly - kenetlenmiş plakadan otomatik gelecek)
             var lblPlateThickness = new Label
             {
                 Text = "Plaka Kalınlığı:",
@@ -104,15 +103,14 @@ namespace ERP.UI.Forms
                 Location = new Point(180, yPos - 3),
                 Width = controlWidth,
                 Height = 30,
-                DropDownStyle = ComboBoxStyle.DropDownList,
+                DropDownStyle = ComboBoxStyle.DropDown,
                 Font = new Font("Segoe UI", 10F)
             };
-            _cmbPlateThickness.SelectedIndexChanged += FilterClampings;
             this.Controls.Add(lblPlateThickness);
             this.Controls.Add(_cmbPlateThickness);
             yPos += spacing;
 
-            // Hatve (ComboBox - tablodaki değerlerden)
+            // Hatve (ReadOnly - kenetlenmiş plakadan otomatik gelecek)
             var lblHatve = new Label
             {
                 Text = "Hatve:",
@@ -125,15 +123,14 @@ namespace ERP.UI.Forms
                 Location = new Point(180, yPos - 3),
                 Width = controlWidth,
                 Height = 30,
-                DropDownStyle = ComboBoxStyle.DropDownList,
+                DropDownStyle = ComboBoxStyle.DropDown,
                 Font = new Font("Segoe UI", 10F)
             };
-            _cmbHatve.SelectedIndexChanged += FilterClampings;
             this.Controls.Add(lblHatve);
             this.Controls.Add(_cmbHatve);
             yPos += spacing;
 
-            // Ölçü (ComboBox - tablodaki değerlerden)
+            // Ölçü (ReadOnly - kenetlenmiş plakadan otomatik gelecek)
             var lblSize = new Label
             {
                 Text = "Ölçü:",
@@ -146,15 +143,14 @@ namespace ERP.UI.Forms
                 Location = new Point(180, yPos - 3),
                 Width = controlWidth,
                 Height = 30,
-                DropDownStyle = ComboBoxStyle.DropDownList,
+                DropDownStyle = ComboBoxStyle.DropDown,
                 Font = new Font("Segoe UI", 10F)
             };
-            _cmbSize.SelectedIndexChanged += FilterClampings;
             this.Controls.Add(lblSize);
             this.Controls.Add(_cmbSize);
             yPos += spacing;
 
-            // Uzunluk
+            // Uzunluk (ReadOnly - kenetlenmiş plakadan otomatik gelecek)
             var lblLength = new Label
             {
                 Text = "Uzunluk:",
@@ -214,10 +210,10 @@ namespace ERP.UI.Forms
             this.Controls.Add(_cmbMachine);
             yPos += spacing;
 
-            // İstenen Montaj Adedi (Mühendis tarafından girilecek)
+            // Montajlanacak Kenet Sayısı (Mühendis tarafından girilecek)
             var lblRequestedAssemblyCount = new Label
             {
-                Text = "İstenen Montaj Adedi:",
+                Text = "Montajlanacak Kenet Sayısı:",
                 Location = new Point(20, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold)
@@ -336,8 +332,11 @@ namespace ERP.UI.Forms
                 // Operatörleri yükle
                 LoadEmployees();
                 
-                // Combo box'ları kenetlenmiş stok tablosundan doldur
-                LoadFilterComboBoxes();
+                // Siparişten bilgileri al ve form alanlarını doldur
+                LoadOrderDataToForm();
+                
+                // Sipariş bilgilerine göre kenetlenmiş plakaları yükle
+                LoadClampingsBasedOnOrder();
             }
             catch (Exception ex)
             {
@@ -345,61 +344,213 @@ namespace ERP.UI.Forms
             }
         }
 
-        private void LoadFilterComboBoxes()
+        private void LoadOrderDataToForm()
         {
             try
             {
-                // Tüm kenetlenmiş stokları al
-                var allClampings = _clampingRepository.GetAll()
-                    .Where(c => c.ClampCount > 0 && c.IsActive)
-                    .ToList();
-
-                // Farklı Hatve değerlerini al
-                var hatveValues = allClampings
-                    .Select(c => c.Hatve)
-                    .Distinct()
-                    .OrderBy(h => h)
-                    .ToList();
-                _cmbHatve.Items.Clear();
-                _cmbHatve.Items.Add(""); // Boş seçenek
-                foreach (var hatve in hatveValues)
+                // Siparişten bilgileri al
+                var order = _orderRepository.GetById(_orderId);
+                if (order == null || string.IsNullOrEmpty(order.ProductCode))
                 {
-                    _cmbHatve.Items.Add(hatve.ToString("F2", CultureInfo.InvariantCulture));
+                    MessageBox.Show("Sipariş bulunamadı veya ürün kodu eksik!", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
                 }
 
-                // Farklı Size değerlerini al
-                var sizeValues = allClampings
-                    .Select(c => c.Size)
-                    .Distinct()
-                    .OrderBy(s => s)
-                    .ToList();
-                _cmbSize.Items.Clear();
-                _cmbSize.Items.Add(""); // Boş seçenek
-                foreach (var size in sizeValues)
+                var parts = order.ProductCode.Split('-');
+                
+                // Size (Ölçü) bilgisini siparişten al
+                if (parts.Length >= 4 && int.TryParse(parts[3], out int plakaOlcusuMM))
                 {
-                    _cmbSize.Items.Add(size.ToString("F1", CultureInfo.InvariantCulture));
+                    // Plaka ölçüsü com (mm): <= 1150 ise aynı, > 1150 ise /2
+                    int plakaOlcusuComMM = plakaOlcusuMM <= 1150 ? plakaOlcusuMM : plakaOlcusuMM / 2;
+                    decimal sizeCM = plakaOlcusuComMM / 10.0m;
+                    
+                    // ComboBox'a tüm mevcut size değerlerini ekle ve default'u seç
+                    var allSizes = _clampingRepository.GetAll()
+                        .Select(c => c.Size)
+                        .Distinct()
+                        .OrderBy(s => s)
+                        .ToList();
+                    _cmbSize.Items.Clear();
+                    foreach (var s in allSizes)
+                    {
+                        _cmbSize.Items.Add(s.ToString("F2", CultureInfo.InvariantCulture));
+                    }
+                    
+                    var sizeText = sizeCM.ToString("F2", CultureInfo.InvariantCulture);
+                    if (_cmbSize.Items.Contains(sizeText))
+                        _cmbSize.SelectedItem = sizeText;
+                    else
+                        _cmbSize.Text = sizeText;
                 }
-
-                // Farklı PlateThickness değerlerini al
-                var plateThicknessValues = allClampings
-                    .Select(c => c.PlateThickness)
-                    .Distinct()
-                    .OrderBy(pt => pt)
-                    .ToList();
-                _cmbPlateThickness.Items.Clear();
-                _cmbPlateThickness.Items.Add(""); // Boş seçenek
-                foreach (var pt in plateThicknessValues)
+                
+                // Hatve bilgisini siparişten al
+                if (parts.Length >= 3)
                 {
-                    _cmbPlateThickness.Items.Add(pt.ToString("F3", CultureInfo.InvariantCulture));
+                    string modelProfile = parts[2];
+                    if (modelProfile.Length > 0)
+                    {
+                        char modelLetter = modelProfile[0];
+                        decimal hatve = GetHtave(modelLetter);
+                        
+                        // ComboBox'a tüm mevcut hatve değerlerini ekle ve default'u seç
+                        var allHatves = _clampingRepository.GetAll()
+                            .Select(c => c.Hatve)
+                            .Distinct()
+                            .OrderBy(h => h)
+                            .ToList();
+                        _cmbHatve.Items.Clear();
+                        foreach (var h in allHatves)
+                        {
+                            _cmbHatve.Items.Add(h.ToString("F2", CultureInfo.InvariantCulture));
+                        }
+                        
+                        var hatveText = hatve.ToString("F2", CultureInfo.InvariantCulture);
+                        if (_cmbHatve.Items.Contains(hatveText))
+                            _cmbHatve.SelectedItem = hatveText;
+                        else
+                            _cmbHatve.Text = hatveText;
+                    }
+                }
+                
+                // Plaka Kalınlığı (Lamel Kalınlığı)
+                if (order.LamelThickness.HasValue)
+                {
+                    // ComboBox'a tüm mevcut plaka kalınlığı değerlerini ekle ve default'u seç
+                    var allPlateThicknesses = _clampingRepository.GetAll()
+                        .Select(c => c.PlateThickness)
+                        .Distinct()
+                        .OrderBy(pt => pt)
+                        .ToList();
+                    _cmbPlateThickness.Items.Clear();
+                    foreach (var pt in allPlateThicknesses)
+                    {
+                        _cmbPlateThickness.Items.Add(pt.ToString("F3", CultureInfo.InvariantCulture));
+                    }
+                    
+                    var plateThicknessText = order.LamelThickness.Value.ToString("F3", CultureInfo.InvariantCulture);
+                    if (_cmbPlateThickness.Items.Contains(plateThicknessText))
+                        _cmbPlateThickness.SelectedItem = plateThicknessText;
+                    else
+                        _cmbPlateThickness.Text = plateThicknessText;
+                }
+                
+                // Uzunluk bilgisini siparişten al (MM olarak göster)
+                if (parts.Length >= 5 && int.TryParse(parts[4], out int yukseklikMM))
+                {
+                    // Yükseklik com: <= 1800 ise aynı, > 1800 ise /2
+                    int yukseklikComMM = yukseklikMM <= 1800 ? yukseklikMM : yukseklikMM / 2;
+                    // MM olarak göster (CM'ye çevirmeden direkt MM)
+                    _txtLength.Text = yukseklikComMM.ToString("F2", CultureInfo.InvariantCulture);
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Filtre combo box'ları yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Sipariş bilgileri yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        private void FilterClampings(object sender, EventArgs e)
+        private decimal GetHtave(char modelLetter)
+        {
+            switch (char.ToUpper(modelLetter))
+            {
+                case 'H': return 3.25m;
+                case 'D': return 4.5m;
+                case 'M': return 6.5m;
+                case 'L': return 9m;
+                default: return 0m;
+            }
+        }
+
+        private void LoadClampingsBasedOnOrder()
+        {
+            try
+            {
+                _cmbClamping.Items.Clear();
+                
+                // Form alanlarından filtreleme değerlerini al
+                if (string.IsNullOrWhiteSpace(_cmbHatve.Text) || 
+                    string.IsNullOrWhiteSpace(_cmbSize.Text) || 
+                    string.IsNullOrWhiteSpace(_cmbPlateThickness.Text) ||
+                    string.IsNullOrWhiteSpace(_txtLength.Text))
+                {
+                    _cmbClamping.Enabled = false;
+                    return;
+                }
+
+                if (!decimal.TryParse(_cmbHatve.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal hatve) ||
+                    !decimal.TryParse(_cmbSize.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal size) ||
+                    !decimal.TryParse(_cmbPlateThickness.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal plateThickness) ||
+                    !decimal.TryParse(_txtLength.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal lengthMM))
+                {
+                    _cmbClamping.Enabled = false;
+                    return;
+                }
+
+                // Uzunluk artık MM olarak giriliyor (veritabanında mm cinsinden saklanıyor)
+
+                // TÜM kenetlenmiş stokları yükle (sadece belirli bir siparişe ait değil, stoktan da kullanılabilir)
+                var allClampings = _clampingRepository.GetAll();
+                
+                // Filtreleme: Hatve, Ölçü, Plaka Kalınlığı, Uzunluk - tam eşleşme (combo box'dan seçildiği için)
+                var filteredClampings = allClampings.Where(c => 
+                    c.ClampCount > 0 && 
+                    c.IsActive &&
+                    Math.Abs(c.Hatve - hatve) < 0.01m &&
+                    Math.Abs(c.Size - size) < 0.1m &&
+                    Math.Abs(c.PlateThickness - plateThickness) < 0.001m &&
+                    Math.Abs(c.Length - lengthMM) < 1.0m); // MM cinsinden tolerance (1mm = 0.1cm)
+                
+                var filteredList = filteredClampings.OrderByDescending(c => c.ClampingDate).ToList();
+                
+                if (!filteredList.Any())
+                {
+                    _cmbClamping.Enabled = false;
+                    return;
+                }
+                
+                foreach (var clamping in filteredList)
+                {
+                    // Daha önce montajda kullanılan kenet adedini hesapla
+                    // Hem eski Assembly kayıtlarından hem de tamamlanmış AssemblyRequest'lerden
+                    var usedClampCountFromAssembly = _assemblyRepository.GetAll()
+                        .Where(a => a.ClampingId == clamping.Id && a.IsActive)
+                        .Sum(a => a.UsedClampCount);
+                    
+                    var usedClampCountFromRequests = _assemblyRequestRepository.GetAll()
+                        .Where(ar => ar.ClampingId == clamping.Id && ar.IsActive && ar.Status == "Tamamlandı")
+                        .Sum(ar => ar.ActualClampCount ?? ar.RequestedAssemblyCount);
+                    
+                    var totalUsedCount = usedClampCountFromAssembly + usedClampCountFromRequests;
+                    var availableClampCount = clamping.ClampCount - totalUsedCount;
+                    
+                    if (availableClampCount > 0)
+                    {
+                        var order = clamping.OrderId.HasValue ? _orderRepository.GetById(clamping.OrderId.Value) : null;
+                        string orderInfo = order != null ? $" - {order.TrexOrderNo}" : " - Stok";
+                        
+                        _cmbClamping.Items.Add(new 
+                        { 
+                            Id = clamping.Id, 
+                            DisplayText = $"Kenet #{clamping.ClampingDate:dd.MM.yyyy}{orderInfo} - {clamping.ClampCount} adet (Kalan: {availableClampCount})",
+                            Clamping = clamping
+                        });
+                    }
+                }
+                _cmbClamping.DisplayMember = "DisplayText";
+                _cmbClamping.ValueMember = "Id";
+                
+                // Combo box'u aktif et (en az bir öğe varsa)
+                _cmbClamping.Enabled = _cmbClamping.Items.Count > 0;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Kenetlenmiş stoklar yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        // FilterClampings metodu kaldırıldı - artık kenetlenmiş plaka seçilince değerler otomatik geliyor
+        private void FilterClampings_Removed(object sender, EventArgs e)
         {
             try
             {
@@ -482,38 +633,43 @@ namespace ERP.UI.Forms
             }
         }
 
+        // Kenetlenmiş plaka seçimi artık sadece seçim yapıyor, değerleri değiştirmiyor
         private void CmbClamping_SelectedIndexChanged(object sender, EventArgs e)
         {
+            // Kenetlenmiş plaka seçildiğinde sadece Rulo Seri No'yu güncelle
+            // Diğer değerler (Hatve, Ölçü, Plaka Kalınlığı, Uzunluk) Order'dan geliyor
             if (_cmbClamping.SelectedItem == null)
+            {
+                _cmbSerialNo.SelectedItem = null;
                 return;
+            }
 
             try
             {
-                var idProperty = _cmbClamping.SelectedItem.GetType().GetProperty("Id");
-                if (idProperty == null)
+                var clampingProperty = _cmbClamping.SelectedItem.GetType().GetProperty("Clamping");
+                if (clampingProperty == null)
                     return;
 
-                var clampingId = (Guid)idProperty.GetValue(_cmbClamping.SelectedItem);
-                var clamping = _clampingRepository.GetAll().FirstOrDefault(c => c.Id == clampingId);
+                var clamping = clampingProperty.GetValue(_cmbClamping.SelectedItem) as Clamping;
+                if (clamping == null)
+                    return;
 
-                if (clamping != null)
+                // Rulo Seri No'yu doldur (kenetlenmiş plakadan)
+                if (clamping.SerialNoId.HasValue)
                 {
-                    // Rulo Seri No'yu doldur (kenetlenmiş plakadan)
-                    if (clamping.SerialNoId.HasValue)
+                    foreach (var item in _cmbSerialNo.Items)
                     {
-                        foreach (var item in _cmbSerialNo.Items)
+                        var itemIdProperty = item.GetType().GetProperty("Id");
+                        if (itemIdProperty != null && itemIdProperty.GetValue(item).Equals(clamping.SerialNoId.Value))
                         {
-                            var itemIdProperty = item.GetType().GetProperty("Id");
-                            if (itemIdProperty != null && itemIdProperty.GetValue(item).Equals(clamping.SerialNoId.Value))
-                            {
-                                _cmbSerialNo.SelectedItem = item;
-                                break;
-                            }
+                            _cmbSerialNo.SelectedItem = item;
+                            break;
                         }
                     }
-                    
-                    // Uzunluk bilgisini doldur
-                    _txtLength.Text = clamping.Length.ToString("F2", CultureInfo.InvariantCulture);
+                }
+                else
+                {
+                    _cmbSerialNo.SelectedItem = null;
                 }
             }
             catch (Exception ex)
@@ -653,10 +809,11 @@ namespace ERP.UI.Forms
                 {
                     OrderId = orderId, // Dialog hangi sipariş için açıldıysa o siparişe ait
                     ClampingId = clampingId,
-                    PlateThickness = decimal.Parse(_cmbPlateThickness.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture),
-                    Hatve = decimal.Parse(_cmbHatve.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture),
-                    Size = decimal.Parse(_cmbSize.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture),
-                    Length = decimal.Parse(_txtLength.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
+                    PlateThickness = decimal.Parse(_cmbPlateThickness.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
+                    Hatve = decimal.Parse(_cmbHatve.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
+                    Size = decimal.Parse(_cmbSize.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
+                    // Uzunluk MM olarak giriliyor, CM'ye çevirip kaydet (veritabanında CM olarak saklanıyor)
+                    Length = decimal.Parse(_txtLength.Text, NumberStyles.Any, CultureInfo.InvariantCulture) / 10.0m,
                     SerialNoId = clamping?.SerialNoId,
                     MachineId = _cmbMachine.SelectedItem != null ? GetSelectedId(_cmbMachine) : (Guid?)null,
                     RequestedAssemblyCount = int.Parse(_txtRequestedAssemblyCount.Text),
@@ -677,39 +834,61 @@ namespace ERP.UI.Forms
 
         private bool ValidateForm()
         {
-            if (_cmbPlateThickness.SelectedItem == null || string.IsNullOrWhiteSpace(_cmbPlateThickness.SelectedItem.ToString()))
-            {
-                MessageBox.Show("Lütfen plaka kalınlığı seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return false;
-            }
-
-            if (_cmbHatve.SelectedItem == null || string.IsNullOrWhiteSpace(_cmbHatve.SelectedItem.ToString()))
-            {
-                MessageBox.Show("Lütfen hatve seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return false;
-            }
-
-            if (_cmbSize.SelectedItem == null || string.IsNullOrWhiteSpace(_cmbSize.SelectedItem.ToString()))
-            {
-                MessageBox.Show("Lütfen ölçü seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return false;
-            }
-
+            // Kenetlenmiş plaka seçimi zorunlu (diğer değerler bundan otomatik gelecek)
             if (_cmbClamping.SelectedItem == null)
             {
                 MessageBox.Show("Lütfen kenetlenmiş plaka seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
 
+            // Plaka Kalınlığı kontrolü (Text veya SelectedItem olabilir - DropDown style)
+            if (string.IsNullOrWhiteSpace(_cmbPlateThickness.Text))
+            {
+                MessageBox.Show("Lütfen plaka kalınlığı giriniz veya seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+
+            if (!decimal.TryParse(_cmbPlateThickness.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal plateThickness) || plateThickness <= 0)
+            {
+                MessageBox.Show("Lütfen geçerli bir plaka kalınlığı giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+
+            // Hatve kontrolü (Text veya SelectedItem olabilir - DropDown style)
+            if (string.IsNullOrWhiteSpace(_cmbHatve.Text))
+            {
+                MessageBox.Show("Lütfen hatve giriniz veya seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+
+            if (!decimal.TryParse(_cmbHatve.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal hatve) || hatve <= 0)
+            {
+                MessageBox.Show("Lütfen geçerli bir hatve giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+
+            // Ölçü kontrolü (Text veya SelectedItem olabilir - DropDown style)
+            if (string.IsNullOrWhiteSpace(_cmbSize.Text))
+            {
+                MessageBox.Show("Lütfen ölçü giriniz veya seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+
+            if (!decimal.TryParse(_cmbSize.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal size) || size <= 0)
+            {
+                MessageBox.Show("Lütfen geçerli bir ölçü giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+
             if (string.IsNullOrWhiteSpace(_txtLength.Text) || !decimal.TryParse(_txtLength.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal length) || length <= 0)
             {
-                MessageBox.Show("Lütfen geçerli bir uzunluk giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Uzunluk bilgisi yüklenemedi. Lütfen tekrar deneyiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
 
             if (string.IsNullOrWhiteSpace(_txtRequestedAssemblyCount.Text) || !int.TryParse(_txtRequestedAssemblyCount.Text, out int requestedAssemblyCount) || requestedAssemblyCount <= 0)
             {
-                MessageBox.Show("Lütfen geçerli bir istenen montaj adedi giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Lütfen geçerli bir montajlanacak kenet sayısı giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
 
@@ -733,7 +912,7 @@ namespace ERP.UI.Forms
                 
                 if (requestedAssemblyCount > availableClampCount)
                 {
-                    MessageBox.Show($"İstenen montaj adedi kalan kenetlenmiş plaka adedinden fazla olamaz! (Kalan: {availableClampCount}, İstenen: {requestedAssemblyCount})", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show($"Montajlanacak kenet sayısı kalan kenetlenmiş plaka adedinden fazla olamaz! (Kalan: {availableClampCount}, İstenen: {requestedAssemblyCount})", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return false;
                 }
             }

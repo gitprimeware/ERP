@@ -122,6 +122,10 @@ namespace ERP.UI.Forms
             {
                 _contentManager.ShowForm("ClampingRequests");
             }
+            else if (formTag == "Clamping2Requests")
+            {
+                _contentManager.ShowForm("Clamping2Requests");
+            }
             else if (formTag == "AssemblyRequests")
             {
                 _contentManager.ShowForm("AssemblyRequests");

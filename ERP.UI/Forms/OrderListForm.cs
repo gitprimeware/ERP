@@ -287,7 +287,10 @@ namespace ERP.UI.Forms
         {
             try
             {
-                var orders = _orderRepository.GetAll(searchTerm, companyId).ToList();
+                // Sadece SP (normal) siparişleri göster, YM (stok) siparişlerini filtrele
+                var orders = _orderRepository.GetAll(searchTerm, companyId)
+                    .Where(o => !o.IsStockOrder) // IsStockOrder == false olanları al (SP siparişleri)
+                    .ToList();
 
                 if (_isTableView)
                 {
