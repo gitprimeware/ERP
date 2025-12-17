@@ -17,6 +17,14 @@ namespace ERP.UI.Forms
         private CuttingRepository _cuttingRepository;
         private PressingRepository _pressingRepository;
         private OrderRepository _orderRepository;
+        
+        // Filtreleme kontrolleri
+        private ComboBox _cmbSiparisNo;
+        private ComboBox _cmbHatve;
+        private ComboBox _cmbOlcu;
+        private ComboBox _cmbRuloSeriNo;
+        private Button _btnFiltrele;
+        private Button _btnFiltreleriTemizle;
 
         public KesilmisStokTakipForm()
         {
@@ -58,12 +66,129 @@ namespace ERP.UI.Forms
                 Location = new Point(30, 30)
             };
 
+            // Filtreleme paneli
+            var filterPanel = new Panel
+            {
+                Location = new Point(30, 70),
+                Width = _mainPanel.Width - 60,
+                Height = 50,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                BackColor = Color.Transparent
+            };
+
+            // Sipariş No filtresi
+            var lblSiparisNo = new Label
+            {
+                Text = "Sipariş No:",
+                Location = new Point(0, 15),
+                Width = 90,
+                ForeColor = ThemeColors.TextPrimary
+            };
+            _cmbSiparisNo = new ComboBox
+            {
+                Location = new Point(95, 12),
+                Width = 150,
+                DropDownStyle = ComboBoxStyle.DropDown,
+                AutoCompleteMode = AutoCompleteMode.SuggestAppend,
+                AutoCompleteSource = AutoCompleteSource.ListItems
+            };
+
+            // Hatve filtresi
+            var lblHatve = new Label
+            {
+                Text = "Hatve:",
+                Location = new Point(255, 15),
+                Width = 60,
+                ForeColor = ThemeColors.TextPrimary
+            };
+            _cmbHatve = new ComboBox
+            {
+                Location = new Point(320, 12),
+                Width = 120,
+                DropDownStyle = ComboBoxStyle.DropDown,
+                AutoCompleteMode = AutoCompleteMode.SuggestAppend,
+                AutoCompleteSource = AutoCompleteSource.ListItems
+            };
+
+            // Ölçü filtresi
+            var lblOlcu = new Label
+            {
+                Text = "Ölçü:",
+                Location = new Point(450, 15),
+                Width = 50,
+                ForeColor = ThemeColors.TextPrimary
+            };
+            _cmbOlcu = new ComboBox
+            {
+                Location = new Point(505, 12),
+                Width = 100,
+                DropDownStyle = ComboBoxStyle.DropDown,
+                AutoCompleteMode = AutoCompleteMode.SuggestAppend,
+                AutoCompleteSource = AutoCompleteSource.ListItems
+            };
+
+            // Rulo Seri No filtresi
+            var lblRuloSeriNo = new Label
+            {
+                Text = "Rulo Seri No:",
+                Location = new Point(615, 15),
+                Width = 100,
+                ForeColor = ThemeColors.TextPrimary
+            };
+            _cmbRuloSeriNo = new ComboBox
+            {
+                Location = new Point(720, 12),
+                Width = 150,
+                DropDownStyle = ComboBoxStyle.DropDown,
+                AutoCompleteMode = AutoCompleteMode.SuggestAppend,
+                AutoCompleteSource = AutoCompleteSource.ListItems
+            };
+
+            // Filtrele butonu
+            _btnFiltrele = new Button
+            {
+                Text = "🔍 Filtrele",
+                Location = new Point(880, 10),
+                Width = 100,
+                Height = 30,
+                BackColor = ThemeColors.Primary,
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
+            };
+            _btnFiltrele.FlatAppearance.BorderSize = 0;
+
+            // Filtreleri Temizle butonu
+            _btnFiltreleriTemizle = new Button
+            {
+                Text = "🗑️ Temizle",
+                Location = new Point(990, 10),
+                Width = 100,
+                Height = 30,
+                BackColor = ThemeColors.Secondary,
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
+            };
+            _btnFiltreleriTemizle.FlatAppearance.BorderSize = 0;
+
+            filterPanel.Controls.Add(lblSiparisNo);
+            filterPanel.Controls.Add(_cmbSiparisNo);
+            filterPanel.Controls.Add(lblHatve);
+            filterPanel.Controls.Add(_cmbHatve);
+            filterPanel.Controls.Add(lblOlcu);
+            filterPanel.Controls.Add(_cmbOlcu);
+            filterPanel.Controls.Add(lblRuloSeriNo);
+            filterPanel.Controls.Add(_cmbRuloSeriNo);
+            filterPanel.Controls.Add(_btnFiltrele);
+            filterPanel.Controls.Add(_btnFiltreleriTemizle);
+
             // DataGridView
             _dataGridView = new DataGridView
             {
-                Location = new Point(30, 80),
+                Location = new Point(30, 130),
                 Width = _mainPanel.Width - 60,
-                Height = _mainPanel.Height - 130,
+                Height = _mainPanel.Height - 180,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
                 AllowUserToAddRows = false,
@@ -78,9 +203,14 @@ namespace ERP.UI.Forms
 
             _mainPanel.Resize += (s, e) =>
             {
+                filterPanel.Width = _mainPanel.Width - 60;
                 _dataGridView.Width = _mainPanel.Width - 60;
-                _dataGridView.Height = _mainPanel.Height - 130;
+                _dataGridView.Height = _mainPanel.Height - 180;
             };
+
+            // Event handlers
+            _btnFiltrele.Click += BtnFiltrele_Click;
+            _btnFiltreleriTemizle.Click += BtnFiltreleriTemizle_Click;
 
             // Kolonlar
             _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
@@ -158,11 +288,14 @@ namespace ERP.UI.Forms
             _dataGridView.EnableHeadersVisualStyles = false;
 
             _mainPanel.Controls.Add(titleLabel);
+            _mainPanel.Controls.Add(filterPanel);
             _mainPanel.Controls.Add(_dataGridView);
 
             this.Controls.Add(_mainPanel);
             _mainPanel.BringToFront();
         }
+
+        private bool _filterControlsLoaded = false;
 
         private void LoadData()
         {
@@ -172,6 +305,16 @@ namespace ERP.UI.Forms
                     .Where(c => c.PlakaAdedi > 0 && c.IsActive)
                     .OrderByDescending(c => c.CuttingDate)
                     .ToList();
+
+                // Filtreleme kontrollerini doldur
+                if (!_filterControlsLoaded)
+                {
+                    LoadFilterControls(cuttings);
+                    _filterControlsLoaded = true;
+                }
+
+                // Filtreleme uygula
+                cuttings = ApplyFilters(cuttings);
 
                 var stockData = new List<StockRowData>();
 
@@ -189,11 +332,14 @@ namespace ERP.UI.Forms
                     // Kalan plaka adedi
                     int kalanPlakaAdedi = cutting.PlakaAdedi - usedPlakaAdedi;
 
+                    // Hatve değerini harf ile göster
+                    string hatveDisplay = GetHatveDisplay(cutting.Hatve);
+
                     stockData.Add(new StockRowData
                     {
                         SiparisNo = siparisNo,
                         KesimTarihi = cutting.CuttingDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
-                        Hatve = cutting.Hatve.ToString("F2", CultureInfo.InvariantCulture),
+                        Hatve = hatveDisplay,
                         Olcu = cutting.Size.ToString("F2", CultureInfo.InvariantCulture),
                         RuloSeriNo = cutting.SerialNo?.SerialNumber ?? "-",
                         ToplamPlakaAdedi = cutting.PlakaAdedi.ToString(),
@@ -219,6 +365,191 @@ namespace ERP.UI.Forms
 
         public void RefreshData()
         {
+            LoadData();
+        }
+
+        private void LoadFilterControls(List<Cutting> cuttings)
+        {
+            // Sipariş No listesini doldur
+            var orderIds = cuttings
+                .Where(c => c.OrderId.HasValue)
+                .Select(c => c.OrderId.Value)
+                .Distinct()
+                .ToList();
+            
+            var orders = _orderRepository.GetAll()
+                .Where(o => orderIds.Contains(o.Id) && !string.IsNullOrEmpty(o.TrexOrderNo))
+                .Select(o => o.TrexOrderNo)
+                .Distinct()
+                .OrderBy(s => s)
+                .ToList();
+            
+            _cmbSiparisNo.Items.Clear();
+            _cmbSiparisNo.Items.Add(""); // Tümü seçeneği
+            foreach (var orderNo in orders)
+            {
+                _cmbSiparisNo.Items.Add(orderNo);
+            }
+
+            // Hatve listesini doldur (H, D, M, L değerleri ile)
+            var hatveValues = cuttings
+                .Select(c => c.Hatve)
+                .Distinct()
+                .OrderBy(h => h)
+                .ToList();
+            
+            _cmbHatve.Items.Clear();
+            _cmbHatve.Items.Add(""); // Tümü seçeneği
+            foreach (var hatve in hatveValues)
+            {
+                string hatveDisplay = GetHatveDisplay(hatve);
+                _cmbHatve.Items.Add(hatveDisplay);
+            }
+
+            // Ölçü listesini doldur
+            var sizes = cuttings
+                .Select(c => c.Size)
+                .Distinct()
+                .OrderBy(s => s)
+                .ToList();
+            
+            _cmbOlcu.Items.Clear();
+            _cmbOlcu.Items.Add(""); // Tümü seçeneği
+            foreach (var size in sizes)
+            {
+                _cmbOlcu.Items.Add(size.ToString("F2", CultureInfo.InvariantCulture));
+            }
+
+            // Rulo Seri No listesini doldur
+            var serialNumbers = cuttings
+                .Where(c => c.SerialNo != null && !string.IsNullOrEmpty(c.SerialNo.SerialNumber))
+                .Select(c => c.SerialNo.SerialNumber)
+                .Distinct()
+                .OrderBy(s => s)
+                .ToList();
+            
+            _cmbRuloSeriNo.Items.Clear();
+            _cmbRuloSeriNo.Items.Add(""); // Tümü seçeneği
+            foreach (var serialNo in serialNumbers)
+            {
+                _cmbRuloSeriNo.Items.Add(serialNo);
+            }
+        }
+
+        private List<Cutting> ApplyFilters(List<Cutting> cuttings)
+        {
+            // Filtreleme kriterlerini al
+            string filterSiparisNo = _cmbSiparisNo?.Text?.Trim() ?? "";
+            string filterHatve = _cmbHatve?.Text?.Trim() ?? "";
+            string filterOlcu = _cmbOlcu?.Text?.Trim() ?? "";
+            string filterRuloSeriNo = _cmbRuloSeriNo?.Text?.Trim() ?? "";
+
+            // Sipariş No filtresi
+            if (!string.IsNullOrEmpty(filterSiparisNo))
+            {
+                var orderIds = _orderRepository.GetAll()
+                    .Where(o => o.TrexOrderNo != null && o.TrexOrderNo.Contains(filterSiparisNo, StringComparison.OrdinalIgnoreCase))
+                    .Select(o => o.Id)
+                    .ToList();
+                
+                cuttings = cuttings.Where(c => c.OrderId.HasValue && orderIds.Contains(c.OrderId.Value)).ToList();
+            }
+
+            // Hatve filtresi (H, D, M, L veya sayısal değer)
+            if (!string.IsNullOrEmpty(filterHatve))
+            {
+                // H, D, M, L harflerini kontrol et
+                decimal? hatveValue = null;
+                if (filterHatve.Length == 1)
+                {
+                    char hatveLetter = char.ToUpper(filterHatve[0]);
+                    switch (hatveLetter)
+                    {
+                        case 'H': hatveValue = 3.25m; break;
+                        case 'D': hatveValue = 4.5m; break;
+                        case 'M': hatveValue = 6.5m; break;
+                        case 'L': hatveValue = 9m; break;
+                    }
+                }
+                
+                // Eğer harf değilse, sayısal değer olarak parse et
+                if (!hatveValue.HasValue)
+                {
+                    // "3.25 (H)" formatından sayıyı çıkar
+                    string numericPart = filterHatve.Split('(')[0].Trim();
+                    if (decimal.TryParse(numericPart, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal parsedValue))
+                    {
+                        hatveValue = parsedValue;
+                    }
+                }
+
+                if (hatveValue.HasValue)
+                {
+                    cuttings = cuttings.Where(c => Math.Abs(c.Hatve - hatveValue.Value) < 0.1m).ToList();
+                }
+            }
+
+            // Ölçü filtresi
+            if (!string.IsNullOrEmpty(filterOlcu))
+            {
+                if (decimal.TryParse(filterOlcu, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal sizeValue))
+                {
+                    cuttings = cuttings.Where(c => Math.Abs(c.Size - sizeValue) < 0.01m).ToList();
+                }
+            }
+
+            // Rulo Seri No filtresi
+            if (!string.IsNullOrEmpty(filterRuloSeriNo))
+            {
+                cuttings = cuttings.Where(c => c.SerialNo != null && 
+                    c.SerialNo.SerialNumber != null && 
+                    c.SerialNo.SerialNumber.Contains(filterRuloSeriNo, StringComparison.OrdinalIgnoreCase)).ToList();
+            }
+
+            return cuttings;
+        }
+
+        private string GetHatveDisplay(decimal hatveValue)
+        {
+            string hatveLetter = GetHatveLetter(hatveValue);
+            if (hatveLetter == "H" || hatveLetter == "D" || hatveLetter == "M" || hatveLetter == "L")
+            {
+                return $"{hatveValue.ToString("F2", CultureInfo.InvariantCulture)} ({hatveLetter})";
+            }
+            return hatveValue.ToString("F2", CultureInfo.InvariantCulture);
+        }
+
+        private string GetHatveLetter(decimal hatveValue)
+        {
+            const decimal tolerance = 0.1m;
+            
+            if (Math.Abs(hatveValue - 3.25m) < tolerance)
+                return "H";
+            else if (Math.Abs(hatveValue - 4.5m) < tolerance)
+                return "D";
+            else if (Math.Abs(hatveValue - 6.5m) < tolerance)
+                return "M";
+            else if (Math.Abs(hatveValue - 9m) < tolerance)
+                return "L";
+            else
+                return hatveValue.ToString("F2", CultureInfo.InvariantCulture);
+        }
+
+        private void BtnFiltrele_Click(object sender, EventArgs e)
+        {
+            LoadData();
+        }
+
+        private void BtnFiltreleriTemizle_Click(object sender, EventArgs e)
+        {
+            _cmbSiparisNo.SelectedIndex = -1;
+            _cmbSiparisNo.Text = "";
+            _cmbHatve.SelectedIndex = -1;
+            _cmbHatve.Text = "";
+            _cmbOlcu.SelectedIndex = -1;
+            _cmbOlcu.Text = "";
+            _cmbRuloSeriNo.SelectedIndex = -1;
+            _cmbRuloSeriNo.Text = "";
             LoadData();
         }
 

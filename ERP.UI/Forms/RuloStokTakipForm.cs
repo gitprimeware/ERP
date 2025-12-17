@@ -17,6 +17,14 @@ namespace ERP.UI.Forms
         private MaterialEntryRepository _materialEntryRepository;
         private SerialNoRepository _serialNoRepository;
         private CuttingRepository _cuttingRepository;
+        
+        // Filtreleme kontrolleri
+        private ComboBox _cmbRuloSeriNo;
+        private ComboBox _cmbMalzeme;
+        private ComboBox _cmbKalinlik;
+        private ComboBox _cmbOlcu;
+        private Button _btnFiltrele;
+        private Button _btnFiltreleriTemizle;
 
         // Static event - kesim yapıldığında tetiklenecek
         public static event EventHandler CuttingSaved;
@@ -112,12 +120,129 @@ namespace ERP.UI.Forms
                 Location = new Point(30, 30)
             };
 
+            // Filtreleme paneli
+            var filterPanel = new Panel
+            {
+                Location = new Point(30, 70),
+                Width = _mainPanel.Width - 60,
+                Height = 50,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                BackColor = Color.Transparent
+            };
+
+            // Rulo Seri No filtresi
+            var lblRuloSeriNo = new Label
+            {
+                Text = "Rulo Seri No:",
+                Location = new Point(0, 15),
+                Width = 100,
+                ForeColor = ThemeColors.TextPrimary
+            };
+            _cmbRuloSeriNo = new ComboBox
+            {
+                Location = new Point(105, 12),
+                Width = 180,
+                DropDownStyle = ComboBoxStyle.DropDown,
+                AutoCompleteMode = AutoCompleteMode.SuggestAppend,
+                AutoCompleteSource = AutoCompleteSource.ListItems
+            };
+
+            // Malzeme filtresi
+            var lblMalzeme = new Label
+            {
+                Text = "Malzeme:",
+                Location = new Point(295, 15),
+                Width = 80,
+                ForeColor = ThemeColors.TextPrimary
+            };
+            _cmbMalzeme = new ComboBox
+            {
+                Location = new Point(380, 12),
+                Width = 150,
+                DropDownStyle = ComboBoxStyle.DropDown,
+                AutoCompleteMode = AutoCompleteMode.SuggestAppend,
+                AutoCompleteSource = AutoCompleteSource.ListItems
+            };
+
+            // Kalınlık filtresi
+            var lblKalinlik = new Label
+            {
+                Text = "Kalınlık:",
+                Location = new Point(540, 15),
+                Width = 70,
+                ForeColor = ThemeColors.TextPrimary
+            };
+            _cmbKalinlik = new ComboBox
+            {
+                Location = new Point(615, 12),
+                Width = 100,
+                DropDownStyle = ComboBoxStyle.DropDown,
+                AutoCompleteMode = AutoCompleteMode.SuggestAppend,
+                AutoCompleteSource = AutoCompleteSource.ListItems
+            };
+
+            // Ölçü filtresi
+            var lblOlcu = new Label
+            {
+                Text = "Ölçü:",
+                Location = new Point(725, 15),
+                Width = 50,
+                ForeColor = ThemeColors.TextPrimary
+            };
+            _cmbOlcu = new ComboBox
+            {
+                Location = new Point(780, 12),
+                Width = 100,
+                DropDownStyle = ComboBoxStyle.DropDown,
+                AutoCompleteMode = AutoCompleteMode.SuggestAppend,
+                AutoCompleteSource = AutoCompleteSource.ListItems
+            };
+
+            // Filtrele butonu
+            _btnFiltrele = new Button
+            {
+                Text = "🔍 Filtrele",
+                Location = new Point(890, 10),
+                Width = 100,
+                Height = 30,
+                BackColor = ThemeColors.Primary,
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
+            };
+            _btnFiltrele.FlatAppearance.BorderSize = 0;
+
+            // Filtreleri Temizle butonu
+            _btnFiltreleriTemizle = new Button
+            {
+                Text = "🗑️ Temizle",
+                Location = new Point(1000, 10),
+                Width = 100,
+                Height = 30,
+                BackColor = ThemeColors.Secondary,
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
+            };
+            _btnFiltreleriTemizle.FlatAppearance.BorderSize = 0;
+
+            filterPanel.Controls.Add(lblRuloSeriNo);
+            filterPanel.Controls.Add(_cmbRuloSeriNo);
+            filterPanel.Controls.Add(lblMalzeme);
+            filterPanel.Controls.Add(_cmbMalzeme);
+            filterPanel.Controls.Add(lblKalinlik);
+            filterPanel.Controls.Add(_cmbKalinlik);
+            filterPanel.Controls.Add(lblOlcu);
+            filterPanel.Controls.Add(_cmbOlcu);
+            filterPanel.Controls.Add(_btnFiltrele);
+            filterPanel.Controls.Add(_btnFiltreleriTemizle);
+
             // DataGridView
             _dataGridView = new DataGridView
             {
-                Location = new Point(30, 80),
+                Location = new Point(30, 130),
                 Width = _mainPanel.Width - 60,
-                Height = _mainPanel.Height - 130,
+                Height = _mainPanel.Height - 180,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
                 AllowUserToAddRows = false,
@@ -131,16 +256,24 @@ namespace ERP.UI.Forms
 
             _mainPanel.Resize += (s, e) =>
             {
+                filterPanel.Width = _mainPanel.Width - 60;
                 _dataGridView.Width = _mainPanel.Width - 60;
-                _dataGridView.Height = _mainPanel.Height - 130;
+                _dataGridView.Height = _mainPanel.Height - 180;
             };
 
+            // Event handlers
+            _btnFiltrele.Click += BtnFiltrele_Click;
+            _btnFiltreleriTemizle.Click += BtnFiltreleriTemizle_Click;
+
             _mainPanel.Controls.Add(titleLabel);
+            _mainPanel.Controls.Add(filterPanel);
             _mainPanel.Controls.Add(_dataGridView);
 
             this.Controls.Add(_mainPanel);
             _mainPanel.BringToFront();
         }
+
+        private bool _filterControlsLoaded = false;
 
         private void LoadData()
         {
@@ -150,6 +283,13 @@ namespace ERP.UI.Forms
                 var serialNos = _serialNoRepository.GetAll();
                 var cuttings = _cuttingRepository.GetAll();
 
+                // Filtreleme kontrollerini sadece ilk yüklemede doldur
+                if (!_filterControlsLoaded)
+                {
+                    LoadFilterControls(entries, serialNos);
+                    _filterControlsLoaded = true;
+                }
+
                 LoadDataGridView(entries, serialNos, cuttings);
             }
             catch (Exception ex)
@@ -158,8 +298,174 @@ namespace ERP.UI.Forms
             }
         }
 
+        private void LoadFilterControls(List<MaterialEntry> entries, List<SerialNo> serialNos)
+        {
+            // Rulo Seri No listesini doldur
+            var serialNumbers = entries
+                .Where(e => e.SerialNoId.HasValue && e.SerialNo != null)
+                .Select(e => e.SerialNo.SerialNumber)
+                .Distinct()
+                .OrderBy(s => s)
+                .ToList();
+            
+            _cmbRuloSeriNo.Items.Clear();
+            _cmbRuloSeriNo.Items.Add(""); // Tümü seçeneği
+            foreach (var sn in serialNumbers)
+            {
+                _cmbRuloSeriNo.Items.Add(sn);
+            }
+
+            // Malzeme listesini doldur
+            var materials = entries
+                .Where(e => !string.IsNullOrEmpty(e.MaterialSize))
+                .Select(e => e.MaterialSize)
+                .Distinct()
+                .OrderBy(m => m)
+                .ToList();
+            
+            _cmbMalzeme.Items.Clear();
+            _cmbMalzeme.Items.Add(""); // Tümü seçeneği
+            foreach (var material in materials)
+            {
+                _cmbMalzeme.Items.Add(material);
+            }
+
+            // Kalınlık listesini doldur
+            var thicknesses = entries
+                .Where(e => e.Thickness > 0)
+                .Select(e => e.Thickness.ToString("F3", CultureInfo.InvariantCulture))
+                .Distinct()
+                .OrderBy(t => decimal.Parse(t, CultureInfo.InvariantCulture))
+                .ToList();
+            
+            _cmbKalinlik.Items.Clear();
+            _cmbKalinlik.Items.Add(""); // Tümü seçeneği
+            foreach (var thickness in thicknesses)
+            {
+                _cmbKalinlik.Items.Add(thickness);
+            }
+
+            // Ölçü listesini doldur
+            var sizes = entries
+                .Where(e => e.Size > 0)
+                .Select(e => e.Size.ToString())
+                .Distinct()
+                .OrderBy(s => int.Parse(s))
+                .ToList();
+            
+            _cmbOlcu.Items.Clear();
+            _cmbOlcu.Items.Add(""); // Tümü seçeneği
+            foreach (var size in sizes)
+            {
+                _cmbOlcu.Items.Add(size);
+            }
+        }
+
+        private void BtnFiltrele_Click(object sender, EventArgs e)
+        {
+            LoadData();
+        }
+
+        private void BtnFiltreleriTemizle_Click(object sender, EventArgs e)
+        {
+            _cmbRuloSeriNo.SelectedIndex = -1;
+            _cmbRuloSeriNo.Text = "";
+            _cmbMalzeme.SelectedIndex = -1;
+            _cmbMalzeme.Text = "";
+            _cmbKalinlik.SelectedIndex = -1;
+            _cmbKalinlik.Text = "";
+            _cmbOlcu.SelectedIndex = -1;
+            _cmbOlcu.Text = "";
+            LoadData();
+        }
+
         private void LoadDataGridView(List<MaterialEntry> entries, List<SerialNo> serialNos, List<Cutting> cuttings)
         {
+            // Filtreleme kriterlerini al
+            string filterRuloSeriNo = _cmbRuloSeriNo?.Text?.Trim() ?? "";
+            string filterMalzeme = _cmbMalzeme?.Text?.Trim() ?? "";
+            string filterKalinlik = _cmbKalinlik?.Text?.Trim() ?? "";
+            string filterOlcu = _cmbOlcu?.Text?.Trim() ?? "";
+
+            // Önce hangi SerialNo'ların gösterilmesi gerektiğini belirle
+            HashSet<Guid> allowedSerialNoIds = null;
+
+            // Rulo Seri No filtresi
+            if (!string.IsNullOrEmpty(filterRuloSeriNo))
+            {
+                var filteredSerialNos = serialNos
+                    .Where(sn => sn.SerialNumber != null && sn.SerialNumber.Contains(filterRuloSeriNo, StringComparison.OrdinalIgnoreCase))
+                    .Select(sn => sn.Id)
+                    .ToHashSet();
+                
+                if (allowedSerialNoIds == null)
+                    allowedSerialNoIds = filteredSerialNos;
+                else
+                    allowedSerialNoIds.IntersectWith(filteredSerialNos);
+            }
+
+            // Malzeme, Kalınlık ve Ölçü filtreleri için entries'i filtrele ve SerialNo'ları bul
+            var filteredEntries = entries.Where(e => e.SerialNoId.HasValue && e.IsActive).ToList();
+
+            if (!string.IsNullOrEmpty(filterMalzeme))
+            {
+                filteredEntries = filteredEntries.Where(e => e.MaterialSize != null && e.MaterialSize.Contains(filterMalzeme, StringComparison.OrdinalIgnoreCase)).ToList();
+            }
+
+            if (!string.IsNullOrEmpty(filterKalinlik))
+            {
+                if (decimal.TryParse(filterKalinlik, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal thicknessValue))
+                {
+                    filteredEntries = filteredEntries.Where(e => Math.Abs(e.Thickness - thicknessValue) < 0.001m).ToList();
+                }
+            }
+
+            if (!string.IsNullOrEmpty(filterOlcu))
+            {
+                if (int.TryParse(filterOlcu, out int sizeValue))
+                {
+                    filteredEntries = filteredEntries.Where(e => e.Size == sizeValue).ToList();
+                }
+            }
+
+            // Filtrelenmiş entries'lerden SerialNo'ları al
+            var serialNosFromEntries = filteredEntries
+                .Where(e => e.SerialNoId.HasValue)
+                .Select(e => e.SerialNoId.Value)
+                .Distinct()
+                .ToHashSet();
+
+            // SerialNo filtrelerini birleştir
+            if (allowedSerialNoIds == null)
+                allowedSerialNoIds = serialNosFromEntries;
+            else
+                allowedSerialNoIds.IntersectWith(serialNosFromEntries);
+
+            // Eğer hiçbir filtre yoksa, tüm SerialNo'ları göster
+            if (string.IsNullOrEmpty(filterRuloSeriNo) && string.IsNullOrEmpty(filterMalzeme) && 
+                string.IsNullOrEmpty(filterKalinlik) && string.IsNullOrEmpty(filterOlcu))
+            {
+                allowedSerialNoIds = null; // null = tüm SerialNo'lar
+            }
+
+            // Şimdi entries ve cuttings'i filtrele (sadece izin verilen SerialNo'lara ait olanlar)
+            // ÖNEMLİ: Eğer bir SerialNo filtrelenmiş entries'lerde varsa, o SerialNo'ya ait TÜM entries ve cuttings gösterilmeli
+            if (allowedSerialNoIds != null && allowedSerialNoIds.Count > 0)
+            {
+                // Orijinal entries ve cuttings listelerinden filtrele (filtrelenmiş entries'den değil!)
+                var originalEntries = _materialEntryRepository.GetAll();
+                var originalCuttings = _cuttingRepository.GetAll();
+                
+                entries = originalEntries.Where(e => e.SerialNoId.HasValue && allowedSerialNoIds.Contains(e.SerialNoId.Value) && e.IsActive).ToList();
+                cuttings = originalCuttings.Where(c => c.SerialNoId.HasValue && allowedSerialNoIds.Contains(c.SerialNoId.Value) && c.IsActive).ToList();
+            }
+            else if (allowedSerialNoIds != null && allowedSerialNoIds.Count == 0)
+            {
+                // Hiçbir SerialNo eşleşmediyse boş liste göster
+                entries = new List<MaterialEntry>();
+                cuttings = new List<Cutting>();
+            }
+
             _dataGridView.DataSource = null;
             _dataGridView.Columns.Clear();
 
