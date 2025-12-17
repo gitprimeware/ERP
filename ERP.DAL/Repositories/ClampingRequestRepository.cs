@@ -58,11 +58,13 @@ namespace ERP.DAL.Repositories
                              cr.CreatedDate, cr.ModifiedDate, cr.IsActive,
                              sn.SerialNumber as SerialNumber,
                              e.FirstName as EmployeeFirstName, e.LastName as EmployeeLastName,
-                             o.TrexOrderNo, o.ProductCode
+                             o.TrexOrderNo, o.ProductCode,
+                             m.Name as MachineName
                              FROM ClampingRequests cr
                              LEFT JOIN SerialNos sn ON cr.SerialNoId = sn.Id
                              LEFT JOIN Employees e ON cr.EmployeeId = e.Id
                              LEFT JOIN Orders o ON cr.OrderId = o.Id
+                             LEFT JOIN Machines m ON cr.MachineId = m.Id
                              WHERE cr.OrderId = @OrderId AND cr.IsActive = 1
                              ORDER BY cr.RequestDate DESC";
                 
@@ -265,6 +267,10 @@ namespace ERP.DAL.Repositories
             if (!reader.IsDBNull("MachineId"))
             {
                 request.MachineId = reader.GetGuid("MachineId");
+                if (!reader.IsDBNull("MachineName"))
+                {
+                    request.Machine = new Machine { Id = request.MachineId.Value, Name = reader.GetString("MachineName") };
+                }
             }
             if (!reader.IsDBNull("EmployeeId"))
             {

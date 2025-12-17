@@ -1387,10 +1387,11 @@ namespace ERP.UI.Forms
         {
             try
             {
+                // Onaylanmış kesim kayıtları
                 var cuttings = _cuttingRepository.GetByOrderId(_orderId);
-                var data = cuttings.Select(c => new
+                var completedData = cuttings.Select(c => new
                 {
-                    c.Id,
+                    Id = c.Id,
                     Hatve = GetHatveLetter(c.Hatve),
                     Size = c.Size.ToString("F2", CultureInfo.InvariantCulture),
                     MachineName = c.Machine?.Name ?? "",
@@ -1401,8 +1402,32 @@ namespace ERP.UI.Forms
                     PlakaAdedi = c.PlakaAdedi.ToString(),
                     WasteKg = c.WasteKg.ToString("F3", CultureInfo.InvariantCulture),
                     RemainingKg = c.RemainingKg.ToString("F3", CultureInfo.InvariantCulture),
-                    EmployeeName = c.Employee != null ? $"{c.Employee.FirstName} {c.Employee.LastName}" : ""
+                    EmployeeName = c.Employee != null ? $"{c.Employee.FirstName} {c.Employee.LastName}" : "",
+                    Status = "Tamamlandı"
                 }).ToList();
+
+                // Bekleyen kesim talepleri
+                var requests = _cuttingRequestRepository.GetByOrderId(_orderId)
+                    .Where(r => r.Status != "Tamamlandı" && r.Status != "İptal")
+                    .Select(r => new
+                    {
+                        Id = r.Id,
+                        Hatve = GetHatveLetter(r.Hatve),
+                        Size = r.Size.ToString("F2", CultureInfo.InvariantCulture),
+                        MachineName = r.Machine?.Name ?? "-",
+                        SerialNumber = r.SerialNo?.SerialNumber ?? "-",
+                        TotalKg = "-",
+                        CutKg = "-",
+                        CuttingCount = r.ActualCutCount?.ToString() ?? "-",
+                        PlakaAdedi = r.RequestedPlateCount.ToString(),
+                        WasteKg = "-",
+                        RemainingKg = r.RemainingKg.ToString("F3", CultureInfo.InvariantCulture),
+                        EmployeeName = r.Employee != null ? $"{r.Employee.FirstName} {r.Employee.LastName}" : "-",
+                        Status = r.Status
+                    }).ToList();
+
+                // Birleştir
+                var data = completedData.Cast<object>().Concat(requests.Cast<object>()).ToList();
 
                 // DataSource'u null yap (kolonlar kaybolmasın diye)
                 dataGridView.DataSource = null;
@@ -1421,6 +1446,7 @@ namespace ERP.UI.Forms
                     AddKesimColumn(dataGridView, "WasteKg", "Hurda Kg", 100);
                     AddKesimColumn(dataGridView, "RemainingKg", "Kalan Kg", 100);
                     AddKesimColumn(dataGridView, "EmployeeName", "Operatör", 150);
+                    AddKesimColumn(dataGridView, "Status", "Durum", 120);
                 }
 
                 // Kolon başlıklarını kesinlikle göster
@@ -1450,6 +1476,7 @@ namespace ERP.UI.Forms
                         case "WasteKg": column.HeaderText = "Hurda Kg"; break;
                         case "RemainingKg": column.HeaderText = "Kalan Kg"; break;
                         case "EmployeeName": column.HeaderText = "Operatör"; break;
+                        case "Status": column.HeaderText = "Durum"; break;
                     }
                 }
                 
@@ -1789,10 +1816,11 @@ namespace ERP.UI.Forms
         {
             try
             {
+                // Onaylanmış pres kayıtları
                 var pressings = _pressingRepository.GetByOrderId(_orderId);
-                var data = pressings.Select(p => new
+                var completedData = pressings.Select(p => new
                 {
-                    p.Id,
+                    Id = p.Id,
                     Date = p.PressingDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
                     PlateThickness = p.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
                     Hatve = GetHatveLetter(p.Hatve),
@@ -1802,8 +1830,31 @@ namespace ERP.UI.Forms
                     Pressure = p.Pressure.ToString("F3", CultureInfo.InvariantCulture),
                     PressCount = p.PressCount.ToString(),
                     WasteAmount = p.WasteAmount.ToString("F3", CultureInfo.InvariantCulture),
-                    EmployeeName = p.Employee != null ? $"{p.Employee.FirstName} {p.Employee.LastName}" : ""
+                    EmployeeName = p.Employee != null ? $"{p.Employee.FirstName} {p.Employee.LastName}" : "",
+                    Status = "Tamamlandı"
                 }).ToList();
+
+                // Bekleyen pres talepleri
+                var requests = _pressingRequestRepository.GetByOrderId(_orderId)
+                    .Where(r => r.Status != "Tamamlandı" && r.Status != "İptal")
+                    .Select(r => new
+                    {
+                        Id = r.Id,
+                        Date = r.RequestDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
+                        PlateThickness = r.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
+                        Hatve = GetHatveLetter(r.Hatve),
+                        Size = r.Size.ToString("F2", CultureInfo.InvariantCulture),
+                        SerialNumber = r.SerialNo?.SerialNumber ?? "-",
+                        PressNo = r.PressNo ?? "-",
+                        Pressure = r.Pressure.ToString("F3", CultureInfo.InvariantCulture),
+                        PressCount = r.ResultedPressCount?.ToString() ?? "-",
+                        WasteAmount = r.WasteAmount.ToString("F3", CultureInfo.InvariantCulture),
+                        EmployeeName = r.Employee != null ? $"{r.Employee.FirstName} {r.Employee.LastName}" : "-",
+                        Status = r.Status
+                    }).ToList();
+
+                // Birleştir
+                var data = completedData.Cast<object>().Concat(requests.Cast<object>()).ToList();
 
                 // DataSource'u null yap (kolonlar kaybolmasın diye)
                 dataGridView.DataSource = null;
@@ -1821,6 +1872,7 @@ namespace ERP.UI.Forms
                     AddPresColumn(dataGridView, "PressCount", "Pres Adedi", 100);
                     AddPresColumn(dataGridView, "WasteAmount", "Hurda Miktarı", 120);
                     AddPresColumn(dataGridView, "EmployeeName", "Operatör", 150);
+                    AddPresColumn(dataGridView, "Status", "Durum", 120);
                 }
 
                 // Kolon başlıklarını kesinlikle göster
@@ -1849,6 +1901,7 @@ namespace ERP.UI.Forms
                         case "PressCount": column.HeaderText = "Pres Adedi"; break;
                         case "WasteAmount": column.HeaderText = "Hurda Miktarı"; break;
                         case "EmployeeName": column.HeaderText = "Operatör"; break;
+                        case "Status": column.HeaderText = "Durum"; break;
                     }
                 }
                 
@@ -2181,12 +2234,13 @@ namespace ERP.UI.Forms
         {
             try
             {
-                var clampings = _clampingRepository.GetByOrderId(_orderId);
                 var order = _orderRepository.GetById(_orderId);
                 
-                var data = clampings.Select(c => new
+                // Onaylanmış kenetleme kayıtları
+                var clampings = _clampingRepository.GetByOrderId(_orderId);
+                var completedData = clampings.Select(c => new
                 {
-                    c.Id,
+                    Id = c.Id,
                     Date = c.ClampingDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
                     OrderNo = order?.TrexOrderNo ?? "",
                     Hatve = GetHatveLetter(c.Hatve),
@@ -2198,8 +2252,33 @@ namespace ERP.UI.Forms
                     PlateThickness = c.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
                     SerialNumber = c.SerialNo?.SerialNumber ?? "",
                     MachineName = c.Machine?.Name ?? "",
-                    EmployeeName = c.Employee != null ? $"{c.Employee.FirstName} {c.Employee.LastName}" : ""
+                    EmployeeName = c.Employee != null ? $"{c.Employee.FirstName} {c.Employee.LastName}" : "",
+                    Status = "Tamamlandı"
                 }).ToList();
+
+                // Bekleyen kenetleme talepleri
+                var requests = _clampingRequestRepository.GetByOrderId(_orderId)
+                    .Where(r => r.Status != "Tamamlandı" && r.Status != "İptal")
+                    .Select(r => new
+                    {
+                        Id = r.Id,
+                        Date = r.RequestDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
+                        OrderNo = order?.TrexOrderNo ?? "",
+                        Hatve = GetHatveLetter(r.Hatve),
+                        Size = r.Size.ToString("F2", CultureInfo.InvariantCulture),
+                        Length = r.Length.ToString("F2", CultureInfo.InvariantCulture),
+                        ClampCount = r.ResultedClampCount?.ToString() ?? "-",
+                        Customer = order?.Company?.Name ?? "",
+                        UsedPlateCount = r.ActualClampCount?.ToString() ?? "-",
+                        PlateThickness = r.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
+                        SerialNumber = r.SerialNo?.SerialNumber ?? "-",
+                        MachineName = r.Machine?.Name ?? "-",
+                        EmployeeName = r.Employee != null ? $"{r.Employee.FirstName} {r.Employee.LastName}" : "-",
+                        Status = r.Status
+                    }).ToList();
+
+                // Birleştir
+                var data = completedData.Cast<object>().Concat(requests.Cast<object>()).ToList();
 
                 // DataSource'u null yap (kolonlar kaybolmasın diye)
                 dataGridView.DataSource = null;
@@ -2219,6 +2298,7 @@ namespace ERP.UI.Forms
                     AddClampingColumn(dataGridView, "SerialNumber", "Rulo Seri No", 120);
                     AddClampingColumn(dataGridView, "MachineName", "Makina Adı", 120);
                     AddClampingColumn(dataGridView, "EmployeeName", "Operatör", 150);
+                    AddClampingColumn(dataGridView, "Status", "Durum", 120);
                 }
 
                 // Kolon başlıklarını kesinlikle göster
@@ -3229,4 +3309,5 @@ namespace ERP.UI.Forms
 
     }
 }
+
 
