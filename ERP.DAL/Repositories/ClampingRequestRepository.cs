@@ -22,11 +22,13 @@ namespace ERP.DAL.Repositories
                              cr.CreatedDate, cr.ModifiedDate, cr.IsActive,
                              sn.SerialNumber as SerialNumber,
                              e.FirstName as EmployeeFirstName, e.LastName as EmployeeLastName,
-                             o.TrexOrderNo, o.ProductCode
+                             o.TrexOrderNo, o.ProductCode,
+                             m.Name as MachineName
                              FROM ClampingRequests cr
                              LEFT JOIN SerialNos sn ON cr.SerialNoId = sn.Id
                              LEFT JOIN Employees e ON cr.EmployeeId = e.Id
                              LEFT JOIN Orders o ON cr.OrderId = o.Id
+                             LEFT JOIN Machines m ON cr.MachineId = m.Id
                              WHERE cr.IsActive = 1
                              ORDER BY cr.RequestDate DESC";
                 
@@ -98,11 +100,13 @@ namespace ERP.DAL.Repositories
                              cr.CreatedDate, cr.ModifiedDate, cr.IsActive,
                              sn.SerialNumber as SerialNumber,
                              e.FirstName as EmployeeFirstName, e.LastName as EmployeeLastName,
-                             o.TrexOrderNo, o.ProductCode
+                             o.TrexOrderNo, o.ProductCode,
+                             m.Name as MachineName
                              FROM ClampingRequests cr
                              LEFT JOIN SerialNos sn ON cr.SerialNoId = sn.Id
                              LEFT JOIN Employees e ON cr.EmployeeId = e.Id
                              LEFT JOIN Orders o ON cr.OrderId = o.Id
+                             LEFT JOIN Machines m ON cr.MachineId = m.Id
                              WHERE cr.Status IN ('Beklemede', 'Kenetmede') AND cr.IsActive = 1
                              ORDER BY cr.RequestDate DESC";
                 
@@ -132,11 +136,13 @@ namespace ERP.DAL.Repositories
                              cr.CreatedDate, cr.ModifiedDate, cr.IsActive,
                              sn.SerialNumber as SerialNumber,
                              e.FirstName as EmployeeFirstName, e.LastName as EmployeeLastName,
-                             o.TrexOrderNo, o.ProductCode
+                             o.TrexOrderNo, o.ProductCode,
+                             m.Name as MachineName
                              FROM ClampingRequests cr
                              LEFT JOIN SerialNos sn ON cr.SerialNoId = sn.Id
                              LEFT JOIN Employees e ON cr.EmployeeId = e.Id
                              LEFT JOIN Orders o ON cr.OrderId = o.Id
+                             LEFT JOIN Machines m ON cr.MachineId = m.Id
                              WHERE cr.Id = @Id AND cr.IsActive = 1";
 
                 using (var command = new SqlCommand(query, connection))

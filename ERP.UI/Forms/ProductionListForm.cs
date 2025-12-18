@@ -19,6 +19,7 @@ namespace ERP.UI.Forms
         private OrderRepository _orderRepository;
         private CompanyRepository _companyRepository;
         private AssemblyRepository _assemblyRepository;
+        private ClampingRequestRepository _clampingRequestRepository;
         private bool _isTableView = true; // Default tablo görünümü
         private ToolTip _actionToolTip;
         private string _currentToolTipText = "";
@@ -44,6 +45,7 @@ namespace ERP.UI.Forms
             _orderRepository = new OrderRepository();
             _companyRepository = new CompanyRepository();
             _assemblyRepository = new AssemblyRepository();
+            _clampingRequestRepository = new ClampingRequestRepository();
             _actionToolTip = new ToolTip();
             _actionToolTip.IsBalloon = false;
             _actionToolTip.ShowAlways = false;
@@ -90,6 +92,72 @@ namespace ERP.UI.Forms
                 Location = new Point(0, 10)
             };
 
+            // Renk açıklamaları - basit Label'lar ile (performanslı)
+            var colorLegendPanel = new Panel
+            {
+                Location = new Point(120, 12),
+                Width = 400,
+                Height = 25,
+                BackColor = Color.Transparent
+            };
+            
+            var legendItems = new[]
+            {
+                new { Color = Color.FromArgb(244, 67, 54), Text = "İşlem Yok" },
+                new { Color = Color.FromArgb(255, 193, 7), Text = "Kenetleme" },
+                new { Color = Color.FromArgb(33, 150, 243), Text = "Montaj" },
+                new { Color = Color.FromArgb(76, 175, 80), Text = "Gönderildi" }
+            };
+            
+            int xPos = 0;
+            var font = new Font("Segoe UI", 9F, FontStyle.Regular);
+            var textColor = ThemeColors.TextPrimary;
+            
+            foreach (var item in legendItems)
+            {
+                // Renkli daire - Unicode karakter ile (●)
+                var circleLabel = new Label
+                {
+                    Text = "●",
+                    Font = font,
+                    ForeColor = item.Color,
+                    AutoSize = true,
+                    Location = new Point(xPos, 4),
+                    BackColor = Color.Transparent
+                };
+                colorLegendPanel.Controls.Add(circleLabel);
+                xPos += circleLabel.Width + 3;
+                
+                // Metin
+                var textLabel = new Label
+                {
+                    Text = item.Text,
+                    Font = font,
+                    ForeColor = textColor,
+                    AutoSize = true,
+                    Location = new Point(xPos, 4),
+                    BackColor = Color.Transparent
+                };
+                colorLegendPanel.Controls.Add(textLabel);
+                xPos += textLabel.Width + 12;
+                
+                // Ayırıcı (son değilse)
+                if (item != legendItems.Last())
+                {
+                    var separatorLabel = new Label
+                    {
+                        Text = "|",
+                        Font = font,
+                        ForeColor = Color.LightGray,
+                        AutoSize = true,
+                        Location = new Point(xPos, 4),
+                        BackColor = Color.Transparent
+                    };
+                    colorLegendPanel.Controls.Add(separatorLabel);
+                    xPos += separatorLabel.Width + 5;
+                }
+            }
+
             _chkTableView = new CheckBox
             {
                 Text = "📊 Tablo Görünümü",
@@ -103,14 +171,18 @@ namespace ERP.UI.Forms
             _chkTableView.CheckedChanged += ChkTableView_CheckedChanged;
 
             titlePanel.Controls.Add(titleLabel);
+            titlePanel.Controls.Add(colorLegendPanel);
             titlePanel.Controls.Add(_chkTableView);
+            
+            // Başlık panelinin yüksekliğini artır
+            titlePanel.Height = 70;
 
             // Cards panel
             _cardsPanel = new FlowLayoutPanel
             {
-                Location = new Point(30, 100),
+                Location = new Point(30, 120),
                 Width = _mainPanel.Width - 60,
-                Height = _mainPanel.Height - 140,
+                Height = _mainPanel.Height - 160,
                 AutoScroll = true,
                 FlowDirection = FlowDirection.LeftToRight,
                 WrapContents = true,
@@ -121,9 +193,9 @@ namespace ERP.UI.Forms
             // DataGridView - Filtre panelinin altında, header'lar görünür olacak şekilde
             _dataGridView = new DataGridView
             {
-                Location = new Point(30, 140), // Filtre panelinin altında (100px + 40px = 140px)
+                Location = new Point(30, 160), // Filtre panelinin altında (120px + 40px = 160px)
                 Width = _mainPanel.Width - 60,
-                Height = _mainPanel.Height - 180, // Filtre paneli için yükseklik azaltıldı
+                Height = _mainPanel.Height - 200, // Filtre paneli için yükseklik azaltıldı
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
                 AllowUserToAddRows = false,
@@ -156,17 +228,17 @@ namespace ERP.UI.Forms
                 if (titlePanel != null)
                     titlePanel.Width = _mainPanel.Width - 60;
                 _cardsPanel.Width = _mainPanel.Width - 60;
-                _cardsPanel.Height = _mainPanel.Height - 140;
+                _cardsPanel.Height = _mainPanel.Height - 160;
                 _columnFilterPanel.Width = _mainPanel.Width - 60;
                 _dataGridView.Width = _mainPanel.Width - 60;
-                _dataGridView.Height = _mainPanel.Height - 180;
+                _dataGridView.Height = _mainPanel.Height - 200;
                 UpdateColumnFilterPanel();
             };
 
             // Sütun filtre paneli (DataGridView header'larının üstünde)
             _columnFilterPanel = new Panel
             {
-                Location = new Point(30, 100), // Başlığın hemen altında
+                Location = new Point(30, 120), // Başlığın hemen altında (70px titlePanel + 50px boşluk)
                 Width = _mainPanel.Width - 60,
                 Height = 40,
                 BackColor = Color.FromArgb(245, 245, 245),
@@ -398,103 +470,133 @@ namespace ERP.UI.Forms
             _dataGridView.AutoGenerateColumns = false;
 
                 // Kolonları ekle - İstenen sıraya göre
+            // 1. Trex Sipariş No
             _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
             {
                 DataPropertyName = "TrexOrderNo",
                 HeaderText = "Trex Sipariş No",
                 Name = "TrexOrderNo",
-                    Width = 150,
-                    SortMode = DataGridViewColumnSortMode.Programmatic
+                Width = 150,
+                SortMode = DataGridViewColumnSortMode.Programmatic
             });
 
+            // 2. Üretim Kodu
+            _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "ProductCode",
+                HeaderText = "Üretim Kodu",
+                Name = "ProductCode",
+                Width = 180,
+                SortMode = DataGridViewColumnSortMode.Programmatic
+            });
+
+            // 3. Hatve (küçük)
+            _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "Hatve",
+                HeaderText = "Hatve",
+                Name = "Hatve",
+                Width = 70,
+                SortMode = DataGridViewColumnSortMode.Programmatic
+            });
+
+            // 4. Plaka Ölçüsü
+            _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "PlakaOlcusu",
+                HeaderText = "Plaka Ölçüsü",
+                Name = "PlakaOlcusu",
+                Width = 120,
+                SortMode = DataGridViewColumnSortMode.Programmatic
+            });
+
+            // 5. Yükseklik
+            _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "Yukseklik",
+                HeaderText = "Yükseklik",
+                Name = "Yukseklik",
+                Width = 100,
+                SortMode = DataGridViewColumnSortMode.Programmatic
+            });
+
+            // 6. Kapak (küçük)
+            _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "Kapak",
+                HeaderText = "Kapak",
+                Name = "Kapak",
+                Width = 60,
+                SortMode = DataGridViewColumnSortMode.Programmatic
+            });
+
+            // 7. Profil (küçük)
+            _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "Profil",
+                HeaderText = "Profil",
+                Name = "Profil",
+                Width = 60,
+                SortMode = DataGridViewColumnSortMode.Programmatic
+            });
+
+            // 8. Adet (küçük)
+            _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "Quantity",
+                HeaderText = "Adet",
+                Name = "Quantity",
+                Width = 70,
+                SortMode = DataGridViewColumnSortMode.Programmatic
+            });
+
+            // 9. Lamel Kalınlığı
+            _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "LamelThickness",
+                HeaderText = "Lamel Kalınlığı",
+                Name = "LamelThickness",
+                Width = 120,
+                SortMode = DataGridViewColumnSortMode.Programmatic
+            });
+
+            // 10. Firma
             var companyColumn = new DataGridViewTextBoxColumn
             {
                 DataPropertyName = "CompanyName",
                 HeaderText = "Firma",
                 Name = "CompanyName",
-                    Width = 200,
-                    SortMode = DataGridViewColumnSortMode.Programmatic
+                Width = 200,
+                SortMode = DataGridViewColumnSortMode.Programmatic
             };
             _dataGridView.Columns.Add(companyColumn);
 
+            // 11. Termin Tarihi
             _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
             {
-                DataPropertyName = "ProductCode",
-                HeaderText = "Ürün Kodu",
-                Name = "ProductCode",
-                    Width = 200,
-                    SortMode = DataGridViewColumnSortMode.Programmatic
+                DataPropertyName = "TermDate",
+                HeaderText = "Termin Tarihi",
+                Name = "TermDate",
+                Width = 120,
+                SortMode = DataGridViewColumnSortMode.Programmatic
             });
 
+            // 12. Durum
             _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
             {
-                    DataPropertyName = "Hatve",
-                    HeaderText = "Hatve",
-                    Name = "Hatve",
-                    Width = 100,
-                    SortMode = DataGridViewColumnSortMode.Programmatic
+                DataPropertyName = "StatusText",
+                HeaderText = "Durum",
+                Name = "StatusText",
+                Width = 120,
+                SortMode = DataGridViewColumnSortMode.Programmatic
             });
 
-            _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
-            {
-                    DataPropertyName = "PlakaOlcusu",
-                    HeaderText = "Plaka Ölçüsü",
-                    Name = "PlakaOlcusu",
-                    Width = 120,
-                    SortMode = DataGridViewColumnSortMode.Programmatic
-                });
-
-                _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
-                {
-                    DataPropertyName = "Yukseklik",
-                    HeaderText = "Yükseklik",
-                    Name = "Yukseklik",
-                    Width = 100,
-                    SortMode = DataGridViewColumnSortMode.Programmatic
-                });
-
-                _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
-                {
-                    DataPropertyName = "Kapak",
-                    HeaderText = "Kapak",
-                    Name = "Kapak",
-                    Width = 80,
-                    SortMode = DataGridViewColumnSortMode.Programmatic
-                });
-
-                _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
-                {
-                    DataPropertyName = "Profil",
-                    HeaderText = "Profil",
-                    Name = "Profil",
-                    Width = 80,
-                    SortMode = DataGridViewColumnSortMode.Programmatic
-                });
-
-                _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
-                {
-                    DataPropertyName = "LamelThickness",
-                    HeaderText = "Lamel Kalınlığı",
-                    Name = "LamelThickness",
-                    Width = 120,
-                    SortMode = DataGridViewColumnSortMode.Programmatic
-                });
-
-                _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
-                {
-                    DataPropertyName = "Quantity",
-                    HeaderText = "Adet",
-                    Name = "Quantity",
-                    Width = 100,
-                    SortMode = DataGridViewColumnSortMode.Programmatic
-                });
-
-                // İşlemler kolonu (emoji butonları)
+            // 13. İşlemler kolonu (emoji butonları)
             var actionsColumn = new DataGridViewButtonColumn
             {
                 HeaderText = "İşlemler",
                 Name = "Actions",
-                    Width = 220,
+                Width = 220,
                 Text = "",
                 UseColumnTextForButtonValue = false
             };
@@ -505,23 +607,25 @@ namespace ERP.UI.Forms
                 {
                     var parsedData = ParseProductCodeForTable(o.ProductCode);
                     return new
-            {
-                o.Id,
-                o.TrexOrderNo,
-                CompanyName = o.Company?.Name ?? "",
-                o.ProductCode,
+                    {
+                        o.Id,
+                        o.TrexOrderNo,
+                        o.ProductCode,
                         Hatve = parsedData.Hatve,
                         PlakaOlcusu = parsedData.PlakaOlcusu,
                         Yukseklik = parsedData.Yukseklik,
                         Kapak = parsedData.Kapak,
                         Profil = parsedData.Profil,
+                        o.Quantity,
                         LamelThickness = o.LamelThickness.HasValue ? o.LamelThickness.Value.ToString("0.000", System.Globalization.CultureInfo.GetCultureInfo("tr-TR")) : "",
-                o.Quantity,
-                o.Status,
+                        CompanyName = o.Company?.Name ?? "",
+                        TermDate = o.TermDate.ToString("dd.MM.yyyy", System.Globalization.CultureInfo.GetCultureInfo("tr-TR")),
+                        StatusText = GetStatusText(o),
+                        o.Status,
                         IsInProduction = o.Status == "Üretimde",
                         IsStockOrder = o.IsStockOrder
                     };
-            }).ToList();
+                }).ToList();
 
             _dataGridView.Tag = orders; // Orijinal order listesini sakla
 
@@ -970,23 +1074,56 @@ namespace ERP.UI.Forms
 
             Color rowColor = Color.White;
 
-            // Montaj işlemi tamamlanmış mı kontrol et
-            bool hasCompletedAssembly = false;
-            if (orderId != Guid.Empty)
+            // Order bilgisini al
+            Order currentOrder = null;
+            if (_dataGridView.Tag is List<Order> ordersList)
             {
-                var assemblies = _assemblyRepository.GetByOrderId(orderId);
-                hasCompletedAssembly = assemblies.Any(a => a.IsActive);
+                currentOrder = ordersList.FirstOrDefault(o => o.Id == orderId);
             }
-
-            // Montaj tamamlanmışsa yeşil renk (sevkiyata hazır)
-            if (hasCompletedAssembly)
+            
+            // Üretim geçtiyse (Muhasebede, Tamamlandı, Sevkiyata Hazır) veya Üretimde durumu için renklendirme yap
+            if (orderId != Guid.Empty && currentOrder != null)
             {
-                rowColor = Color.FromArgb(120, 76, 175, 80); // Yeşil
-            }
-            // Sadece "Üretimde" durumu için mavi renklendirme (hafif saydam - Alpha değeri 120)
-            else if (status == "Üretimde")
-            {
-                rowColor = Color.FromArgb(120, 33, 150, 243); // Mavi
+                // Üretimden geçmiş mi kontrol et (Muhasebede, Tamamlandı, Sevkiyata Hazır veya ShipmentDate dolu ise)
+                bool isProductionPassed = currentOrder.Status == "Muhasebede" || 
+                                         currentOrder.Status == "Tamamlandı" || 
+                                         currentOrder.Status == "Sevkiyata Hazır" ||
+                                         currentOrder.ShipmentDate.HasValue;
+                
+                // Üretimden geçmişse yeşil
+                if (isProductionPassed)
+                {
+                    rowColor = Color.FromArgb(120, 76, 175, 80); // Yeşil - Gönderildi
+                }
+                else if (status == "Üretimde")
+                {
+                    // Montaj işlemi yapılmış mı kontrol et
+                    var assemblies = _assemblyRepository.GetByOrderId(orderId);
+                    bool hasCompletedAssembly = assemblies.Any(a => a.IsActive);
+                    
+                    // Montaj yapılmışsa mavi
+                    if (hasCompletedAssembly)
+                    {
+                        rowColor = Color.FromArgb(120, 33, 150, 243); // Mavi - Montaj
+                    }
+                    else
+                    {
+                        // Kenetleme işlemi yapılmış mı kontrol et
+                        var clampingRequests = _clampingRequestRepository.GetByOrderId(orderId);
+                        bool hasClamping = clampingRequests.Any(cr => cr.IsActive);
+                        
+                        // Kenetleme yapılmışsa sarı
+                        if (hasClamping)
+                        {
+                            rowColor = Color.FromArgb(120, 255, 193, 7); // Sarı - Kenetleme
+                        }
+                        else
+                        {
+                            // Hiç işlem yapılmamışsa kırmızı
+                            rowColor = Color.FromArgb(120, 244, 67, 54); // Kırmızı - İşlem Yok
+                        }
+                    }
+                }
             }
 
             // Satır seviyesinde arka plan rengi uygula
@@ -1120,31 +1257,75 @@ namespace ERP.UI.Forms
                     }
                 }
 
-                // Montaj işlemi tamamlanmış mı kontrol et
-                bool hasCompletedAssembly = false;
-                if (orderId != Guid.Empty)
-                {
-                    var assemblies = _assemblyRepository.GetByOrderId(orderId);
-                    hasCompletedAssembly = assemblies.Any(a => a.IsActive);
-                }
-
-                // Satır rengini belirle - Montaj tamamlanmışsa yeşil, üretimde ise mavi
+                // Satır rengini belirle
                 Color rowBgColor = Color.White;
-                if (hasCompletedAssembly)
+                
+                // Order bilgisini al
+                Order order = null;
+                if (orders != null && e.RowIndex < orders.Count)
                 {
-                    rowBgColor = Color.FromArgb(120, 76, 175, 80); // Yeşil
+                    order = orders[e.RowIndex];
                 }
-                else if (status == "Üretimde")
+                else if (orders != null)
                 {
-                    rowBgColor = Color.FromArgb(120, 33, 150, 243); // Mavi
+                    order = orders.FirstOrDefault(o => o.Id == orderId);
+                }
+                else if (_dataGridView.Tag is List<Order> orderList)
+                {
+                    order = orderList.FirstOrDefault(o => o.Id == orderId);
+                }
+                
+                // Üretim geçtiyse (Muhasebede, Tamamlandı, Sevkiyata Hazır) veya Üretimde durumu için renklendirme yap
+                if (orderId != Guid.Empty && order != null)
+                {
+                    // Üretimden geçmiş mi kontrol et (Muhasebede, Tamamlandı, Sevkiyata Hazır veya ShipmentDate dolu ise)
+                    bool isProductionPassed = order.Status == "Muhasebede" || 
+                                             order.Status == "Tamamlandı" || 
+                                             order.Status == "Sevkiyata Hazır" ||
+                                             order.ShipmentDate.HasValue;
+                    
+                    // Üretimden geçmişse yeşil
+                    if (isProductionPassed)
+                    {
+                        rowBgColor = Color.FromArgb(120, 76, 175, 80); // Yeşil - Gönderildi
+                    }
+                    else if (status == "Üretimde")
+                    {
+                        // Montaj işlemi yapılmış mı kontrol et
+                        var assemblies = _assemblyRepository.GetByOrderId(orderId);
+                        bool hasCompletedAssembly = assemblies.Any(a => a.IsActive);
+                        
+                        // Montaj yapılmışsa mavi
+                        if (hasCompletedAssembly)
+                        {
+                            rowBgColor = Color.FromArgb(120, 33, 150, 243); // Mavi - Montaj
+                        }
+                        else
+                        {
+                            // Kenetleme işlemi yapılmış mı kontrol et
+                            var clampingRequests = _clampingRequestRepository.GetByOrderId(orderId);
+                            bool hasClamping = clampingRequests.Any(cr => cr.IsActive);
+                            
+                            // Kenetleme yapılmışsa sarı
+                            if (hasClamping)
+                            {
+                                rowBgColor = Color.FromArgb(120, 255, 193, 7); // Sarı - Kenetleme
+                            }
+                            else
+                            {
+                                // Hiç işlem yapılmamışsa kırmızı
+                                rowBgColor = Color.FromArgb(120, 244, 67, 54); // Kırmızı - İşlem Yok
+                            }
+                        }
+                    }
                 }
 
                 // Actions kolonu için özel işlem
                 if (isActionsColumn && row.DataBoundItem != null && orders != null && e.RowIndex < orders.Count)
                 {
-                    var order = orders[e.RowIndex];
-                    bool isInProduction = order.Status == "Üretimde";
-                    bool isStockOrder = order.IsStockOrder;
+                    var actionOrder = orders[e.RowIndex];
+                    bool isInProduction = actionOrder.Status == "Üretimde";
+                    bool isStockOrder = actionOrder.IsStockOrder;
 
                     // Actions kolonu için satır arka planını çiz
                     using (SolidBrush bgBrush = new SolidBrush(rowBgColor))
@@ -1291,6 +1472,70 @@ namespace ERP.UI.Forms
             _currentToolTipText = "";
         }
 
+        private string GetStatusText(Order order)
+        {
+            if (order == null) return "";
+            
+            // Üretimden geçmiş mi kontrol et (Muhasebede, Tamamlandı, Sevkiyata Hazır veya ShipmentDate dolu ise)
+            bool isProductionPassed = order.Status == "Muhasebede" || 
+                                     order.Status == "Tamamlandı" || 
+                                     order.Status == "Sevkiyata Hazır" ||
+                                     order.ShipmentDate.HasValue;
+            
+            if (isProductionPassed)
+            {
+                return "Gönderildi";
+            }
+            
+            // Üretimde değilse durumu direkt döndür
+            if (order.Status != "Üretimde")
+            {
+                return order.Status;
+            }
+            
+            // Montaj işlemi yapılmış mı kontrol et
+            var assemblies = _assemblyRepository.GetByOrderId(order.Id);
+            bool hasCompletedAssembly = assemblies.Any(a => a.IsActive);
+            
+            if (hasCompletedAssembly)
+            {
+                return "Montaj";
+            }
+            
+            // Kenetleme işlemi yapılmış mı kontrol et
+            var clampingRequests = _clampingRequestRepository.GetByOrderId(order.Id);
+            bool hasClamping = clampingRequests.Any(cr => cr.IsActive);
+            
+            if (hasClamping)
+            {
+                return "Kenetleme";
+            }
+            
+            // Hiç işlem yapılmamışsa
+            return "İşlem Yok";
+        }
+
+        private string GetPlaceholderText(string columnName)
+        {
+            switch (columnName)
+            {
+                case "TrexOrderNo":
+                    return "Sipariş No Girin";
+                case "ProductCode":
+                    return "Üretim Kodu Girin";
+                case "PlakaOlcusu":
+                    return "Plaka Ölçüsü Girin";
+                case "Yukseklik":
+                    return "Yükseklik Girin";
+                case "Quantity":
+                    return "Adet Girin";
+                case "TermDate":
+                    return "Termin Tarihi Girin";
+                default:
+                    return "Ara...";
+            }
+        }
+
         private void UpdateColumnFilterPanel()
         {
             if (_columnFilterPanel == null || _dataGridView == null || _dataGridView.Columns.Count == 0)
@@ -1326,7 +1571,7 @@ namespace ERP.UI.Forms
                         Location = new Point(xPos, 2),
                         BackColor = Color.White
                     };
-                    cmb.Items.Add("Tümü");
+                    cmb.Items.Add("Tüm Firmalar");
                     var companies = _companyRepository.GetAll().OrderBy(c => c.Name).ToList();
                     foreach (var company in companies)
                     {
@@ -1348,7 +1593,7 @@ namespace ERP.UI.Forms
                         Location = new Point(xPos, 2),
                         BackColor = Color.White
                     };
-                    cmb.Items.Add("Tümü");
+                    cmb.Items.Add("Tüm Hatveler");
                     cmb.Items.Add("H");
                     cmb.Items.Add("D");
                     cmb.Items.Add("M");
@@ -1369,7 +1614,7 @@ namespace ERP.UI.Forms
                         Location = new Point(xPos, 2),
                         BackColor = Color.White
                     };
-                    cmb.Items.Add("Tümü");
+                    cmb.Items.Add("Tüm Kapaklar");
                     cmb.Items.Add("30");
                     cmb.Items.Add("2");
                     cmb.SelectedIndex = 0;
@@ -1388,7 +1633,7 @@ namespace ERP.UI.Forms
                         Location = new Point(xPos, 2),
                         BackColor = Color.White
                     };
-                    cmb.Items.Add("Tümü");
+                    cmb.Items.Add("Tüm Profiller");
                     cmb.Items.Add("S");
                     cmb.Items.Add("G");
                     cmb.SelectedIndex = 0;
@@ -1407,7 +1652,7 @@ namespace ERP.UI.Forms
                         Location = new Point(xPos, 2),
                         BackColor = Color.White
                     };
-                    cmb.Items.Add("Tümü");
+                    cmb.Items.Add("Tüm Kalınlıklar");
                     cmb.Items.Add("0,100");
                     cmb.Items.Add("0,120");
                     cmb.Items.Add("0,150");
@@ -1419,7 +1664,7 @@ namespace ERP.UI.Forms
                 }
                 else
                 {
-                    // Diğer sütunlar için TextBox
+                    // Diğer sütunlar için TextBox (placeholder ile)
                     var txt = new TextBox
                     {
                         Width = column.Width - 2,
@@ -1429,7 +1674,40 @@ namespace ERP.UI.Forms
                         BackColor = Color.White,
                         BorderStyle = BorderStyle.FixedSingle
                     };
-                    txt.TextChanged += (s, e) => ApplyColumnFilters();
+                    
+                    // Placeholder metni belirle
+                    string placeholder = GetPlaceholderText(column.Name);
+                    txt.Text = placeholder;
+                    txt.ForeColor = Color.Gray;
+                    txt.Tag = placeholder; // Orijinal placeholder'ı sakla
+                    
+                    // Focus olayları ile placeholder işlevi
+                    txt.Enter += (s, e) =>
+                    {
+                        if (txt.Text == placeholder)
+                        {
+                            txt.Text = "";
+                            txt.ForeColor = Color.Black;
+                        }
+                    };
+                    txt.Leave += (s, e) =>
+                    {
+                        if (string.IsNullOrWhiteSpace(txt.Text))
+                        {
+                            txt.Text = placeholder;
+                            txt.ForeColor = Color.Gray;
+                            ApplyColumnFilters();
+                        }
+                    };
+                    
+                    txt.TextChanged += (s, e) =>
+                    {
+                        // Placeholder text ise filtreleme yapma
+                        if (txt.Text != placeholder && txt.ForeColor != Color.Gray)
+                        {
+                            ApplyColumnFilters();
+                        }
+                    };
                     filterControl = txt;
                 }
 
@@ -1461,15 +1739,17 @@ namespace ERP.UI.Forms
                     {
                         o.Id,
                         o.TrexOrderNo,
-                        CompanyName = o.Company?.Name ?? "",
                         o.ProductCode,
                         Hatve = parsedData.Hatve,
                         PlakaOlcusu = parsedData.PlakaOlcusu,
                         Yukseklik = parsedData.Yukseklik,
                         Kapak = parsedData.Kapak,
                         Profil = parsedData.Profil,
-                        LamelThickness = o.LamelThickness.HasValue ? o.LamelThickness.Value.ToString("0.000", System.Globalization.CultureInfo.GetCultureInfo("tr-TR")) : "",
                         o.Quantity,
+                        LamelThickness = o.LamelThickness.HasValue ? o.LamelThickness.Value.ToString("0.000", System.Globalization.CultureInfo.GetCultureInfo("tr-TR")) : "",
+                        CompanyName = o.Company?.Name ?? "",
+                        TermDate = o.TermDate.ToString("dd.MM.yyyy", System.Globalization.CultureInfo.GetCultureInfo("tr-TR")),
+                        StatusText = GetStatusText(o),
                         o.Status,
                         IsInProduction = o.Status == "Üretimde",
                         IsStockOrder = o.IsStockOrder
@@ -1484,6 +1764,11 @@ namespace ERP.UI.Forms
 
                     if (filterControl is TextBox txt && !string.IsNullOrWhiteSpace(txt.Text))
                     {
+                        // Placeholder text ise filtreleme yapma
+                        string placeholder = txt.Tag?.ToString() ?? "";
+                        if (txt.Text == placeholder || txt.ForeColor == Color.Gray)
+                            continue;
+                            
                         string filterText = txt.Text.ToLower();
                         filteredData = filteredData.Where(item =>
                         {
@@ -1498,8 +1783,8 @@ namespace ERP.UI.Forms
                     }
                     else if (filterControl is ComboBox cmb)
                     {
-                        // "Tümü" seçildiğinde filtreleme yapma (SelectedIndex == 0)
-                        if (cmb.SelectedIndex > 0)
+                        // "Tümü" ile başlayan seçenekler için filtreleme yapma (SelectedIndex == 0)
+                        if (cmb.SelectedIndex > 0 && !cmb.SelectedItem.ToString().StartsWith("Tüm"))
                         {
                             string filterValue = cmb.SelectedItem.ToString();
                             
