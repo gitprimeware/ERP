@@ -168,7 +168,7 @@ namespace ERP.UI.Forms
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 BackColor = Color.White
             };
-            cmbPlateRange.Items.AddRange(new[] { "3.1(H)", "4.3(D)", "6.3(M)", "8.7(L)" });
+            cmbPlateRange.Items.AddRange(new[] { "H", "D", "M", "L" });
             cmbPlateRange.SelectedIndex = 0;
             cmbPlateRange.SelectedIndexChanged += (s, e) => GenerateProductCode();
             return cmbPlateRange;
@@ -303,11 +303,8 @@ namespace ERP.UI.Forms
                 cmbCoverSize.SelectedIndex < 0)
                 return;
 
-            // Plaka aralığından sadece harf kısmını al (H, D, M, L - büyük harf)
-            string plateRange = cmbPlateRange.SelectedItem.ToString();
-            string plateLetter = plateRange.Contains("(H)") ? "H" :
-                               plateRange.Contains("(D)") ? "D" :
-                               plateRange.Contains("(M)") ? "M" : "L";
+            // Plaka aralığından direkt harfi al (H, D, M, L - büyük harf)
+            string plateLetter = cmbPlateRange.SelectedItem?.ToString().ToUpper() ?? "H";
 
             // Profil'den sadece harf kısmını al (S veya G)
             string profile = cmbProfile.SelectedItem.ToString();

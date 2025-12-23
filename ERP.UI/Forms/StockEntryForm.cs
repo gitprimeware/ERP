@@ -21,10 +21,7 @@ namespace ERP.UI.Forms
         private DateTimePicker dtpTermDate;
         private Button btnProductCode;
         private TextBox txtProductCode;
-        private TextBox txtBypassSize;
-        private TextBox txtBypassType;
         private ComboBox cmbLamelThickness;
-        private ComboBox cmbProductType;
         private NumericUpDown nudQuantity;
         private Button btnSave;
         private Button btnCancel;
@@ -140,10 +137,10 @@ namespace ERP.UI.Forms
 
             int row = 0;
 
-            // Firma satırı
+            // Firma satırı - sol tarafta firma, sağ tarafta yeni firma ekle butonu
             AddTableRow("Firma:", CreateCompanyControl(), "+ Yeni Firma Ekle", CreateAddCompanyButton(), row++);
 
-            // Müşteri Sipariş No (Readonly - "Stok")
+            // Müşteri Sipariş No (Readonly - "Stok") ve Trex Sipariş No
             txtCustomerOrderNo = new TextBox { Text = "Stok", ReadOnly = true, BackColor = ThemeColors.SurfaceDark };
             AddTableRow("Müşteri Sipariş No:", CreateReadOnlyTextBox(txtCustomerOrderNo), 
                        "Trex Sipariş No:", CreateTextBox(txtTrexOrderNo = new TextBox()), row++);
@@ -153,20 +150,12 @@ namespace ERP.UI.Forms
             AddTableRow("Cihaz Adı:", CreateReadOnlyTextBox(txtDeviceName),
                        "Sipariş Tarihi:", CreateDateTimePicker(dtpOrderDate = new DateTimePicker()), row++);
 
-            // Termin tarihi
+            // Termin tarihi ve Lamel kalınlığı
             AddTableRow("Termin Tarihi:", CreateDateTimePicker(dtpTermDate = new DateTimePicker()),
-                       "", new Panel(), row++);
-
-            // Ürün kodu ve Bypass ölçüsü
-            AddTableRow("Ürün Kodu:", CreateProductCodeControl(),
-                       "Bypass Ölçüsü:", CreateTextBox(txtBypassSize = new TextBox()), row++);
-
-            // Bypass türü ve Lamel kalınlığı
-            AddTableRow("Bypass Türü:", CreateTextBox(txtBypassType = new TextBox()),
                        "Lamelle Kalınlığı:", CreateLamelThicknessCombo(), row++);
 
-            // Ürün türü ve Miktar
-            AddTableRow("Ürün Türü:", CreateProductTypeCombo(),
+            // Ürün kodu ve Miktar
+            AddTableRow("Ürün Kodu:", CreateProductCodeControl(),
                        "Miktar:", CreateQuantityControl(), row++);
 
             // Fiyat alanları kaldırıldı - stok girişinde gösterilmiyor, arka planda otomatik 0
@@ -294,19 +283,6 @@ namespace ERP.UI.Forms
             };
             cmbLamelThickness.Items.AddRange(new[] { "0.10", "0.12", "0.15", "0.165", "0.180" });
             return cmbLamelThickness;
-        }
-
-        private Control CreateProductTypeCombo()
-        {
-            cmbProductType = new ComboBox
-            {
-                Height = 30,
-                Font = new Font("Segoe UI", 10F),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                BackColor = Color.White
-            };
-            cmbProductType.Items.AddRange(new[] { "Normal", "Epoksi Boyalı" });
-            return cmbProductType;
         }
 
         private Control CreateQuantityControl()
@@ -625,9 +601,9 @@ namespace ERP.UI.Forms
                 OrderDate = dtpOrderDate.Value,
                 TermDate = dtpTermDate.Value,
                 ProductCode = string.IsNullOrWhiteSpace(txtProductCode.Text) ? null : txtProductCode.Text.Trim(),
-                BypassSize = string.IsNullOrWhiteSpace(txtBypassSize.Text) ? null : txtBypassSize.Text.Trim(),
-                BypassType = string.IsNullOrWhiteSpace(txtBypassType.Text) ? null : txtBypassType.Text.Trim(),
-                ProductType = cmbProductType.SelectedItem?.ToString(),
+                BypassSize = null,
+                BypassType = null,
+                ProductType = null,
                 Quantity = (int)nudQuantity.Value,
                 SalesPrice = 0, // Otomatik 0
                 TotalPrice = 0, // Otomatik 0
@@ -667,10 +643,7 @@ namespace ERP.UI.Forms
             dtpOrderDate.Value = DateTime.Now;
             dtpTermDate.Value = DateTime.Now;
             txtProductCode.Clear();
-            txtBypassSize.Clear();
-            txtBypassType.Clear();
             cmbLamelThickness.SelectedIndex = -1;
-            cmbProductType.SelectedIndex = -1;
             nudQuantity.Value = 1;
             GenerateTrexOrderNo(); // Yeni numara oluştur
         }
@@ -709,8 +682,6 @@ namespace ERP.UI.Forms
                 dtpOrderDate.Value = order.OrderDate;
                 dtpTermDate.Value = order.TermDate;
                 txtProductCode.Text = order.ProductCode ?? "";
-                txtBypassSize.Text = order.BypassSize ?? "";
-                txtBypassType.Text = order.BypassType ?? "";
 
                 // LamelThickness - Değeri olduğu gibi göster
                 if (order.LamelThickness.HasValue)
@@ -723,18 +694,6 @@ namespace ERP.UI.Forms
                         if (itemValue.Replace(",", ".") == thicknessStr)
                         {
                             cmbLamelThickness.SelectedIndex = i;
-                            break;
-                        }
-                    }
-                }
-
-                if (!string.IsNullOrEmpty(order.ProductType))
-                {
-                    for (int i = 0; i < cmbProductType.Items.Count; i++)
-                    {
-                        if (cmbProductType.Items[i].ToString() == order.ProductType)
-                        {
-                            cmbProductType.SelectedIndex = i;
                             break;
                         }
                     }

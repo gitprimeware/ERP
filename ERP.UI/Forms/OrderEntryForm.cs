@@ -148,10 +148,10 @@ namespace ERP.UI.Forms
 
             int row = 0;
 
-            // Firma satırı
+            // Firma satırı - sol tarafta firma, sağ tarafta yeni firma ekle butonu
             AddTableRow("Firma:", CreateCompanyControl(), "+ Yeni Firma Ekle", CreateAddCompanyButton(), row++);
 
-            // Sipariş numaraları
+            // Müşteri Sipariş No ve Trex Sipariş No
             AddTableRow("Müşteri Sipariş No:", CreateTextBox(txtCustomerOrderNo = new TextBox()), 
                        "Trex Sipariş No:", CreateTextBox(txtTrexOrderNo = new TextBox()), row++);
 
@@ -159,39 +159,32 @@ namespace ERP.UI.Forms
             AddTableRow("Cihaz Adı:", CreateTextBox(txtDeviceName = new TextBox()),
                        "Sipariş Tarihi:", CreateDateTimePicker(dtpOrderDate = new DateTimePicker()), row++);
 
-            // Termin tarihi
+            // Termin tarihi ve Sevk tarihi (Sipariş tarihinin altına)
             AddTableRow("Termin Tarihi:", CreateDateTimePicker(dtpTermDate = new DateTimePicker()),
-                       "", new Panel(), row++);
+                       "Sevk Tarihi:", CreateDisabledDateTimePicker(dtpShipmentDate = new DateTimePicker()), row++);
 
-            // Ürün kodu ve Bypass ölçüsü
+            // Ürün kodu ve Miktar
             AddTableRow("Ürün Kodu:", CreateProductCodeControl(),
-                       "Bypass Ölçüsü:", CreateTextBox(txtBypassSize = new TextBox()), row++);
-
-            // Bypass türü ve Lamel kalınlığı
-            AddTableRow("Bypass Türü:", CreateTextBox(txtBypassType = new TextBox()),
-                       "Lamelle Kalınlığı:", CreateLamelThicknessCombo(), row++);
-
-            // Ürün türü ve Miktar
-            AddTableRow("Ürün Türü:", CreateProductTypeCombo(),
                        "Miktar:", CreateQuantityControl(), row++);
 
-            // Satış fiyatı (USD) ve Toplam fiyat (USD)
-            AddTableRow("Satış Fiyatı (USD):", CreateTextBox(txtSalesPriceUSD = new TextBox()),
-                       "Toplam Fiyat (USD):", CreateReadOnlyTextBox(txtTotalPriceUSD = new TextBox()), row++);
+            // Lamelle Kalınlığı (Ürün Kodu'nun altına) ve Satış Fiyatı (USD)
+            AddTableRow("Lamelle Kalınlığı:", CreateLamelThicknessCombo(),
+                       "Satış Fiyatı (USD):", CreateTextBox(txtSalesPriceUSD = new TextBox()), row++);
             txtSalesPriceUSD.TextChanged += TxtSalesPriceUSD_TextChanged;
 
-            // Kur ve Toplam fiyat (TL)
-            AddTableRow("Kur:", CreateReadOnlyTextBox(txtCurrencyRate = new TextBox()),
-                       "Toplam Fiyat (TL):", CreateReadOnlyTextBox(txtTotalPriceTL = new TextBox()), row++);
-            txtCurrencyRate.Text = "0,00";
-            txtTotalPriceTL.Text = "0,00";
-            
-            // Kur değiştiğinde TL fiyatını hesapla (sadece gösterim için)
-            // Not: Kur readonly olduğu için bu event çalışmayacak ama yine de ekleyelim
+            // Bypass ölçüsü ve Toplam Fiyat (USD)
+            AddTableRow("Bypass Ölçüsü:", CreateTextBox(txtBypassSize = new TextBox()),
+                       "Toplam Fiyat (USD):", CreateReadOnlyTextBox(txtTotalPriceUSD = new TextBox()), row++);
 
-            // Sevk tarihi
-            AddTableRow("Sevk Tarihi:", CreateDisabledDateTimePicker(dtpShipmentDate = new DateTimePicker()),
-                       "", new Panel(), row++);
+            // Bypass türü ve Kur
+            AddTableRow("Bypass Türü:", CreateTextBox(txtBypassType = new TextBox()),
+                       "Kur:", CreateReadOnlyTextBox(txtCurrencyRate = new TextBox()), row++);
+            txtCurrencyRate.Text = "0,00";
+
+            // Ürün türü ve Toplam Fiyat (TL)
+            AddTableRow("Ürün Türü:", CreateProductTypeCombo(),
+                       "Toplam Fiyat (TL):", CreateReadOnlyTextBox(txtTotalPriceTL = new TextBox()), row++);
+            txtTotalPriceTL.Text = "0,00";
 
             mainPanel.Resize += (s, e) =>
             {
