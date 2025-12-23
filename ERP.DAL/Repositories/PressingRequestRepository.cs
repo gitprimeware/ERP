@@ -17,7 +17,7 @@ namespace ERP.DAL.Repositories
             {
                 connection.Open();
                 var query = @"SELECT pr.Id, pr.OrderId, pr.Hatve, pr.Size, pr.PlateThickness, pr.SerialNoId, pr.CuttingId,
-                             pr.RequestedPressCount, pr.ActualPressCount, pr.ResultedPressCount, pr.PressNo, pr.Pressure, pr.WasteAmount,
+                             pr.RequestedPressCount, pr.ActualPressCount, pr.ResultedPressCount, pr.WasteCount, pr.PressNo, pr.Pressure, pr.WasteAmount,
                              pr.EmployeeId, pr.Status, pr.RequestDate, pr.CompletionDate,
                              pr.CreatedDate, pr.ModifiedDate, pr.IsActive,
                              sn.SerialNumber as SerialNumber,
@@ -53,7 +53,7 @@ namespace ERP.DAL.Repositories
             {
                 connection.Open();
                 var query = @"SELECT pr.Id, pr.OrderId, pr.Hatve, pr.Size, pr.PlateThickness, pr.SerialNoId, pr.CuttingId,
-                             pr.RequestedPressCount, pr.ActualPressCount, pr.ResultedPressCount, pr.PressNo, pr.Pressure, pr.WasteAmount,
+                             pr.RequestedPressCount, pr.ActualPressCount, pr.ResultedPressCount, pr.WasteCount, pr.PressNo, pr.Pressure, pr.WasteAmount,
                              pr.EmployeeId, pr.Status, pr.RequestDate, pr.CompletionDate,
                              pr.CreatedDate, pr.ModifiedDate, pr.IsActive,
                              sn.SerialNumber as SerialNumber,
@@ -91,7 +91,7 @@ namespace ERP.DAL.Repositories
             {
                 connection.Open();
                 var query = @"SELECT pr.Id, pr.OrderId, pr.Hatve, pr.Size, pr.PlateThickness, pr.SerialNoId, pr.CuttingId,
-                             pr.RequestedPressCount, pr.ActualPressCount, pr.ResultedPressCount, pr.PressNo, pr.Pressure, pr.WasteAmount,
+                             pr.RequestedPressCount, pr.ActualPressCount, pr.ResultedPressCount, pr.WasteCount, pr.PressNo, pr.Pressure, pr.WasteAmount,
                              pr.EmployeeId, pr.Status, pr.RequestDate, pr.CompletionDate,
                              pr.CreatedDate, pr.ModifiedDate, pr.IsActive,
                              sn.SerialNumber as SerialNumber,
@@ -125,7 +125,7 @@ namespace ERP.DAL.Repositories
             {
                 connection.Open();
                 var query = @"SELECT pr.Id, pr.OrderId, pr.Hatve, pr.Size, pr.PlateThickness, pr.SerialNoId, pr.CuttingId,
-                             pr.RequestedPressCount, pr.ActualPressCount, pr.ResultedPressCount, pr.PressNo, pr.Pressure, pr.WasteAmount,
+                             pr.RequestedPressCount, pr.ActualPressCount, pr.ResultedPressCount, pr.WasteCount, pr.PressNo, pr.Pressure, pr.WasteAmount,
                              pr.EmployeeId, pr.Status, pr.RequestDate, pr.CompletionDate,
                              pr.CreatedDate, pr.ModifiedDate, pr.IsActive,
                              sn.SerialNumber as SerialNumber,
@@ -162,10 +162,10 @@ namespace ERP.DAL.Repositories
             {
                 connection.Open();
                 var query = @"INSERT INTO PressingRequests (Id, OrderId, Hatve, Size, PlateThickness, SerialNoId, CuttingId,
-                             RequestedPressCount, ActualPressCount, ResultedPressCount, PressNo, Pressure, WasteAmount,
+                             RequestedPressCount, ActualPressCount, ResultedPressCount, WasteCount, PressNo, Pressure, WasteAmount,
                              EmployeeId, Status, RequestDate, CompletionDate, CreatedDate, IsActive)
                              VALUES (@Id, @OrderId, @Hatve, @Size, @PlateThickness, @SerialNoId, @CuttingId,
-                             @RequestedPressCount, @ActualPressCount, @ResultedPressCount, @PressNo, @Pressure, @WasteAmount,
+                             @RequestedPressCount, @ActualPressCount, @ResultedPressCount, @WasteCount, @PressNo, @Pressure, @WasteAmount,
                              @EmployeeId, @Status, @RequestDate, @CompletionDate, @CreatedDate, @IsActive)";
 
                 using (var command = new SqlCommand(query, connection))
@@ -194,6 +194,7 @@ namespace ERP.DAL.Repositories
                              RequestedPressCount = @RequestedPressCount,
                              ActualPressCount = @ActualPressCount,
                              ResultedPressCount = @ResultedPressCount,
+                             WasteCount = @WasteCount,
                              PressNo = @PressNo,
                              Pressure = @Pressure,
                              WasteAmount = @WasteAmount,
@@ -240,6 +241,7 @@ namespace ERP.DAL.Repositories
                 RequestedPressCount = reader.GetInt32("RequestedPressCount"),
                 ActualPressCount = reader.IsDBNull("ActualPressCount") ? (int?)null : reader.GetInt32("ActualPressCount"),
                 ResultedPressCount = reader.IsDBNull("ResultedPressCount") ? (int?)null : reader.GetInt32("ResultedPressCount"),
+                WasteCount = reader.IsDBNull("WasteCount") ? (int?)null : reader.GetInt32("WasteCount"),
                 PressNo = reader.IsDBNull("PressNo") ? "" : reader.GetString("PressNo"),
                 Pressure = reader.GetDecimal("Pressure"),
                 WasteAmount = reader.GetDecimal("WasteAmount"),
@@ -286,6 +288,7 @@ namespace ERP.DAL.Repositories
             command.Parameters.AddWithValue("@RequestedPressCount", request.RequestedPressCount);
             command.Parameters.AddWithValue("@ActualPressCount", request.ActualPressCount.HasValue ? (object)request.ActualPressCount.Value : DBNull.Value);
             command.Parameters.AddWithValue("@ResultedPressCount", request.ResultedPressCount.HasValue ? (object)request.ResultedPressCount.Value : DBNull.Value);
+            command.Parameters.AddWithValue("@WasteCount", request.WasteCount.HasValue ? (object)request.WasteCount.Value : DBNull.Value);
             command.Parameters.AddWithValue("@PressNo", (object)request.PressNo ?? DBNull.Value);
             command.Parameters.AddWithValue("@Pressure", request.Pressure);
             command.Parameters.AddWithValue("@WasteAmount", request.WasteAmount);

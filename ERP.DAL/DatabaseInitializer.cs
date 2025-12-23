@@ -807,6 +807,7 @@ namespace ERP.DAL
                         [RequestedPressCount] INT NOT NULL,
                         [ActualPressCount] INT NULL,
                         [ResultedPressCount] INT NULL,
+                        [WasteCount] INT NULL,
                         [PressNo] NVARCHAR(50) NULL,
                         [Pressure] DECIMAL(10,2) NOT NULL,
                         [WasteAmount] DECIMAL(10,2) NOT NULL DEFAULT 0,
@@ -829,7 +830,7 @@ namespace ERP.DAL
                 command.ExecuteNonQuery();
             }
 
-            // Mevcut tablolar için migration: ResultedPressCount kolonunu ekle
+            // Mevcut tablolar için migration: ResultedPressCount ve WasteCount kolonlarını ekle
             var migrationQuery = @"
                 IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[PressingRequests]') AND type in (N'U'))
                 BEGIN
@@ -843,6 +844,20 @@ namespace ERP.DAL
                         END TRY
                         BEGIN CATCH
                             PRINT 'PressingRequests tablosuna ResultedPressCount kolonu eklenirken hata oluştu: ' + ERROR_MESSAGE()
+                        END CATCH
+                    END
+                    
+                    -- WasteCount kolonu ekle
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[PressingRequests]') AND name = 'WasteCount')
+                    BEGIN
+                        BEGIN TRY
+                            ALTER TABLE [dbo].[PressingRequests]
+                            ADD [WasteCount] INT NULL
+                            
+                            PRINT 'PressingRequests tablosuna WasteCount kolonu eklendi.'
+                        END TRY
+                        BEGIN CATCH
+                            PRINT 'PressingRequests tablosuna WasteCount kolonu eklenirken hata oluştu: ' + ERROR_MESSAGE()
                         END CATCH
                     END
                 END";

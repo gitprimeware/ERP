@@ -19,7 +19,6 @@ namespace ERP.UI.Forms
         private TextBox _txtPressCount;
         private TextBox _txtPressNo;
         private TextBox _txtPressure;
-        private TextBox _txtWasteAmount;
         private ComboBox _cmbEmployee;
         private Button _btnAddEmployee;
         private Button _btnSave;
@@ -210,25 +209,6 @@ namespace ERP.UI.Forms
             };
             this.Controls.Add(lblPressure);
             this.Controls.Add(_txtPressure);
-            yPos += spacing;
-
-            // Hurda Miktarı
-            var lblWasteAmount = new Label
-            {
-                Text = "Hurda Miktarı:",
-                Location = new Point(20, yPos),
-                Width = labelWidth,
-                Font = new Font("Segoe UI", 10F)
-            };
-            _txtWasteAmount = new TextBox
-            {
-                Location = new Point(150, yPos - 3),
-                Width = controlWidth,
-                Height = controlHeight,
-                Font = new Font("Segoe UI", 10F)
-            };
-            this.Controls.Add(lblWasteAmount);
-            this.Controls.Add(_txtWasteAmount);
             yPos += spacing;
 
             // Operatör
@@ -530,14 +510,26 @@ namespace ERP.UI.Forms
                 }
 
                 char modelLetter = modelProfile[0];
-                decimal hatve = GetHtave(modelLetter);
                 
                 decimal size = 0;
+                decimal plakaOlcusuCM = 0;
                 if (parts.Length >= 4 && int.TryParse(parts[3], out int plakaOlcusuMM))
                 {
                     size = plakaOlcusuMM <= 1150 ? plakaOlcusuMM : plakaOlcusuMM / 2;
-                    size = size / 10;
+                    size = size / 10; // cm'ye çevir
+                    plakaOlcusuCM = size; // Plaka ölçüsü cm olarak
                 }
+
+                // Dinamik hatve hesaplaması (rapordaki gibi)
+                decimal hatve = GetHtave(modelLetter); // Fallback için eski metod
+                var hatveOlcumu = GetHatveOlcumu(modelLetter, plakaOlcusuCM);
+                if (hatveOlcumu.HasValue)
+                {
+                    hatve = hatveOlcumu.Value;
+                }
+
+                // Hatve tipi harfini belirle
+                string hatveTipiHarf = char.ToUpper(modelLetter).ToString();
 
                 // Toplam mevcut stok
                 var mevcutKesilmisler = _cuttingRepository.GetAll()
@@ -558,7 +550,8 @@ namespace ERP.UI.Forms
                         toplamMevcutStok += kalanPlakaAdedi;
                 }
 
-                _lblMevcutKesilmisStok.Text = $"{toplamMevcutStok} adet (Hatve: {hatve:F2}, Ölçü: {size:F1}cm)";
+                // Format: 3.10(H) gibi göster
+                _lblMevcutKesilmisStok.Text = $"{toplamMevcutStok} adet (Hatve: {hatve:F2}({hatveTipiHarf}), Ölçü: {size:F1}cm)";
             }
             catch (Exception ex)
             {
@@ -788,6 +781,43 @@ namespace ERP.UI.Forms
             }
         }
 
+        private decimal? GetHatveOlcumu(char hatveTipi, decimal plakaOlcusuCM)
+        {
+            // Plaka ölçüsünü cm cinsinden al (20, 30, 40, 50, 60, 70, 80, 100 gibi)
+            // En yakın 10'a yuvarla (örn: 21-29 -> 20, 31-39 -> 30)
+            int plakaOlcusuYuvarla = (int)Math.Round(plakaOlcusuCM / 10.0m, MidpointRounding.AwayFromZero) * 10;
+            
+            char hatveTipiUpper = char.ToUpper(hatveTipi);
+            
+            // Hatve tipi ve plaka ölçüsüne göre hatve değerini döndür
+            switch (hatveTipiUpper)
+            {
+                case 'H':
+                    // H20, H30, H40, H50: 3.10
+                    if (plakaOlcusuYuvarla == 20 || plakaOlcusuYuvarla == 30 || plakaOlcusuYuvarla == 40 || plakaOlcusuYuvarla == 50)
+                        return 3.10m;
+                    break;
+                case 'M':
+                    // M30: 6.4, M40: 6.3, M50: 6.4, M60: 6.3, M70: 6.5, M80: 6.5, M100: 6.5
+                    if (plakaOlcusuYuvarla == 30 || plakaOlcusuYuvarla == 50) return 6.4m;
+                    if (plakaOlcusuYuvarla == 40 || plakaOlcusuYuvarla == 60) return 6.3m;
+                    if (plakaOlcusuYuvarla == 70 || plakaOlcusuYuvarla == 80 || plakaOlcusuYuvarla == 100) return 6.5m;
+                    break;
+                case 'D':
+                    // D30: 4.5, D40: 4.5, D50: 4.5, D60: 4.3
+                    if (plakaOlcusuYuvarla == 30 || plakaOlcusuYuvarla == 40 || plakaOlcusuYuvarla == 50) return 4.5m;
+                    if (plakaOlcusuYuvarla == 60) return 4.3m;
+                    break;
+                case 'L':
+                    // L30: 8.7, L40: 8.7, L50: 8.7, L60: 8.65, L70: 8.65, L80: 8.65, L100: 8.65
+                    if (plakaOlcusuYuvarla == 30 || plakaOlcusuYuvarla == 40 || plakaOlcusuYuvarla == 50) return 8.7m;
+                    if (plakaOlcusuYuvarla == 60 || plakaOlcusuYuvarla == 70 || plakaOlcusuYuvarla == 80 || plakaOlcusuYuvarla == 100) return 8.65m;
+                    break;
+            }
+            
+            return null; // Eğer eşleşme bulunamazsa null döndür
+        }
+
         private void LoadEmployees()
         {
             try
@@ -993,8 +1023,8 @@ namespace ERP.UI.Forms
                         RequestedPressCount = kullanilacakAdet,
                     PressNo = _txtPressNo.Text,
                     Pressure = decimal.Parse(_txtPressure.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
-                        WasteAmount = !string.IsNullOrWhiteSpace(_txtWasteAmount.Text) ? 
-                                     decimal.Parse(_txtWasteAmount.Text, NumberStyles.Any, CultureInfo.InvariantCulture) : 0,
+                    WasteAmount = 0, // Artık WasteCount kullanılıyor, WasteAmount deprecated
+                    WasteCount = null, // İlk oluşturulurken null, sonra girilecek
                     EmployeeId = _cmbEmployee.SelectedItem != null ? GetSelectedId(_cmbEmployee) : (Guid?)null,
                         Status = "Beklemede",
                         RequestDate = DateTime.Now
@@ -1083,15 +1113,6 @@ namespace ERP.UI.Forms
                         MessageBox.Show($"Kesim #{cutting.CuttingDate:dd.MM.yyyy} için yeterli stok yok (Kalan: {kalanPlakaAdedi}, Seçilen: {selectedCutting.Value})", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return false;
                     }
-                }
-            }
-
-            if (!string.IsNullOrWhiteSpace(_txtWasteAmount.Text))
-            {
-            if (!decimal.TryParse(_txtWasteAmount.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal wasteAmount))
-            {
-                    MessageBox.Show("Lütfen geçerli bir hurda miktarı giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return false;
                 }
             }
 

@@ -1964,20 +1964,34 @@ namespace ERP.UI.Forms
             {
                 // Onaylanmış pres kayıtları
                 var pressings = _pressingRepository.GetByOrderId(_orderId);
-                var completedData = pressings.Select(p => new
+                // Tamamlanmış PressingRequest'leri al (WasteCount için)
+                var completedRequests = _pressingRequestRepository.GetByOrderId(_orderId)
+                    .Where(r => r.Status == "Tamamlandı")
+                    .ToList();
+                
+                var completedData = pressings.Select(p =>
                 {
-                    Id = p.Id,
-                    Date = p.PressingDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
-                    PlateThickness = p.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
-                    Hatve = GetHatveLetter(p.Hatve),
-                    Size = p.Size.ToString("F2", CultureInfo.InvariantCulture),
-                    SerialNumber = p.SerialNo?.SerialNumber ?? "",
-                    PressNo = p.PressNo ?? "",
-                    Pressure = p.Pressure.ToString("F3", CultureInfo.InvariantCulture),
-                    PressCount = p.PressCount.ToString(),
-                    WasteAmount = p.WasteAmount.ToString("F3", CultureInfo.InvariantCulture),
-                    EmployeeName = p.Employee != null ? $"{p.Employee.FirstName} {p.Employee.LastName}" : "",
-                    Status = GetShortStatus("Tamamlandı")
+                    // Bu pressing için ilgili PressingRequest'i bul (CuttingId ve OrderId üzerinden, en son tamamlananı al)
+                    var relatedRequest = completedRequests
+                        .Where(r => r.CuttingId == p.CuttingId && r.OrderId == p.OrderId)
+                        .OrderByDescending(r => r.CompletionDate ?? r.ModifiedDate ?? r.CreatedDate)
+                        .FirstOrDefault();
+                    
+                    return new
+                    {
+                        Id = p.Id,
+                        Date = p.PressingDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
+                        PlateThickness = p.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
+                        Hatve = GetHatveLetter(p.Hatve),
+                        Size = p.Size.ToString("F2", CultureInfo.InvariantCulture),
+                        SerialNumber = p.SerialNo?.SerialNumber ?? "",
+                        PressNo = p.PressNo ?? "",
+                        Pressure = p.Pressure.ToString("F3", CultureInfo.InvariantCulture),
+                        PressCount = p.PressCount.ToString(),
+                        WasteAmount = relatedRequest?.WasteCount.HasValue == true ? relatedRequest.WasteCount.Value.ToString() : "-",
+                        EmployeeName = p.Employee != null ? $"{p.Employee.FirstName} {p.Employee.LastName}" : "",
+                        Status = GetShortStatus("Tamamlandı")
+                    };
                 }).ToList();
 
                 // Bekleyen pres talepleri
@@ -1994,7 +2008,7 @@ namespace ERP.UI.Forms
                         PressNo = r.PressNo ?? "-",
                         Pressure = r.Pressure.ToString("F3", CultureInfo.InvariantCulture),
                         PressCount = r.ResultedPressCount?.ToString() ?? "-",
-                        WasteAmount = r.WasteAmount.ToString("F3", CultureInfo.InvariantCulture),
+                        WasteAmount = r.WasteCount.HasValue ? r.WasteCount.Value.ToString() : "-",
                         EmployeeName = r.Employee != null ? $"{r.Employee.FirstName} {r.Employee.LastName}" : "-",
                         Status = GetShortStatus(r.Status)
                     }).ToList();
@@ -2164,26 +2178,46 @@ namespace ERP.UI.Forms
                 if (selectedRequest == null)
                     return;
 
-                // Pres adedi girilmiş mi kontrol et
-                if (!selectedRequest.ActualPressCount.HasValue)
+                // Preslenmiş adet girilmiş mi kontrol et
+                if (!selectedRequest.ResultedPressCount.HasValue)
                 {
-                    MessageBox.Show("Lütfen önce pres adedini giriniz (Pres Talepleri sayfasından).", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("Lütfen önce preslenmiş adedi giriniz (Pres Talepleri sayfasından).", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
-                // Preslenmiş oluşan adet girilmiş mi kontrol et
-                if (!selectedRequest.ResultedPressCount.HasValue)
+                // Hurda adedi girilmiş mi kontrol et
+                if (!selectedRequest.WasteCount.HasValue)
                 {
-                    MessageBox.Show("Lütfen önce kaç tane preslenmiş oluştuğunu giriniz (Pres Talepleri sayfasından).", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("Lütfen önce hurda adedini giriniz (Pres Talepleri sayfasından).", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Kontrol: İstenen Pres = Preslenmiş + Hurda (1:1 oran)
+                int toplamCikis = selectedRequest.ResultedPressCount.Value + selectedRequest.WasteCount.Value;
+                if (toplamCikis != selectedRequest.RequestedPressCount)
+                {
+                    MessageBox.Show(
+                        $"Hata: İstenen Pres ({selectedRequest.RequestedPressCount}) ile çıktılar eşleşmiyor!\n\n" +
+                        $"Preslenmiş adet: {selectedRequest.ResultedPressCount.Value}\n" +
+                        $"Hurda adedi: {selectedRequest.WasteCount.Value}\n" +
+                        $"Toplam: {toplamCikis}\n\n" +
+                        $"İstenen Pres = Preslenmiş Adet + Hurda Adedi olmalıdır!",
+                        "Hata",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
                     return;
                 }
 
                 // Onaylama işlemi
+                // ActualPressCount = ResultedPressCount + WasteCount
+                int calculatedActualPressCount = selectedRequest.ResultedPressCount.Value + selectedRequest.WasteCount.Value;
+                
                 var result = MessageBox.Show(
                     $"Pres talebi onaylanacak:\n\n" +
                     $"İstenen: {selectedRequest.RequestedPressCount} adet\n" +
-                    $"Preslenen (kesilmiş stoktan kullanılan): {selectedRequest.ActualPressCount.Value} adet\n" +
-                    $"Oluşan (preslenmiş stoğa eklenecek): {selectedRequest.ResultedPressCount.Value} adet\n\n" +
+                    $"Preslenmiş adet: {selectedRequest.ResultedPressCount.Value} adet\n" +
+                    $"Hurda adedi: {selectedRequest.WasteCount.Value} adet\n" +
+                    $"Kullanılan (otomatik hesaplanan): {calculatedActualPressCount} adet\n\n" +
                     $"Onaylamak istediğinize emin misiniz?",
                     "Pres Talebi Onayla",
                     MessageBoxButtons.YesNo,
@@ -2206,6 +2240,9 @@ namespace ERP.UI.Forms
                     }
                 }
 
+                // ActualPressCount'u güncelle (calculatedActualPressCount zaten yukarıda hesaplanmıştı)
+                selectedRequest.ActualPressCount = calculatedActualPressCount;
+                
                 // Durumu "Tamamlandı" yap
                 selectedRequest.Status = "Tamamlandı";
                 selectedRequest.CompletionDate = DateTime.Now;
@@ -2223,7 +2260,7 @@ namespace ERP.UI.Forms
                     PressNo = selectedRequest.PressNo,
                     Pressure = selectedRequest.Pressure,
                     PressCount = selectedRequest.ResultedPressCount.Value, // Oluşan preslenmiş adet
-                    WasteAmount = selectedRequest.WasteAmount,
+                    WasteAmount = 0, // Artık WasteCount kullanılıyor, WasteAmount deprecated
                     EmployeeId = selectedRequest.EmployeeId,
                     PressingDate = DateTime.Now
                 };

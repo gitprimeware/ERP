@@ -105,31 +105,30 @@ namespace ERP.UI.Forms
             AddPressingRequestColumn("Pressure", "Basınç", 100);
             AddPressingRequestColumn("RequestedPressCount", "İstenen Pres", 120);
             
-            // Kaç Tane Preslendiği - buton kolonu
-            var colActualPressCount = new DataGridViewButtonColumn
-            {
-                HeaderText = "Kaç Tane Preslendiği",
-                Name = "ActualPressCount",
-                Width = 150,
-                Text = "Gir",
-                UseColumnTextForButtonValue = false // Dinamik buton metni için false
-            };
-            colActualPressCount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            _dataGridView.Columns.Add(colActualPressCount);
-            
-            // Kaç Tane Preslenmiş Oluştu - buton kolonu
+            // Preslenmiş Adet - buton kolonu (eski: Kaç Tane Preslenmiş Oluştu)
             var colResultedPressCount = new DataGridViewButtonColumn
             {
-                HeaderText = "Kaç Tane Preslenmiş Oluştu",
+                HeaderText = "Preslenmiş Adet",
                 Name = "ResultedPressCount",
-                Width = 180,
+                Width = 150,
                 Text = "Gir",
                 UseColumnTextForButtonValue = false // Dinamik buton metni için false
             };
             colResultedPressCount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             _dataGridView.Columns.Add(colResultedPressCount);
             
-            AddPressingRequestColumn("WasteAmount", "Hurda Miktarı", 120);
+            // Hurda Adedi - buton kolonu
+            var colWasteCount = new DataGridViewButtonColumn
+            {
+                HeaderText = "Hurda Adedi",
+                Name = "WasteCount",
+                Width = 120,
+                Text = "Gir",
+                UseColumnTextForButtonValue = false // Dinamik buton metni için false
+            };
+            colWasteCount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            _dataGridView.Columns.Add(colWasteCount);
+            
             AddPressingRequestColumn("Status", "Durum", 100);
 
             // Stil ayarları
@@ -213,9 +212,8 @@ namespace ERP.UI.Forms
                         PressNo = r.PressNo ?? "",
                         Pressure = r.Pressure.ToString("F2", CultureInfo.InvariantCulture),
                         RequestedPressCount = r.RequestedPressCount.ToString(),
-                        ActualPressCount = r.ActualPressCount.HasValue ? r.ActualPressCount.Value.ToString() : "",
                         ResultedPressCount = r.ResultedPressCount.HasValue ? r.ResultedPressCount.Value.ToString() : "",
-                        WasteAmount = r.WasteAmount.ToString("F2", CultureInfo.InvariantCulture),
+                        WasteCount = r.WasteCount.HasValue ? r.WasteCount.Value.ToString() : "",
                         Status = r.Status
                     };
                 }).ToList();
@@ -245,28 +243,8 @@ namespace ERP.UI.Forms
                 {
                     var item = row.DataBoundItem;
                     
-                    // ActualPressCount buton kolonu için
-                    if (columnName == "ActualPressCount")
-                    {
-                        var actualPressCountProperty = item.GetType().GetProperty("ActualPressCount");
-                        if (actualPressCountProperty != null)
-                        {
-                            var actualPressCountValue = actualPressCountProperty.GetValue(item)?.ToString();
-                            
-                            if (!string.IsNullOrWhiteSpace(actualPressCountValue))
-                            {
-                                e.Value = $"Girildi ({actualPressCountValue})";
-                                e.FormattingApplied = true;
-                            }
-                            else
-                            {
-                                e.Value = "Gir";
-                                e.FormattingApplied = true;
-                            }
-                        }
-                    }
                     // ResultedPressCount buton kolonu için
-                    else if (columnName == "ResultedPressCount")
+                    if (columnName == "ResultedPressCount")
                     {
                         var resultedPressCountProperty = item.GetType().GetProperty("ResultedPressCount");
                         if (resultedPressCountProperty != null)
@@ -276,6 +254,26 @@ namespace ERP.UI.Forms
                             if (!string.IsNullOrWhiteSpace(resultedPressCountValue))
                             {
                                 e.Value = $"Girildi ({resultedPressCountValue})";
+                                e.FormattingApplied = true;
+                            }
+                            else
+                            {
+                                e.Value = "Gir";
+                                e.FormattingApplied = true;
+                            }
+                        }
+                    }
+                    // WasteCount buton kolonu için
+                    else if (columnName == "WasteCount")
+                    {
+                        var wasteCountProperty = item.GetType().GetProperty("WasteCount");
+                        if (wasteCountProperty != null)
+                        {
+                            var wasteCountValue = wasteCountProperty.GetValue(item)?.ToString();
+                            
+                            if (!string.IsNullOrWhiteSpace(wasteCountValue) && wasteCountValue != "0")
+                            {
+                                e.Value = $"Girildi ({wasteCountValue})";
                                 e.FormattingApplied = true;
                             }
                             else
@@ -296,7 +294,7 @@ namespace ERP.UI.Forms
                 return;
 
             var columnName = _dataGridView.Columns[e.ColumnIndex].Name;
-            if (columnName != "ActualPressCount" && columnName != "ResultedPressCount")
+            if (columnName != "ResultedPressCount" && columnName != "WasteCount")
                 return;
 
             try
@@ -322,24 +320,27 @@ namespace ERP.UI.Forms
                     return;
 
                 // Dialog aç
-                if (columnName == "ActualPressCount")
-                {
-                    int? actualPressCount = ShowActualPressCountDialog(request);
-                    if (actualPressCount.HasValue)
-                    {
-                        request.ActualPressCount = actualPressCount.Value;
-                        request.Status = "Presde"; // İşçi pres adedini girdiğinde durum "Presde" olur
-                        _pressingRequestRepository.Update(request);
-                        LoadData(); // Verileri yeniden yükle
-                    }
-                }
-                else if (columnName == "ResultedPressCount")
+                if (columnName == "ResultedPressCount")
                 {
                     int? resultedPressCount = ShowResultedPressCountDialog(request);
                     if (resultedPressCount.HasValue)
                     {
                         request.ResultedPressCount = resultedPressCount.Value;
+                        // ActualPressCount = ResultedPressCount + WasteCount (otomatik hesapla)
+                        request.ActualPressCount = resultedPressCount.Value + (request.WasteCount ?? 0);
                         request.Status = "Presde";
+                        _pressingRequestRepository.Update(request);
+                        LoadData(); // Verileri yeniden yükle
+                    }
+                }
+                else if (columnName == "WasteCount")
+                {
+                    int? wasteCount = ShowWasteCountDialog(request);
+                    if (wasteCount.HasValue)
+                    {
+                        request.WasteCount = wasteCount.Value;
+                        // ActualPressCount = ResultedPressCount + WasteCount (otomatik hesapla)
+                        request.ActualPressCount = (request.ResultedPressCount ?? 0) + wasteCount.Value;
                         _pressingRequestRepository.Update(request);
                         LoadData(); // Verileri yeniden yükle
                     }
@@ -435,7 +436,7 @@ namespace ERP.UI.Forms
         {
             using (var dialog = new Form
             {
-                Text = "Kaç Tane Preslenmiş Oluştu",
+                Text = "Preslenmiş Adet",
                 Width = 400,
                 Height = 200,
                 StartPosition = FormStartPosition.CenterParent,
@@ -447,7 +448,7 @@ namespace ERP.UI.Forms
             {
                 var lblInfo = new Label
                 {
-                    Text = $"Preslenen: {request.ActualPressCount?.ToString() ?? "-"} adet\n\nKaç tane preslenmiş oluştu?",
+                    Text = $"İstenen Pres: {request.RequestedPressCount} adet\n\nPreslenmiş adet girin:",
                     Location = new Point(20, 20),
                     Width = 350,
                     Height = 60,
@@ -457,7 +458,7 @@ namespace ERP.UI.Forms
 
                 var lblAdet = new Label
                 {
-                    Text = "Oluşan Adet:",
+                    Text = "Preslenmiş Adet:",
                     Location = new Point(20, 90),
                     AutoSize = true,
                     Font = new Font("Segoe UI", 10F)
@@ -469,7 +470,87 @@ namespace ERP.UI.Forms
                     Width = 200,
                     Minimum = 0,
                     Maximum = 999999,
-                    Value = request.ResultedPressCount ?? (request.ActualPressCount ?? 0),
+                    Value = request.ResultedPressCount ?? 0,
+                    DecimalPlaces = 0,
+                    Font = new Font("Segoe UI", 10F)
+                };
+
+                var btnOk = new Button
+                {
+                    Text = "Tamam",
+                    DialogResult = DialogResult.OK,
+                    Location = new Point(200, 130),
+                    Width = 80,
+                    BackColor = ThemeColors.Success,
+                    ForeColor = Color.White,
+                    FlatStyle = FlatStyle.Flat
+                };
+                btnOk.FlatAppearance.BorderSize = 0;
+
+                var btnCancel = new Button
+                {
+                    Text = "İptal",
+                    DialogResult = DialogResult.Cancel,
+                    Location = new Point(290, 130),
+                    Width = 80,
+                    BackColor = ThemeColors.Secondary,
+                    ForeColor = Color.White,
+                    FlatStyle = FlatStyle.Flat
+                };
+                btnCancel.FlatAppearance.BorderSize = 0;
+
+                dialog.Controls.AddRange(new Control[] { lblInfo, lblAdet, txtAdet, btnOk, btnCancel });
+                dialog.AcceptButton = btnOk;
+                dialog.CancelButton = btnCancel;
+
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    return (int)txtAdet.Value;
+                }
+            }
+
+            return null;
+        }
+
+        private int? ShowWasteCountDialog(PressingRequest request)
+        {
+            using (var dialog = new Form
+            {
+                Text = "Hurda Adedi",
+                Width = 400,
+                Height = 200,
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                BackColor = ThemeColors.Background
+            })
+            {
+                var lblInfo = new Label
+                {
+                    Text = "Hurda adedi girin:",
+                    Location = new Point(20, 20),
+                    Width = 350,
+                    Height = 40,
+                    AutoSize = false,
+                    Font = new Font("Segoe UI", 10F)
+                };
+
+                var lblAdet = new Label
+                {
+                    Text = "Hurda Adedi:",
+                    Location = new Point(20, 90),
+                    AutoSize = true,
+                    Font = new Font("Segoe UI", 10F)
+                };
+
+                var txtAdet = new NumericUpDown
+                {
+                    Location = new Point(150, 87),
+                    Width = 200,
+                    Minimum = 0,
+                    Maximum = 999999,
+                    Value = request.WasteCount ?? 0,
                     DecimalPlaces = 0,
                     Font = new Font("Segoe UI", 10F)
                 };
