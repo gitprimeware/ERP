@@ -44,7 +44,7 @@ namespace ERP.UI.Components
 
             _titleLabel = new Label
             {
-                Text = "ERP/MRP YÖNETİM SİSTEMİ",
+                Text = "ERP YÖNETİM SİSTEMİ",
                 Font = new Font("Segoe UI", 16F, FontStyle.Bold),
                 ForeColor = ThemeColors.TextOnPrimary,
                 AutoSize = true,

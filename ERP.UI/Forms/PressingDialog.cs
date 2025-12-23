@@ -51,8 +51,8 @@ namespace ERP.UI.Forms
         private void InitializeComponent()
         {
             this.Text = "Pres Yap";
-            this.Width = 600;
-            this.Height = 750;
+            this.Width = 550;
+            this.Height = 650;
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -65,10 +65,11 @@ namespace ERP.UI.Forms
 
         private void CreateControls()
         {
-            int yPos = 20;
-            int labelWidth = 150;
-            int controlWidth = 400;
-            int spacing = 35;
+            int yPos = 30;
+            int labelWidth = 130;
+            int controlWidth = 300;
+            int controlHeight = 32;
+            int spacing = 32;
 
             // Gereken Pres Adedi (Formülden - Readonly)
             var lblGerekenPresAdedi = new Label
@@ -81,9 +82,9 @@ namespace ERP.UI.Forms
             };
             _txtGerekenPresAdedi = new TextBox
             {
-                Location = new Point(180, yPos - 3),
+                Location = new Point(150, yPos - 3),
                 Width = controlWidth,
-                Height = 30,
+                Height = controlHeight,
                 ReadOnly = true,
                 BackColor = Color.FromArgb(255, 240, 248, 255),
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
@@ -103,9 +104,9 @@ namespace ERP.UI.Forms
             };
             _lblMevcutKesilmisStok = new Label
             {
-                Location = new Point(180, yPos),
+                Location = new Point(150, yPos),
                 Width = controlWidth,
-                Height = 30,
+                Height = controlHeight,
                 Font = new Font("Segoe UI", 9F),
                 ForeColor = ThemeColors.TextPrimary,
                 AutoSize = false
@@ -119,7 +120,7 @@ namespace ERP.UI.Forms
             {
                 Location = new Point(20, yPos),
                 Width = controlWidth + labelWidth + 20,
-                Height = 40,
+                Height = 30,
                 Font = new Font("Segoe UI", 9F, FontStyle.Italic),
                 ForeColor = ThemeColors.TextSecondary,
                 Text = "",
@@ -139,7 +140,7 @@ namespace ERP.UI.Forms
             };
             _clbKesilmisStoklar = new CheckedListBox
             {
-                Location = new Point(180, yPos - 3),
+                Location = new Point(150, yPos - 3),
                 Width = controlWidth,
                 Height = 150,
                 Font = new Font("Segoe UI", 9F),
@@ -161,9 +162,9 @@ namespace ERP.UI.Forms
             };
             _txtPressCount = new TextBox
             {
-                Location = new Point(180, yPos - 3),
+                Location = new Point(150, yPos - 3),
                 Width = controlWidth,
-                Height = 30,
+                Height = controlHeight,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 ReadOnly = true,
                 BackColor = Color.LightGray
@@ -183,9 +184,9 @@ namespace ERP.UI.Forms
             };
             _txtPressNo = new TextBox
             {
-                Location = new Point(180, yPos - 3),
+                Location = new Point(150, yPos - 3),
                 Width = controlWidth,
-                Height = 30,
+                Height = controlHeight,
                 Font = new Font("Segoe UI", 10F)
             };
             this.Controls.Add(lblPressNo);
@@ -202,9 +203,9 @@ namespace ERP.UI.Forms
             };
             _txtPressure = new TextBox
             {
-                Location = new Point(180, yPos - 3),
+                Location = new Point(150, yPos - 3),
                 Width = controlWidth,
-                Height = 30,
+                Height = controlHeight,
                 Font = new Font("Segoe UI", 10F)
             };
             this.Controls.Add(lblPressure);
@@ -221,9 +222,9 @@ namespace ERP.UI.Forms
             };
             _txtWasteAmount = new TextBox
             {
-                Location = new Point(180, yPos - 3),
+                Location = new Point(150, yPos - 3),
                 Width = controlWidth,
-                Height = 30,
+                Height = controlHeight,
                 Font = new Font("Segoe UI", 10F)
             };
             this.Controls.Add(lblWasteAmount);
@@ -240,15 +241,15 @@ namespace ERP.UI.Forms
             };
             var employeePanel = new Panel
             {
-                Location = new Point(180, yPos - 3),
+                Location = new Point(150, yPos - 3),
                 Width = controlWidth,
-                Height = 30
+                Height = controlHeight
             };
             _cmbEmployee = new ComboBox
             {
                 Dock = DockStyle.Left,
-                Width = controlWidth - 120,
-                Height = 30,
+                Width = controlWidth - 75,
+                Height = controlHeight,
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 10F)
             };
@@ -256,8 +257,8 @@ namespace ERP.UI.Forms
             {
                 Text = "+ Ekle",
                 Dock = DockStyle.Right,
-                Width = 110,
-                Height = 30,
+                Width = 70,
+                Height = controlHeight,
                 BackColor = ThemeColors.Secondary,
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 9F),
@@ -269,16 +270,16 @@ namespace ERP.UI.Forms
             employeePanel.Controls.Add(_btnAddEmployee);
             this.Controls.Add(lblEmployee);
             this.Controls.Add(employeePanel);
-            yPos += spacing + 10;
+            yPos += spacing + 12;
 
             // Butonlar
             _btnCancel = new Button
             {
                 Text = "İptal",
                 DialogResult = DialogResult.Cancel,
-                Location = new Point(380, yPos),
-                Width = 100,
-                Height = 35,
+                Location = new Point(370, yPos),
+                Width = 90,
+                Height = 32,
                 BackColor = ThemeColors.Secondary,
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 10F),
@@ -289,9 +290,9 @@ namespace ERP.UI.Forms
             _btnSave = new Button
             {
                 Text = "Kaydet",
-                Location = new Point(270, yPos),
-                Width = 100,
-                Height = 35,
+                Location = new Point(275, yPos),
+                Width = 90,
+                Height = 32,
                 BackColor = ThemeColors.Success,
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
@@ -304,6 +305,9 @@ namespace ERP.UI.Forms
             this.Controls.Add(_btnCancel);
             this.AcceptButton = _btnSave;
             this.CancelButton = _btnCancel;
+            
+            // Dialog yüksekliğini butonların altına göre ayarla (biraz boşluk ile)
+            this.Height = yPos + _btnSave.Height + 45;
         }
 
         private void LoadData()

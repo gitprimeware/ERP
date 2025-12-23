@@ -42,9 +42,9 @@ namespace ERP.UI.Forms
 
         private void InitializeCustomComponents()
         {
-            this.BackColor = ThemeColors.Background;
+            this.BackColor = Color.White;
             this.Dock = DockStyle.Fill;
-            this.Padding = new Padding(20);
+            this.Padding = new Padding(0);
 
             CreateMainPanel();
             LoadData();
@@ -55,17 +55,15 @@ namespace ERP.UI.Forms
             _mainPanel = new Panel
             {
                 Dock = DockStyle.Fill,
-                BackColor = ThemeColors.Surface,
-                Padding = new Padding(30)
+                BackColor = Color.White,
+                Padding = new Padding(20)
             };
-
-            UIHelper.ApplyCardStyle(_mainPanel, 12);
 
             // Başlık ve buton paneli
             var headerPanel = new Panel
             {
-                Location = new Point(30, 30),
-                Width = _mainPanel.Width - 60,
+                Location = new Point(20, 20),
+                Width = _mainPanel.Width - 40,
                 Height = 50,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
                 BackColor = Color.Transparent
@@ -104,8 +102,8 @@ namespace ERP.UI.Forms
             // DataGridView
             _dataGridView = new DataGridView
             {
-                Location = new Point(30, 90),
-                Width = _mainPanel.Width - 60,
+                Location = new Point(20, 80),
+                Width = _mainPanel.Width - 40,
                 Height = _mainPanel.Height - 140,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
@@ -114,16 +112,16 @@ namespace ERP.UI.Forms
                 ReadOnly = true,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 MultiSelect = false,
-                BackgroundColor = ThemeColors.Background,
+                BackgroundColor = Color.White,
                 BorderStyle = BorderStyle.None,
                 AutoGenerateColumns = false
             };
 
             _mainPanel.Resize += (s, e) =>
             {
-                _dataGridView.Width = _mainPanel.Width - 60;
+                _dataGridView.Width = _mainPanel.Width - 40;
                 _dataGridView.Height = _mainPanel.Height - 140;
-                headerPanel.Width = _mainPanel.Width - 60;
+                headerPanel.Width = _mainPanel.Width - 40;
                 btnKenetlemeEkle.Location = new Point(headerPanel.Width - 200, 5);
             };
 
@@ -207,7 +205,7 @@ namespace ERP.UI.Forms
                 _dataGridView.DataSource = stockData;
 
                 // Stil ayarları
-                _dataGridView.DefaultCellStyle.BackColor = ThemeColors.Surface;
+                _dataGridView.DefaultCellStyle.BackColor = Color.White;
                 _dataGridView.DefaultCellStyle.ForeColor = ThemeColors.TextPrimary;
                 _dataGridView.DefaultCellStyle.SelectionBackColor = ThemeColors.Primary;
                 _dataGridView.DefaultCellStyle.SelectionForeColor = Color.White;

@@ -602,8 +602,101 @@ namespace ERP.UI.Managers
             _currentRuloStokTakipForm = null;
             var welcomePanel = new Components.WelcomePanel();
             welcomePanel.Dock = DockStyle.Fill;
+            welcomePanel.CardClicked += (s, formTag) => HandleCardClick(formTag);
             _contentPanel.Controls.Add(welcomePanel);
             welcomePanel.BringToFront();
+        }
+
+        private void HandleCardClick(string formTag)
+        {
+            // MainForm'daki MenuManager_MenuItemClicked mantığıyla aynı
+            if (formTag == "OrderList")
+            {
+                ShowForm("OrderList");
+            }
+            else if (formTag == "OrderCreate")
+            {
+                ShowForm("OrderCreate");
+            }
+            else if (formTag == "StockEntry")
+            {
+                ShowForm("StockEntry");
+            }
+            else if (formTag == "Accounting")
+            {
+                ShowForm("Accounting");
+            }
+            else if (formTag == "StockDetail")
+            {
+                ShowForm("StockDetail");
+            }
+            else if (formTag == "MaterialEntry")
+            {
+                ShowForm("MaterialEntry");
+            }
+            else if (formTag == "MaterialExit")
+            {
+                ShowForm("MaterialExit");
+            }
+            else if (formTag == "Production")
+            {
+                ShowForm("Production");
+            }
+            else if (formTag == "RuloStokTakip" || formTag == "KesilmisStokTakip" || 
+                     formTag == "PreslenmisStokTakip" || formTag == "KenetlenmisStokTakip")
+            {
+                ShowStockTrackingContainer();
+            }
+            else if (formTag == "Consumption")
+            {
+                ShowForm("Consumption");
+            }
+            else if (formTag == "CuttingRequests")
+            {
+                ShowForm("CuttingRequests");
+            }
+            else if (formTag == "PressingRequests")
+            {
+                ShowForm("PressingRequests");
+            }
+            else if (formTag == "ClampingRequests")
+            {
+                ShowForm("ClampingRequests");
+            }
+            else if (formTag == "Clamping2Requests")
+            {
+                ShowForm("Clamping2Requests");
+            }
+            else if (formTag == "AssemblyRequests")
+            {
+                ShowForm("AssemblyRequests");
+            }
+            else if (formTag == "MRPReport")
+            {
+                ShowForm("MRPReport");
+            }
+            else if (formTag == "CustomerReport")
+            {
+                ShowForm("CustomerReport");
+            }
+            else if (formTag == "AnnualReport")
+            {
+                ShowForm("AnnualReport");
+            }
+            else
+            {
+                ShowForm(formTag);
+            }
+        }
+
+        public void ShowStockTrackingContainer()
+        {
+            _contentPanel.Controls.Clear();
+            _currentRuloStokTakipForm = null;
+            var container = new Forms.StockTrackingContainerForm();
+            container.Dock = DockStyle.Fill;
+            _contentPanel.Controls.Add(container);
+            container.BringToFront();
         }
 
         public void RefreshRuloStokTakip()

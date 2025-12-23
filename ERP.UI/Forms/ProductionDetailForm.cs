@@ -59,7 +59,6 @@ namespace ERP.UI.Forms
         private TextBox txtReportDurum;
         private TextBox txtReportPlakaAdedi;
         
-        private Button btnBack;
         private Button btnRapor;
         private Button btnMuhasebeyeGonder;
 
@@ -191,25 +190,7 @@ namespace ERP.UI.Forms
             CreateUretimAyrintiTab(tabUretimAyrinti);
             tabControl.TabPages.Add(tabUretimAyrinti);
 
-            // Geri butonu - sağ üste, tab'ların yanında
-            btnBack = ButtonFactory.CreateActionButton("⬅️ Geri", ThemeColors.Secondary, Color.White, 90, 32);
-            btnBack.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnBack.Location = new Point(mainPanel.Width - btnBack.Width - 20, 15);
-            btnBack.Click += BtnBack_Click;
-            btnBack.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
-
-            // mainPanel resize olduğunda geri tuşunun konumunu güncelle
-            mainPanel.Resize += (s, e) =>
-            {
-                if (btnBack != null)
-                {
-                    btnBack.Location = new Point(mainPanel.Width - btnBack.Width - 20, 15);
-                }
-            };
-
             mainPanel.Controls.Add(tabControl);
-            mainPanel.Controls.Add(btnBack);
-            btnBack.BringToFront();
 
             this.Controls.Add(mainPanel);
             mainPanel.BringToFront();
@@ -506,11 +487,6 @@ namespace ERP.UI.Forms
             }
 
             return panel;
-        }
-
-        private void BtnBack_Click(object sender, EventArgs e)
-        {
-            BackRequested?.Invoke(this, EventArgs.Empty);
         }
 
         private void LoadOrderData()
@@ -961,6 +937,28 @@ namespace ERP.UI.Forms
             }
         }
 
+        private string GetShortStatus(string status)
+        {
+            // Durum metinlerini kısalt
+            switch (status)
+            {
+                case "Tamamlandı":
+                    return "Tamam";
+                case "Beklemede":
+                    return "Bekliyor";
+                case "Kesimde":
+                    return "Kesim";
+                case "Presde":
+                    return "Pres";
+                case "Montajda":
+                    return "Montaj";
+                case "Kenetmede":
+                    return "Kenet";
+                default:
+                    return status;
+            }
+        }
+
         private string GetHatveLetter(decimal hatveValue)
         {
             // Hatve değerlerini harfe çevir: 3.25=H, 4.5=D, 6.5=M, 9=L
@@ -1281,15 +1279,15 @@ namespace ERP.UI.Forms
             };
 
             // Onayla butonu (Kesim taleplerini onaylamak için)
-            var btnOnayla = ButtonFactory.CreateActionButton("✅ Kesim Talebini Onayla", ThemeColors.Success, Color.White, 200, 35);
+            var btnOnayla = ButtonFactory.CreateActionButton("✅ Kesim Onayla", ThemeColors.Success, Color.White, 130, 35);
             btnOnayla.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnOnayla.Location = new Point(buttonPanel.Width - 200, 5);
+            btnOnayla.Location = new Point(buttonPanel.Width - 130, 5);
             buttonPanel.Controls.Add(btnOnayla);
 
             // Ekle butonu
-            var btnEkle = ButtonFactory.CreateActionButton("➕ Ekle", ThemeColors.Primary, Color.White, 120, 35);
+            var btnEkle = ButtonFactory.CreateActionButton("➕ Ekle", ThemeColors.Primary, Color.White, 80, 35);
             btnEkle.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnEkle.Location = new Point(buttonPanel.Width - 200 - 130, 5);
+            btnEkle.Location = new Point(buttonPanel.Width - 130 - 90, 5);
             buttonPanel.Controls.Add(btnEkle);
 
             // DataGridView paneli
@@ -1320,17 +1318,17 @@ namespace ERP.UI.Forms
             };
 
             // Kolonları ekle
-            AddKesimColumn(dataGridView, "Hatve", "Hatve", 80);
-            AddKesimColumn(dataGridView, "Size", "Ölçü", 80);
-            AddKesimColumn(dataGridView, "MachineName", "Makina No", 100);
-            AddKesimColumn(dataGridView, "SerialNumber", "Rulo Seri No", 120);
-            AddKesimColumn(dataGridView, "TotalKg", "Toplam Kg", 100);
-            AddKesimColumn(dataGridView, "CutKg", "Kesilen Kg", 100);
-            AddKesimColumn(dataGridView, "CuttingCount", "Kesim Adedi", 100);
-            AddKesimColumn(dataGridView, "PlakaAdedi", "Plaka Adedi", 100);
-            AddKesimColumn(dataGridView, "WasteKg", "Hurda Kg", 100);
-            AddKesimColumn(dataGridView, "RemainingKg", "Kalan Kg", 100);
-            AddKesimColumn(dataGridView, "EmployeeName", "Operatör", 150);
+            AddKesimColumn(dataGridView, "Hatve", "Hatve", 60);
+            AddKesimColumn(dataGridView, "Size", "Ölçü", 70);
+            AddKesimColumn(dataGridView, "MachineName", "Makina No", 80);
+            AddKesimColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
+            AddKesimColumn(dataGridView, "TotalKg", "Toplam Kg", 85);
+            AddKesimColumn(dataGridView, "CutKg", "Kesilen Kg", 85);
+            AddKesimColumn(dataGridView, "CuttingCount", "Kesim Adedi", 80);
+            AddKesimColumn(dataGridView, "PlakaAdedi", "Plaka Adedi", 80);
+            AddKesimColumn(dataGridView, "WasteKg", "Hurda Kg", 80);
+            AddKesimColumn(dataGridView, "RemainingKg", "Kalan Kg", 80);
+            AddKesimColumn(dataGridView, "EmployeeName", "Operatör", 120);
 
             // Stil ayarları - ÖNCE bu ayarları yap
             dataGridView.ColumnHeadersVisible = true;
@@ -1403,7 +1401,7 @@ namespace ERP.UI.Forms
                     WasteKg = c.WasteKg.ToString("F3", CultureInfo.InvariantCulture),
                     RemainingKg = c.RemainingKg.ToString("F3", CultureInfo.InvariantCulture),
                     EmployeeName = c.Employee != null ? $"{c.Employee.FirstName} {c.Employee.LastName}" : "",
-                    Status = "Tamamlandı"
+                    Status = GetShortStatus("Tamamlandı")
                 }).ToList();
 
                 // Bekleyen kesim talepleri
@@ -1423,7 +1421,7 @@ namespace ERP.UI.Forms
                         WasteKg = "-",
                         RemainingKg = r.RemainingKg.ToString("F3", CultureInfo.InvariantCulture),
                         EmployeeName = r.Employee != null ? $"{r.Employee.FirstName} {r.Employee.LastName}" : "-",
-                        Status = r.Status
+                        Status = GetShortStatus(r.Status)
                     }).ToList();
 
                 // Birleştir
@@ -1435,18 +1433,18 @@ namespace ERP.UI.Forms
                 // Kolonların var olduğundan emin ol
                 if (dataGridView.Columns.Count == 0)
                 {
-                    AddKesimColumn(dataGridView, "Hatve", "Hatve", 80);
-                    AddKesimColumn(dataGridView, "Size", "Ölçü", 80);
-                    AddKesimColumn(dataGridView, "MachineName", "Makina No", 100);
-                    AddKesimColumn(dataGridView, "SerialNumber", "Rulo Seri No", 120);
-                    AddKesimColumn(dataGridView, "TotalKg", "Toplam Kg", 100);
-                    AddKesimColumn(dataGridView, "CutKg", "Kesilen Kg", 100);
-                    AddKesimColumn(dataGridView, "CuttingCount", "Kesim Adedi", 100);
-                    AddKesimColumn(dataGridView, "PlakaAdedi", "Plaka Adedi", 100);
-                    AddKesimColumn(dataGridView, "WasteKg", "Hurda Kg", 100);
-                    AddKesimColumn(dataGridView, "RemainingKg", "Kalan Kg", 100);
-                    AddKesimColumn(dataGridView, "EmployeeName", "Operatör", 150);
-                    AddKesimColumn(dataGridView, "Status", "Durum", 120);
+                    AddKesimColumn(dataGridView, "Hatve", "Hatve", 60);
+                    AddKesimColumn(dataGridView, "Size", "Ölçü", 70);
+                    AddKesimColumn(dataGridView, "MachineName", "Makina No", 80);
+                    AddKesimColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
+                    AddKesimColumn(dataGridView, "TotalKg", "Toplam Kg", 85);
+                    AddKesimColumn(dataGridView, "CutKg", "Kesilen Kg", 85);
+                    AddKesimColumn(dataGridView, "CuttingCount", "Kesim Adedi", 80);
+                    AddKesimColumn(dataGridView, "PlakaAdedi", "Plaka Adedi", 80);
+                    AddKesimColumn(dataGridView, "WasteKg", "Hurda Kg", 80);
+                    AddKesimColumn(dataGridView, "RemainingKg", "Kalan Kg", 80);
+                    AddKesimColumn(dataGridView, "EmployeeName", "Operatör", 120);
+                    AddKesimColumn(dataGridView, "Status", "Durum", 80);
                 }
 
                 // Kolon başlıklarını kesinlikle göster
@@ -1550,7 +1548,7 @@ namespace ERP.UI.Forms
                             Size = r.Size.ToString("F1", CultureInfo.InvariantCulture),
                             RequestedPlateCount = r.RequestedPlateCount,
                             ActualCutCount = r.ActualCutCount?.ToString() ?? "-",
-                            Status = r.Status
+                            Status = GetShortStatus(r.Status)
                         }).ToList();
 
                         var btnSelect = new Button
@@ -1711,15 +1709,15 @@ namespace ERP.UI.Forms
             };
 
             // Onayla butonu (Pres taleplerini onaylamak için)
-            var btnOnayla = ButtonFactory.CreateActionButton("✅ Pres Talebini Onayla", ThemeColors.Success, Color.White, 200, 35);
+            var btnOnayla = ButtonFactory.CreateActionButton("✅ Pres Onayla", ThemeColors.Success, Color.White, 130, 35);
             btnOnayla.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnOnayla.Location = new Point(buttonPanel.Width - 200, 5);
+            btnOnayla.Location = new Point(buttonPanel.Width - 130, 5);
             buttonPanel.Controls.Add(btnOnayla);
 
             // Ekle butonu
-            var btnEkle = ButtonFactory.CreateActionButton("➕ Ekle", ThemeColors.Primary, Color.White, 120, 35);
+            var btnEkle = ButtonFactory.CreateActionButton("➕ Ekle", ThemeColors.Primary, Color.White, 80, 35);
             btnEkle.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnEkle.Location = new Point(buttonPanel.Width - 200 - 130, 5);
+            btnEkle.Location = new Point(buttonPanel.Width - 130 - 90, 5);
             buttonPanel.Controls.Add(btnEkle);
 
             // DataGridView paneli
@@ -1750,16 +1748,16 @@ namespace ERP.UI.Forms
             };
 
             // Kolonları ekle
-            AddPresColumn(dataGridView, "Date", "Tarih", 120);
-            AddPresColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 120);
-            AddPresColumn(dataGridView, "Hatve", "Hatve", 80);
-            AddPresColumn(dataGridView, "Size", "Ölçü", 80);
-            AddPresColumn(dataGridView, "SerialNumber", "Rulo Seri No", 120);
-            AddPresColumn(dataGridView, "PressNo", "Pres No", 100);
-            AddPresColumn(dataGridView, "Pressure", "Basınç", 100);
-            AddPresColumn(dataGridView, "PressCount", "Pres Adedi", 100);
-            AddPresColumn(dataGridView, "WasteAmount", "Hurda Miktarı", 120);
-            AddPresColumn(dataGridView, "EmployeeName", "Operatör", 150);
+            AddPresColumn(dataGridView, "Date", "Tarih", 100);
+            AddPresColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 110);
+            AddPresColumn(dataGridView, "Hatve", "Hatve", 60);
+            AddPresColumn(dataGridView, "Size", "Ölçü", 70);
+            AddPresColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
+            AddPresColumn(dataGridView, "PressNo", "Pres No", 80);
+            AddPresColumn(dataGridView, "Pressure", "Basınç", 80);
+            AddPresColumn(dataGridView, "PressCount", "Pres Adedi", 85);
+            AddPresColumn(dataGridView, "WasteAmount", "Hurda Miktarı", 100);
+            AddPresColumn(dataGridView, "EmployeeName", "Operatör", 120);
 
             // Stil ayarları
             dataGridView.ColumnHeadersVisible = true;
@@ -1831,7 +1829,7 @@ namespace ERP.UI.Forms
                     PressCount = p.PressCount.ToString(),
                     WasteAmount = p.WasteAmount.ToString("F3", CultureInfo.InvariantCulture),
                     EmployeeName = p.Employee != null ? $"{p.Employee.FirstName} {p.Employee.LastName}" : "",
-                    Status = "Tamamlandı"
+                    Status = GetShortStatus("Tamamlandı")
                 }).ToList();
 
                 // Bekleyen pres talepleri
@@ -1850,7 +1848,7 @@ namespace ERP.UI.Forms
                         PressCount = r.ResultedPressCount?.ToString() ?? "-",
                         WasteAmount = r.WasteAmount.ToString("F3", CultureInfo.InvariantCulture),
                         EmployeeName = r.Employee != null ? $"{r.Employee.FirstName} {r.Employee.LastName}" : "-",
-                        Status = r.Status
+                        Status = GetShortStatus(r.Status)
                     }).ToList();
 
                 // Birleştir
@@ -1862,17 +1860,17 @@ namespace ERP.UI.Forms
                 // Kolonların var olduğundan emin ol
                 if (dataGridView.Columns.Count == 0)
                 {
-                    AddPresColumn(dataGridView, "Date", "Tarih", 120);
-                    AddPresColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 120);
-                    AddPresColumn(dataGridView, "Hatve", "Hatve", 80);
-                    AddPresColumn(dataGridView, "Size", "Ölçü", 80);
-                    AddPresColumn(dataGridView, "SerialNumber", "Rulo Seri No", 120);
-                    AddPresColumn(dataGridView, "PressNo", "Pres No", 100);
-                    AddPresColumn(dataGridView, "Pressure", "Basınç", 100);
-                    AddPresColumn(dataGridView, "PressCount", "Pres Adedi", 100);
-                    AddPresColumn(dataGridView, "WasteAmount", "Hurda Miktarı", 120);
-                    AddPresColumn(dataGridView, "EmployeeName", "Operatör", 150);
-                    AddPresColumn(dataGridView, "Status", "Durum", 120);
+                    AddPresColumn(dataGridView, "Date", "Tarih", 100);
+                    AddPresColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 110);
+                    AddPresColumn(dataGridView, "Hatve", "Hatve", 60);
+                    AddPresColumn(dataGridView, "Size", "Ölçü", 70);
+                    AddPresColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
+                    AddPresColumn(dataGridView, "PressNo", "Pres No", 80);
+                    AddPresColumn(dataGridView, "Pressure", "Basınç", 80);
+                    AddPresColumn(dataGridView, "PressCount", "Pres Adedi", 85);
+                    AddPresColumn(dataGridView, "WasteAmount", "Hurda Miktarı", 100);
+                    AddPresColumn(dataGridView, "EmployeeName", "Operatör", 120);
+                    AddPresColumn(dataGridView, "Status", "Durum", 80);
                 }
 
                 // Kolon başlıklarını kesinlikle göster
@@ -1977,7 +1975,7 @@ namespace ERP.UI.Forms
                             RequestedPressCount = r.RequestedPressCount,
                             ActualPressCount = r.ActualPressCount?.ToString() ?? "-",
                             ResultedPressCount = r.ResultedPressCount?.ToString() ?? "-",
-                            Status = r.Status
+                            Status = GetShortStatus(r.Status)
                         }).ToList();
 
                         var btnSelect = new Button
@@ -2127,15 +2125,15 @@ namespace ERP.UI.Forms
             };
 
             // Onayla butonu (Kenetleme taleplerini onaylamak için)
-            var btnOnayla = ButtonFactory.CreateActionButton("✅ Kenetleme Talebini Onayla", ThemeColors.Success, Color.White, 220, 35);
+            var btnOnayla = ButtonFactory.CreateActionButton("✅ Kenetleme Onayla", ThemeColors.Success, Color.White, 150, 35);
             btnOnayla.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnOnayla.Location = new Point(buttonPanel.Width - 220, 5);
+            btnOnayla.Location = new Point(buttonPanel.Width - 150, 5);
             buttonPanel.Controls.Add(btnOnayla);
 
             // Ekle butonu
-            var btnEkle = ButtonFactory.CreateActionButton("➕ Ekle", ThemeColors.Primary, Color.White, 120, 35);
+            var btnEkle = ButtonFactory.CreateActionButton("➕ Ekle", ThemeColors.Primary, Color.White, 80, 35);
             btnEkle.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnEkle.Location = new Point(buttonPanel.Width - 220 - 130, 5);
+            btnEkle.Location = new Point(buttonPanel.Width - 150 - 90, 5);
             buttonPanel.Controls.Add(btnEkle);
 
             // DataGridView paneli
@@ -2166,18 +2164,18 @@ namespace ERP.UI.Forms
             };
 
             // Kolonları ekle
-            AddClampingColumn(dataGridView, "Date", "Tarih", 120);
-            AddClampingColumn(dataGridView, "OrderNo", "Sipariş No", 100);
-            AddClampingColumn(dataGridView, "Hatve", "Hatve", 80);
-            AddClampingColumn(dataGridView, "Size", "Ölçü", 80);
+            AddClampingColumn(dataGridView, "Date", "Tarih", 100);
+            AddClampingColumn(dataGridView, "OrderNo", "Sipariş No", 90);
+            AddClampingColumn(dataGridView, "Hatve", "Hatve", 60);
+            AddClampingColumn(dataGridView, "Size", "Ölçü", 70);
             AddClampingColumn(dataGridView, "Length", "Uzunluk", 80);
-            AddClampingColumn(dataGridView, "ClampCount", "Adet", 80);
-            AddClampingColumn(dataGridView, "Customer", "Müşteri", 150);
-            AddClampingColumn(dataGridView, "UsedPlateCount", "Kullanılan Plaka Adedi", 150);
-            AddClampingColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 120);
-            AddClampingColumn(dataGridView, "SerialNumber", "Rulo Seri No", 120);
-            AddClampingColumn(dataGridView, "MachineName", "Makina Adı", 120);
-            AddClampingColumn(dataGridView, "EmployeeName", "Operatör", 150);
+            AddClampingColumn(dataGridView, "ClampCount", "Adet", 70);
+            AddClampingColumn(dataGridView, "Customer", "Müşteri", 130);
+            AddClampingColumn(dataGridView, "UsedPlateCount", "Kullanılan Plaka Adedi", 140);
+            AddClampingColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 110);
+            AddClampingColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
+            AddClampingColumn(dataGridView, "MachineName", "Makina Adı", 100);
+            AddClampingColumn(dataGridView, "EmployeeName", "Operatör", 120);
 
             // Stil ayarları
             dataGridView.ColumnHeadersVisible = true;
@@ -2253,7 +2251,7 @@ namespace ERP.UI.Forms
                     SerialNumber = c.SerialNo?.SerialNumber ?? "",
                     MachineName = c.Machine?.Name ?? "",
                     EmployeeName = c.Employee != null ? $"{c.Employee.FirstName} {c.Employee.LastName}" : "",
-                    Status = "Tamamlandı"
+                    Status = GetShortStatus("Tamamlandı")
                 }).ToList();
 
                 // Bekleyen kenetleme talepleri
@@ -2274,7 +2272,7 @@ namespace ERP.UI.Forms
                         SerialNumber = r.SerialNo?.SerialNumber ?? "-",
                         MachineName = r.Machine?.Name ?? "-",
                         EmployeeName = r.Employee != null ? $"{r.Employee.FirstName} {r.Employee.LastName}" : "-",
-                        Status = r.Status
+                        Status = GetShortStatus(r.Status)
                     }).ToList();
 
                 // Birleştir
@@ -2286,19 +2284,19 @@ namespace ERP.UI.Forms
                 // Kolonların var olduğundan emin ol
                 if (dataGridView.Columns.Count == 0)
                 {
-                    AddClampingColumn(dataGridView, "Date", "Tarih", 120);
-                    AddClampingColumn(dataGridView, "OrderNo", "Sipariş No", 100);
-                    AddClampingColumn(dataGridView, "Hatve", "Hatve", 80);
-                    AddClampingColumn(dataGridView, "Size", "Ölçü", 80);
+                    AddClampingColumn(dataGridView, "Date", "Tarih", 100);
+                    AddClampingColumn(dataGridView, "OrderNo", "Sipariş No", 90);
+                    AddClampingColumn(dataGridView, "Hatve", "Hatve", 60);
+                    AddClampingColumn(dataGridView, "Size", "Ölçü", 70);
                     AddClampingColumn(dataGridView, "Length", "Uzunluk", 80);
-                    AddClampingColumn(dataGridView, "ClampCount", "Adet", 80);
-                    AddClampingColumn(dataGridView, "Customer", "Müşteri", 150);
-                    AddClampingColumn(dataGridView, "UsedPlateCount", "Kullanılan Plaka Adedi", 150);
-                    AddClampingColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 120);
-                    AddClampingColumn(dataGridView, "SerialNumber", "Rulo Seri No", 120);
-                    AddClampingColumn(dataGridView, "MachineName", "Makina Adı", 120);
-                    AddClampingColumn(dataGridView, "EmployeeName", "Operatör", 150);
-                    AddClampingColumn(dataGridView, "Status", "Durum", 120);
+                    AddClampingColumn(dataGridView, "ClampCount", "Adet", 70);
+                    AddClampingColumn(dataGridView, "Customer", "Müşteri", 130);
+                    AddClampingColumn(dataGridView, "UsedPlateCount", "Kullanılan Plaka Adedi", 140);
+                    AddClampingColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 110);
+                    AddClampingColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
+                    AddClampingColumn(dataGridView, "MachineName", "Makina Adı", 100);
+                    AddClampingColumn(dataGridView, "EmployeeName", "Operatör", 120);
+                    AddClampingColumn(dataGridView, "Status", "Durum", 80);
                 }
 
                 // Kolon başlıklarını kesinlikle göster
@@ -2423,7 +2421,7 @@ namespace ERP.UI.Forms
                             RequestedClampCount = r.RequestedClampCount,
                             ActualClampCount = r.ActualClampCount?.ToString() ?? "-",
                             ResultedClampCount = r.ResultedClampCount?.ToString() ?? "-",
-                            Status = r.Status
+                            Status = GetShortStatus(r.Status)
                         }).ToList();
 
                         var btnSelect = new Button
@@ -2543,15 +2541,15 @@ namespace ERP.UI.Forms
             };
 
             // Onayla butonu (Montaj taleplerini onaylamak için)
-            var btnOnayla = ButtonFactory.CreateActionButton("✅ Montaj Talebini Onayla", ThemeColors.Success, Color.White, 220, 35);
+            var btnOnayla = ButtonFactory.CreateActionButton("✅ Montaj Onayla", ThemeColors.Success, Color.White, 140, 35);
             btnOnayla.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnOnayla.Location = new Point(buttonPanel.Width - 220, 5);
+            btnOnayla.Location = new Point(buttonPanel.Width - 140, 5);
             buttonPanel.Controls.Add(btnOnayla);
 
             // Ekle butonu
-            var btnEkle = ButtonFactory.CreateActionButton("➕ Ekle", ThemeColors.Primary, Color.White, 120, 35);
+            var btnEkle = ButtonFactory.CreateActionButton("➕ Ekle", ThemeColors.Primary, Color.White, 80, 35);
             btnEkle.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnEkle.Location = new Point(buttonPanel.Width - 220 - 130, 5);
+            btnEkle.Location = new Point(buttonPanel.Width - 140 - 90, 5);
             buttonPanel.Controls.Add(btnEkle);
 
             // DataGridView paneli
@@ -2582,17 +2580,17 @@ namespace ERP.UI.Forms
             };
 
             // Kolonları ekle
-            AddAssemblyColumn(dataGridView, "Date", "Tarih", 120);
-            AddAssemblyColumn(dataGridView, "OrderNo", "Sipariş No", 100);
-            AddAssemblyColumn(dataGridView, "Hatve", "Hatve", 80);
-            AddAssemblyColumn(dataGridView, "Size", "Ölçü", 80);
+            AddAssemblyColumn(dataGridView, "Date", "Tarih", 100);
+            AddAssemblyColumn(dataGridView, "OrderNo", "Sipariş No", 90);
+            AddAssemblyColumn(dataGridView, "Hatve", "Hatve", 60);
+            AddAssemblyColumn(dataGridView, "Size", "Ölçü", 70);
             AddAssemblyColumn(dataGridView, "Length", "Uzunluk", 80);
-            AddAssemblyColumn(dataGridView, "AssemblyCount", "Montaj Adedi", 100);
-            AddAssemblyColumn(dataGridView, "Customer", "Müşteri", 150);
-            AddAssemblyColumn(dataGridView, "UsedClampCount", "Kullanılan Kenet Adedi", 150);
-            AddAssemblyColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 120);
-            AddAssemblyColumn(dataGridView, "SerialNumber", "Rulo Seri No", 120);
-            AddAssemblyColumn(dataGridView, "EmployeeName", "Operatör", 150);
+            AddAssemblyColumn(dataGridView, "AssemblyCount", "Montaj Adedi", 90);
+            AddAssemblyColumn(dataGridView, "Customer", "Müşteri", 130);
+            AddAssemblyColumn(dataGridView, "UsedClampCount", "Kullanılan Kenet Adedi", 140);
+            AddAssemblyColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 110);
+            AddAssemblyColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
+            AddAssemblyColumn(dataGridView, "EmployeeName", "Operatör", 120);
 
             // Stil ayarları
             dataGridView.ColumnHeadersVisible = true;
@@ -2674,17 +2672,17 @@ namespace ERP.UI.Forms
                 // Kolonların var olduğundan emin ol
                 if (dataGridView.Columns.Count == 0)
                 {
-                    AddAssemblyColumn(dataGridView, "Date", "Tarih", 120);
-                    AddAssemblyColumn(dataGridView, "OrderNo", "Sipariş No", 100);
-                    AddAssemblyColumn(dataGridView, "Hatve", "Hatve", 80);
-                    AddAssemblyColumn(dataGridView, "Size", "Ölçü", 80);
+                    AddAssemblyColumn(dataGridView, "Date", "Tarih", 100);
+                    AddAssemblyColumn(dataGridView, "OrderNo", "Sipariş No", 90);
+                    AddAssemblyColumn(dataGridView, "Hatve", "Hatve", 60);
+                    AddAssemblyColumn(dataGridView, "Size", "Ölçü", 70);
                     AddAssemblyColumn(dataGridView, "Length", "Uzunluk", 80);
-                    AddAssemblyColumn(dataGridView, "AssemblyCount", "Montaj Adedi", 100);
-                    AddAssemblyColumn(dataGridView, "Customer", "Müşteri", 150);
-                    AddAssemblyColumn(dataGridView, "UsedClampCount", "Kullanılan Kenet Adedi", 150);
-                    AddAssemblyColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 120);
-                    AddAssemblyColumn(dataGridView, "SerialNumber", "Rulo Seri No", 120);
-                    AddAssemblyColumn(dataGridView, "EmployeeName", "Operatör", 150);
+                    AddAssemblyColumn(dataGridView, "AssemblyCount", "Montaj Adedi", 90);
+                    AddAssemblyColumn(dataGridView, "Customer", "Müşteri", 130);
+                    AddAssemblyColumn(dataGridView, "UsedClampCount", "Kullanılan Kenet Adedi", 140);
+                    AddAssemblyColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 110);
+                    AddAssemblyColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
+                    AddAssemblyColumn(dataGridView, "EmployeeName", "Operatör", 120);
                 }
 
                 dataGridView.DataSource = data;
@@ -2783,7 +2781,7 @@ namespace ERP.UI.Forms
                             RequestedAssemblyCount = r.RequestedAssemblyCount,
                             ActualClampCount = r.ActualClampCount?.ToString() ?? "-",
                             ResultedAssemblyCount = r.ResultedAssemblyCount?.ToString() ?? "-",
-                            Status = r.Status
+                            Status = GetShortStatus(r.Status)
                         }).ToList();
 
                         var btnSelect = new Button
@@ -2900,21 +2898,21 @@ namespace ERP.UI.Forms
             };
 
             // Onayla butonu (Kenetleme 2 taleplerini onaylamak için)
-            var btnOnayla = ButtonFactory.CreateActionButton("✅ Kenetleme 2 Talebini Onayla", ThemeColors.Success, Color.White, 250, 35);
+            var btnOnayla = ButtonFactory.CreateActionButton("✅ Kenetleme 2 Onayla", ThemeColors.Success, Color.White, 160, 35);
             btnOnayla.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnOnayla.Location = new Point(buttonPanel.Width - 250, 5);
+            btnOnayla.Location = new Point(buttonPanel.Width - 160, 5);
             buttonPanel.Controls.Add(btnOnayla);
 
             // Kenetle butonu (Birleştirme)
-            var btnKenetle = ButtonFactory.CreateActionButton("🔗 Kenetle", ThemeColors.Primary, Color.White, 120, 35);
+            var btnKenetle = ButtonFactory.CreateActionButton("🔗 Kenetle", ThemeColors.Primary, Color.White, 90, 35);
             btnKenetle.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnKenetle.Location = new Point(buttonPanel.Width - 250 - 130, 5);
+            btnKenetle.Location = new Point(buttonPanel.Width - 160 - 100, 5);
             buttonPanel.Controls.Add(btnKenetle);
 
             // Bölme butonu
-            var btnBolme = ButtonFactory.CreateActionButton("✂️ Bölme", ThemeColors.Info, Color.White, 120, 35);
+            var btnBolme = ButtonFactory.CreateActionButton("✂️ Bölme", ThemeColors.Info, Color.White, 90, 35);
             btnBolme.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnBolme.Location = new Point(buttonPanel.Width - 250 - 130 - 130, 5);
+            btnBolme.Location = new Point(buttonPanel.Width - 160 - 100 - 100, 5);
             buttonPanel.Controls.Add(btnBolme);
 
             // DataGridView paneli
@@ -2945,16 +2943,16 @@ namespace ERP.UI.Forms
             };
 
             // Kolonları ekle
-            AddClamping2Column(dataGridView, "Date", "Tarih", 120);
-            AddClamping2Column(dataGridView, "OrderNo", "Sipariş No", 100);
-            AddClamping2Column(dataGridView, "Hatve", "Hatve", 80);
-            AddClamping2Column(dataGridView, "PlateThickness", "Lamel Kalınlığı", 120);
-            AddClamping2Column(dataGridView, "ResultedSize", "Sonuç Ölçü", 100);
-            AddClamping2Column(dataGridView, "ResultedLength", "Sonuç Uzunluk", 120);
-            AddClamping2Column(dataGridView, "FirstClampingInfo", "İlk Ürün", 150);
-            AddClamping2Column(dataGridView, "SecondClampingInfo", "İkinci Ürün", 150);
-            AddClamping2Column(dataGridView, "Count", "Adet", 100);
-            AddClamping2Column(dataGridView, "EmployeeName", "Operatör", 150);
+            AddClamping2Column(dataGridView, "Date", "Tarih", 100);
+            AddClamping2Column(dataGridView, "OrderNo", "Sipariş No", 90);
+            AddClamping2Column(dataGridView, "Hatve", "Hatve", 60);
+            AddClamping2Column(dataGridView, "PlateThickness", "Lamel Kalınlığı", 110);
+            AddClamping2Column(dataGridView, "ResultedSize", "Sonuç Ölçü", 85);
+            AddClamping2Column(dataGridView, "ResultedLength", "Sonuç Uzunluk", 100);
+            AddClamping2Column(dataGridView, "FirstClampingInfo", "İlk Ürün", 140);
+            AddClamping2Column(dataGridView, "SecondClampingInfo", "İkinci Ürün", 140);
+            AddClamping2Column(dataGridView, "Count", "Adet", 70);
+            AddClamping2Column(dataGridView, "EmployeeName", "Operatör", 120);
 
             // Stil ayarları
             dataGridView.ColumnHeadersVisible = true;
@@ -3045,16 +3043,16 @@ namespace ERP.UI.Forms
                 // Kolonların var olduğundan emin ol
                 if (dataGridView.Columns.Count == 0)
                 {
-                    AddClamping2Column(dataGridView, "Date", "Tarih", 120);
-                    AddClamping2Column(dataGridView, "OrderNo", "Sipariş No", 100);
-                    AddClamping2Column(dataGridView, "Hatve", "Hatve", 80);
-                    AddClamping2Column(dataGridView, "PlateThickness", "Lamel Kalınlığı", 120);
-                    AddClamping2Column(dataGridView, "ResultedSize", "Sonuç Ölçü", 100);
-                    AddClamping2Column(dataGridView, "ResultedLength", "Sonuç Uzunluk", 120);
-                    AddClamping2Column(dataGridView, "FirstClampingInfo", "İlk Ürün", 150);
-                    AddClamping2Column(dataGridView, "SecondClampingInfo", "İkinci Ürün", 150);
-                    AddClamping2Column(dataGridView, "Count", "Adet", 100);
-                    AddClamping2Column(dataGridView, "EmployeeName", "Operatör", 150);
+                    AddClamping2Column(dataGridView, "Date", "Tarih", 100);
+                    AddClamping2Column(dataGridView, "OrderNo", "Sipariş No", 90);
+                    AddClamping2Column(dataGridView, "Hatve", "Hatve", 60);
+                    AddClamping2Column(dataGridView, "PlateThickness", "Lamel Kalınlığı", 110);
+                    AddClamping2Column(dataGridView, "ResultedSize", "Sonuç Ölçü", 85);
+                    AddClamping2Column(dataGridView, "ResultedLength", "Sonuç Uzunluk", 100);
+                    AddClamping2Column(dataGridView, "FirstClampingInfo", "İlk Ürün", 140);
+                    AddClamping2Column(dataGridView, "SecondClampingInfo", "İkinci Ürün", 140);
+                    AddClamping2Column(dataGridView, "Count", "Adet", 70);
+                    AddClamping2Column(dataGridView, "EmployeeName", "Operatör", 120);
                 }
 
                 dataGridView.DataSource = data;

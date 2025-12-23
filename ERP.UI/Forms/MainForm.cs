@@ -34,7 +34,7 @@ namespace ERP.UI.Forms
         private void InitializeCustomComponents()
         {
             this.BackColor = ThemeColors.Background;
-            this.Text = "ERP/MRP Sistemi";
+            this.Text = "ERP Sistemi";
             this.WindowState = FormWindowState.Maximized;
             this.StartPosition = FormStartPosition.CenterScreen;
             this.MinimumSize = new Size(1200, 700);
@@ -51,7 +51,7 @@ namespace ERP.UI.Forms
         {
             _headerPanel = new HeaderPanel
             {
-                Title = "ERP/MRP YÖNETİM SİSTEMİ",
+                Title = "ERP YÖNETİM SİSTEMİ",
                 UserName = "Kullanıcı: Admin"
             };
 
@@ -130,17 +130,11 @@ namespace ERP.UI.Forms
             {
                 _contentManager.ShowForm("AssemblyRequests");
             }
-            else if (formTag == "RuloStokTakip")
+            else if (formTag == "RuloStokTakip" || formTag == "KesilmisStokTakip" || 
+                     formTag == "PreslenmisStokTakip" || formTag == "KenetlenmisStokTakip")
             {
-                _contentManager.ShowForm("RuloStokTakip");
-            }
-            else if (formTag == "PreslenmisStokTakip")
-            {
-                _contentManager.ShowForm("PreslenmisStokTakip");
-            }
-            else if (formTag == "KenetlenmisStokTakip")
-            {
-                _contentManager.ShowForm("KenetlenmisStokTakip");
+                // Stok takip sayfaları için tab container göster
+                _contentManager.ShowStockTrackingContainer();
             }
             else if (formTag == "Consumption")
             {

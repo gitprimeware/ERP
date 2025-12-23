@@ -42,7 +42,7 @@ namespace ERP.UI.Services
             stockItem.AddSubMenuItem(new MenuItem("📊 Stok Ayrıntı", "StockDetail", "📊", 3));
 
             var reportsItem = new MenuItem("📈 Raporlar", "Reports", "📈", 10);
-            reportsItem.AddSubMenuItem(new MenuItem("📊 MRP Raporu", "MRPReport", "📊", 1));
+            reportsItem.AddSubMenuItem(new MenuItem("📊 Üretim Raporu", "MRPReport", "📊", 1));
             reportsItem.AddSubMenuItem(new MenuItem("🏢 Cari Raporu", "CustomerReport", "🏢", 2));
             reportsItem.AddSubMenuItem(new MenuItem("📅 Yıllık Rapor", "AnnualReport", "📅", 3));
             reportsItem.AddSubMenuItem(new MenuItem("📋 Genel Rapor", "GeneralReport", "📋", 4));

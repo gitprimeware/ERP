@@ -47,8 +47,8 @@ namespace ERP.UI.Forms
         private void InitializeComponent()
         {
             this.Text = "Bölme İşlemi";
-            this.Width = 700;
-            this.Height = 750;
+            this.Width = 550;
+            this.Height = 650;
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -61,10 +61,11 @@ namespace ERP.UI.Forms
 
         private void CreateControls()
         {
-            int yPos = 20;
-            int labelWidth = 150;
+            int yPos = 30;
+            int labelWidth = 130;
             int controlWidth = 300;
-            int spacing = 35;
+            int controlHeight = 32;
+            int spacing = 32;
 
             // Lamel Kalınlığı
             var lblPlateThickness = new Label
@@ -76,9 +77,9 @@ namespace ERP.UI.Forms
             };
             _cmbPlateThickness = new ComboBox
             {
-                Location = new Point(180, yPos - 3),
+                Location = new Point(150, yPos - 3),
                 Width = controlWidth,
-                Height = 30,
+                Height = controlHeight,
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 10F)
             };
@@ -97,9 +98,9 @@ namespace ERP.UI.Forms
             };
             _cmbHatve = new ComboBox
             {
-                Location = new Point(180, yPos - 3),
+                Location = new Point(150, yPos - 3),
                 Width = controlWidth,
-                Height = 30,
+                Height = controlHeight,
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 10F)
             };
@@ -122,9 +123,9 @@ namespace ERP.UI.Forms
             _dgvClampings = new DataGridView
             {
                 Location = new Point(20, yPos),
-                Width = 650,
-                Height = 200,
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                Width = 480,
+                Height = 180,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 MultiSelect = false,
                 ReadOnly = true,
@@ -133,7 +134,7 @@ namespace ERP.UI.Forms
                 BorderStyle = BorderStyle.None
             };
             this.Controls.Add(_dgvClampings);
-            yPos += 210;
+            yPos += 190;
 
             // Kenetlenmiş Ürün
             var lblClamping = new Label
@@ -145,9 +146,9 @@ namespace ERP.UI.Forms
             };
             _cmbClamping = new ComboBox
             {
-                Location = new Point(180, yPos - 3),
+                Location = new Point(150, yPos - 3),
                 Width = controlWidth,
-                Height = 30,
+                Height = controlHeight,
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 10F),
                 Enabled = false
@@ -167,9 +168,9 @@ namespace ERP.UI.Forms
             };
             _lblOriginalLength = new Label
             {
-                Location = new Point(180, yPos),
+                Location = new Point(150, yPos),
                 Width = controlWidth,
-                Height = 25,
+                Height = controlHeight,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 ForeColor = ThemeColors.Primary
             };
@@ -187,9 +188,9 @@ namespace ERP.UI.Forms
             };
             _txtFirstLength = new TextBox
             {
-                Location = new Point(180, yPos - 3),
+                Location = new Point(150, yPos - 3),
                 Width = controlWidth,
-                Height = 30,
+                Height = controlHeight,
                 Font = new Font("Segoe UI", 10F)
             };
             _txtFirstLength.TextChanged += UpdateSecondLength;
@@ -207,9 +208,9 @@ namespace ERP.UI.Forms
             };
             _txtSecondLength = new TextBox
             {
-                Location = new Point(180, yPos - 3),
+                Location = new Point(150, yPos - 3),
                 Width = controlWidth,
-                Height = 30,
+                Height = controlHeight,
                 Font = new Font("Segoe UI", 10F),
                 ReadOnly = true,
                 BackColor = SystemColors.Control
@@ -228,9 +229,9 @@ namespace ERP.UI.Forms
             };
             _txtRequestedCount = new TextBox
             {
-                Location = new Point(180, yPos - 3),
+                Location = new Point(150, yPos - 3),
                 Width = controlWidth,
-                Height = 30,
+                Height = controlHeight,
                 Font = new Font("Segoe UI", 10F)
             };
             this.Controls.Add(lblRequestedCount);
@@ -247,9 +248,9 @@ namespace ERP.UI.Forms
             };
             _cmbMachine = new ComboBox
             {
-                Location = new Point(180, yPos - 3),
+                Location = new Point(150, yPos - 3),
                 Width = controlWidth,
-                Height = 30,
+                Height = controlHeight,
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 10F)
             };
@@ -267,15 +268,15 @@ namespace ERP.UI.Forms
             };
             var employeePanel = new Panel
             {
-                Location = new Point(180, yPos - 3),
+                Location = new Point(150, yPos - 3),
                 Width = controlWidth,
-                Height = 30
+                Height = controlHeight
             };
             _cmbEmployee = new ComboBox
             {
                 Dock = DockStyle.Left,
-                Width = controlWidth - 120,
-                Height = 30,
+                Width = controlWidth - 75,
+                Height = controlHeight,
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 10F)
             };
@@ -283,8 +284,8 @@ namespace ERP.UI.Forms
             {
                 Text = "+ Ekle",
                 Dock = DockStyle.Right,
-                Width = 110,
-                Height = 30,
+                Width = 70,
+                Height = controlHeight,
                 BackColor = ThemeColors.Secondary,
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 9F),
@@ -296,16 +297,16 @@ namespace ERP.UI.Forms
             employeePanel.Controls.Add(_btnAddEmployee);
             this.Controls.Add(lblEmployee);
             this.Controls.Add(employeePanel);
-            yPos += spacing + 10;
+            yPos += spacing + 12;
 
-            // Butonlar
+            // Butonlar (ortada)
             _btnCancel = new Button
             {
                 Text = "İptal",
                 DialogResult = DialogResult.Cancel,
-                Location = new Point(580, yPos),
-                Width = 100,
-                Height = 35,
+                Location = new Point(370, yPos),
+                Width = 90,
+                Height = 32,
                 BackColor = ThemeColors.Secondary,
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 10F),
@@ -316,9 +317,9 @@ namespace ERP.UI.Forms
             _btnSave = new Button
             {
                 Text = "Kaydet",
-                Location = new Point(470, yPos),
-                Width = 100,
-                Height = 35,
+                Location = new Point(275, yPos),
+                Width = 90,
+                Height = 32,
                 BackColor = ThemeColors.Success,
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
@@ -331,6 +332,9 @@ namespace ERP.UI.Forms
             this.Controls.Add(_btnCancel);
             this.AcceptButton = _btnSave;
             this.CancelButton = _btnCancel;
+            
+            // Dialog yüksekliğini butonların altına göre ayarla (biraz boşluk ile)
+            this.Height = yPos + _btnSave.Height + 45;
         }
 
         private void LoadData()
@@ -452,13 +456,25 @@ namespace ERP.UI.Forms
                 _dgvClampings.Columns["Id"].Visible = false;
                 _dgvClampings.Columns["Clamping"].Visible = false;
                 if (_dgvClampings.Columns["Size"] != null)
+                {
                     _dgvClampings.Columns["Size"].HeaderText = "Ölçü";
+                    _dgvClampings.Columns["Size"].Width = 80;
+                }
                 if (_dgvClampings.Columns["Length"] != null)
+                {
                     _dgvClampings.Columns["Length"].HeaderText = "Uzunluk";
+                    _dgvClampings.Columns["Length"].Width = 80;
+                }
                 if (_dgvClampings.Columns["OrderNo"] != null)
+                {
                     _dgvClampings.Columns["OrderNo"].HeaderText = "Sipariş No";
+                    _dgvClampings.Columns["OrderNo"].Width = 140;
+                }
                 if (_dgvClampings.Columns["AvailableCount"] != null)
+                {
                     _dgvClampings.Columns["AvailableCount"].HeaderText = "Kalan Adet";
+                    _dgvClampings.Columns["AvailableCount"].Width = 100;
+                }
 
                 _cmbClamping.Items.Clear();
                 foreach (var item in displayData)

@@ -87,11 +87,13 @@ namespace ERP.UI.Services
             RegisterForm("MaterialEntry", typeof(MaterialEntryForm), "Malzeme Giriş");
             RegisterForm("MaterialExit", typeof(MaterialExitForm), "Malzeme Çıkış");
             RegisterForm("StockDetail", typeof(StockDetailForm), "Stok Ayrıntı");
-            RegisterForm("MRPReport", typeof(MRPReportForm), "MRP Raporu");
+            RegisterForm("MRPReport", typeof(MRPReportForm), "Üretim Raporu");
             RegisterForm("CustomerReport", typeof(CustomerReportForm), "Cari Raporu");
             RegisterForm("AnnualReport", typeof(AnnualReportForm), "Yıllık Rapor");
             RegisterForm("GeneralReport", typeof(GeneralReportForm), "Genel Rapor");
             RegisterForm("Reports", typeof(MRPReportForm), "Raporlar"); // Ana raporlar sayfası
+            RegisterForm("Settings", typeof(SettingsForm), "Ayarlar");
+            RegisterForm("StockTrackingContainer", typeof(StockTrackingContainerForm), "Stok Takip");
             // Diğer formlar buraya eklenecek
         }
 

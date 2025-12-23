@@ -36,7 +36,7 @@ namespace ERP.UI.Forms
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1200, 700);
             this.Name = "MainForm";
-            this.Text = "ERP/MRP Sistemi";
+            this.Text = "ERP Sistemi";
             this.ResumeLayout(false);
         }
 

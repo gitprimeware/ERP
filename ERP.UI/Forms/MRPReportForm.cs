@@ -48,7 +48,7 @@ namespace ERP.UI.Forms
             // Başlık
             var titleLabel = new Label
             {
-                Text = "📊 MRP Raporu",
+                Text = "📊 Üretim Raporu",
                 Font = new Font("Segoe UI", 24F, FontStyle.Bold),
                 ForeColor = ThemeColors.Primary,
                 AutoSize = true,
