@@ -374,33 +374,43 @@ namespace ERP.UI.Forms
                     plakaOlcusu = roundedPlakaOlcusu.ToString(); // MM cinsinden göster
                 }
 
-                // Yükseklik: Direkt yüksekliği göster (kapak çıkarmadan)
-                // Yükseklik <= 1800 ise Yükseklik, > 1800 ise Yükseklik/2
-                if (parts.Length >= 5 && int.TryParse(parts[4], out int yukseklikMM))
-                {
-                    // Yükseklik com hesaplama
-                    int yukseklikCom = yukseklikMM <= 1800 ? yukseklikMM : yukseklikMM / 2;
-                    
-                    // Direkt yüksekliği göster (kapak çıkarmadan)
-                    yukseklik = yukseklikCom.ToString();
-                }
-
-                // Kapak: 030 -> 30
+                // Kapak: 030 -> 30 (önce kapak değerini al ki yükseklikten çıkarabilelim)
+                int kapakBoyuMM = 0;
                 if (parts.Length >= 6)
                 {
                     string kapakStr = parts[5];
                     if (int.TryParse(kapakStr, out int kapakValue))
                     {
                         kapak = kapakValue.ToString();
+                        kapakBoyuMM = kapakValue;
                     }
                     else if (kapakStr == "030")
+                    {
                         kapak = "30";
+                        kapakBoyuMM = 30;
+                    }
                     else if (kapakStr == "002")
+                    {
                         kapak = "2";
+                        kapakBoyuMM = 2;
+                    }
                     else if (kapakStr == "016")
+                    {
                         kapak = "16";
-                    else
-                        kapak = kapakStr;
+                        kapakBoyuMM = 16;
+                    }
+                }
+
+                // Yükseklik: Yükseklik com'dan kapak boyunu çıkar
+                // Yükseklik <= 1800 ise Yükseklik, > 1800 ise Yükseklik/2, sonra kapak boyunu çıkar
+                if (parts.Length >= 5 && int.TryParse(parts[4], out int yukseklikMM))
+                {
+                    // Yükseklik com hesaplama
+                    int yukseklikCom = yukseklikMM <= 1800 ? yukseklikMM : yukseklikMM / 2;
+                    
+                    // Kapak boyunu çıkar
+                    int yukseklikSon = yukseklikCom - kapakBoyuMM;
+                    yukseklik = yukseklikSon.ToString();
                 }
 
                 return (hatve, plakaOlcusu, yukseklik, kapak, profil);

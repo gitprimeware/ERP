@@ -12,6 +12,12 @@ namespace ERP.UI.Forms
 {
     public partial class ProductionDetailForm : UserControl
     {
+        // Performans için cache'lenmiş font ve brush'lar
+        private readonly Font _tabFont = new Font("Segoe UI Emoji", 10F);
+        private readonly SolidBrush _whiteBrush = new SolidBrush(Color.White);
+        private readonly SolidBrush _primaryBrush;
+        private readonly Color _inactiveTabColor = Color.FromArgb(150, 150, 150);
+        
         private Panel mainPanel;
         private TabControl tabControl;
         
@@ -86,6 +92,7 @@ namespace ERP.UI.Forms
         public ProductionDetailForm(Guid orderId)
         {
             _orderId = orderId;
+            _primaryBrush = new SolidBrush(ThemeColors.Primary); // Constructor'da initialize et
             _orderRepository = new OrderRepository();
             _cuttingRepository = new CuttingRepository();
             _cuttingRequestRepository = new CuttingRequestRepository();
@@ -108,6 +115,12 @@ namespace ERP.UI.Forms
             this.BackColor = Color.White;
             this.Dock = DockStyle.Fill;
             this.Padding = new Padding(20);
+            
+            // DoubleBuffered özelliğini aç - performans için kritik
+            SetStyle(ControlStyles.AllPaintingInWmPaint | 
+                     ControlStyles.UserPaint | 
+                     ControlStyles.DoubleBuffer | 
+                     ControlStyles.ResizeRedraw, true);
 
             CreateMainPanel();
             LoadOrderData();
@@ -122,6 +135,11 @@ namespace ERP.UI.Forms
                 Padding = new Padding(30),
                 AutoScroll = true
             };
+            
+            // Panel için de DoubleBuffered aç
+            typeof(Panel).InvokeMember("DoubleBuffered",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.SetProperty,
+                null, mainPanel, new object[] { true });
 
             // TabControl oluştur
             tabControl = new TabControl
@@ -133,35 +151,32 @@ namespace ERP.UI.Forms
                 Appearance = TabAppearance.FlatButtons
             };
             tabControl.DrawMode = TabDrawMode.OwnerDrawFixed;
+            tabControl.BackColor = Color.White; // Sadece bir kez ayarla
+            
             tabControl.DrawItem += (s, e) =>
             {
                 var tabPage = tabControl.TabPages[e.Index];
                 var tabRect = tabControl.GetTabRect(e.Index);
                 
-                // Arka planı tamamen beyaz yap
-                e.Graphics.FillRectangle(new SolidBrush(Color.White), tabRect);
-                tabControl.BackColor = Color.White;
+                // Arka planı tamamen beyaz yap - cache'lenmiş brush kullan
+                e.Graphics.FillRectangle(_whiteBrush, tabRect);
                 
                 Color textColor;
                 if ((e.State & DrawItemState.Selected) == DrawItemState.Selected)
                 {
-                    // Seçili tab için altında mavi çizgi
-                    e.Graphics.FillRectangle(new SolidBrush(ThemeColors.Primary), new Rectangle(tabRect.X, tabRect.Y + tabRect.Height - 3, tabRect.Width, 3));
+                    // Seçili tab için altında mavi çizgi - cache'lenmiş brush kullan
+                    e.Graphics.FillRectangle(_primaryBrush, new Rectangle(tabRect.X, tabRect.Y + tabRect.Height - 3, tabRect.Width, 3));
                     textColor = ThemeColors.Primary;
                 }
                 else
                 {
-                    // Seçili olmayan tab - tamamen beyaz arka plan
-                    textColor = Color.FromArgb(150, 150, 150);
+                    textColor = _inactiveTabColor;
                 }
                 
-                // Emoji'leri doğru şekilde render et - Segoe UI Emoji fontu kullan
-                using (var emojiFont = new Font("Segoe UI Emoji", 10F))
-                {
-                    TextRenderer.DrawText(e.Graphics, tabPage.Text, emojiFont, 
-                        tabRect, textColor, 
-                        TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
-                }
+                // Cache'lenmiş font kullan
+                TextRenderer.DrawText(e.Graphics, tabPage.Text, _tabFont, 
+                    tabRect, textColor, 
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
                 
                 e.DrawFocusRectangle();
             };
@@ -561,7 +576,7 @@ namespace ERP.UI.Forms
             if (txtReportProductCode != null)
                 txtReportProductCode.Text = _order.ProductCode ?? "";
 
-            // Htave - Model satırından (formül sayfasındaki txtHtave'den) ve parantez içinde sözel olarak
+            // Htave - Model satırından (formül sayfasındaki txtHtave'den), hatve ölçümü ve parantez içinde hatve tipi
             if (txtReportHtave != null && txtHtave != null)
             {
                 string hatveText = txtHtave.Text;
@@ -577,21 +592,35 @@ namespace ERP.UI.Forms
                     }
                 }
                 
-                // Sözel karşılığını belirle
-                string sozelKarsilik = "";
-                switch (char.ToUpper(modelLetter))
+                // Hatve ölçümünü hesapla
+                decimal? hatveOlcumu = null;
+                if (txtPlakaOlcusuCM != null)
                 {
-                    case 'H': sozelKarsilik = "Yüksek"; break;
-                    case 'D': sozelKarsilik = "Düşük"; break;
-                    case 'M': sozelKarsilik = "Orta"; break;
-                    case 'L': sozelKarsilik = "Büyük"; break;
-                    default: sozelKarsilik = ""; break;
+                    if (decimal.TryParse(txtPlakaOlcusuCM.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal plakaOlcusuCM))
+                    {
+                        hatveOlcumu = GetHatveOlcumu(modelLetter, plakaOlcusuCM);
+                    }
                 }
                 
-                // Parantez içinde sözel olarak göster
-                if (!string.IsNullOrEmpty(sozelKarsilik))
+                // Hatve tipi harfini belirle
+                string hatveTipiHarf = "";
+                switch (char.ToUpper(modelLetter))
                 {
-                    txtReportHtave.Text = $"{hatveText} ({sozelKarsilik})";
+                    case 'H': hatveTipiHarf = "H"; break;
+                    case 'D': hatveTipiHarf = "D"; break;
+                    case 'M': hatveTipiHarf = "M"; break;
+                    case 'L': hatveTipiHarf = "L"; break;
+                }
+                
+                // Format: 3.10(H) gibi göster
+                if (hatveOlcumu.HasValue && !string.IsNullOrEmpty(hatveTipiHarf))
+                {
+                    txtReportHtave.Text = $"{hatveOlcumu.Value:F2}({hatveTipiHarf})";
+                }
+                else if (!string.IsNullOrEmpty(hatveTipiHarf))
+                {
+                    // Hatve ölçümü bulunamadıysa sadece hatve tipi göster
+                    txtReportHtave.Text = $"({hatveTipiHarf})";
                 }
                 else
                 {
@@ -617,8 +646,7 @@ namespace ERP.UI.Forms
                 }
             }
 
-            // Yükseklik (mm) - Yükseklik 1800 üzerindeyse 2'ye böl, sonra kapak çıkar
-            // Kapak tipi 30 veya 2 olsa da 16 olarak kabul edilir ((30+2)/2 = 16)
+            // Yükseklik (mm) - Önce kapak boyunu çıkar, belli bir yüksekliğin üstündeyse 16 daha çıkar
             int raporYukseklikMM = 0;
             if (txtReportYukseklikCM != null && txtYukseklikMM != null && txtKapakBoyuMM != null)
             {
@@ -627,20 +655,12 @@ namespace ERP.UI.Forms
                     // Yükseklik 1800 üzerindeyse 2'ye böl
                     int yukseklikCom = yukseklikMM <= 1800 ? yukseklikMM : yukseklikMM / 2;
                     
-                    // Kapak değerini belirle - 30 veya 2 olsa da 16 kabul edilir
-                    int cikarilacakKapakDegeri = 16; // Varsayılan olarak 16
-                    
-                    if (int.TryParse(txtKapakBoyuMM.Text, out int kapakBoyuMM))
-                {
-                        // Kapak tipi 30 veya 2 ise 16 kullan, diğer durumlarda direkt değeri kullan
-                        if (kapakBoyuMM == 30 || kapakBoyuMM == 2)
-                        {
-                            cikarilacakKapakDegeri = 16; // (30+2)/2 = 16
-                        }
-                        else
-                        {
-                            cikarilacakKapakDegeri = kapakBoyuMM;
-                        }
+                    // Kapak boyunu al ve çıkar
+                    int kapakBoyuMM = 0;
+                    if (int.TryParse(txtKapakBoyuMM.Text, out kapakBoyuMM))
+                    {
+                        // Kapak boyunu çıkar
+                        raporYukseklikMM = yukseklikCom - kapakBoyuMM;
                     }
                     else if (_order != null && !string.IsNullOrEmpty(_order.ProductCode))
                     {
@@ -651,31 +671,28 @@ namespace ERP.UI.Forms
                             string kapakDegeri = productCodeParts[5];
                             
                             // Ürün kodunda DisplayText formatı kullanılıyor: 030, 002, 016
-                            if (kapakDegeri == "030" || kapakDegeri == "002")
-                            {
-                                cikarilacakKapakDegeri = 16; // (30+2)/2 = 16
-                            }
+                            if (kapakDegeri == "030")
+                                kapakBoyuMM = 30;
+                            else if (kapakDegeri == "002")
+                                kapakBoyuMM = 2;
                             else if (kapakDegeri == "016")
-                            {
-                                cikarilacakKapakDegeri = 16;
-                            }
+                                kapakBoyuMM = 16;
                             else if (int.TryParse(kapakDegeri, out int parsedKapak))
-                            {
-                                if (parsedKapak == 30 || parsedKapak == 2)
-                                {
-                                    cikarilacakKapakDegeri = 16;
-                                }
-                                else
-                                {
-                                    cikarilacakKapakDegeri = parsedKapak;
-                            }
-                            }
+                                kapakBoyuMM = parsedKapak;
+                            
+                            // Kapak boyunu çıkar
+                            raporYukseklikMM = yukseklikCom - kapakBoyuMM;
                         }
                     }
                     
-                    // Rapor yükseklik = (Yükseklik com) - Kapak değeri
-                    raporYukseklikMM = yukseklikCom - cikarilacakKapakDegeri;
-                            txtReportYukseklikCM.Text = raporYukseklikMM.ToString();
+                    // Eğer yükseklik com belli bir değerin üstündeyse (örneğin 1800), ek olarak 16 çıkar
+                    // Not: Bu mantık kullanıcıya göre değişebilir, şimdilik yukseklikCom > 1800 kontrolü yapıyoruz
+                    if (yukseklikCom > 1800)
+                    {
+                        raporYukseklikMM = raporYukseklikMM - 16;
+                    }
+                    
+                    txtReportYukseklikCM.Text = raporYukseklikMM.ToString();
                 }
             }
 
@@ -832,13 +849,14 @@ namespace ERP.UI.Forms
 
                 int plakaAdet = 1; // Varsayılan değer
                 int boyAdet = 1; // Varsayılan değer
+                char modelLetter = ' '; // Varsayılan değer
 
                 // Model ve Profil: LG -> Model: L, Profil: G
                 // veya HS -> Model: H, Profil: S
                 string modelProfile = parts[2]; // LG veya HS
                 if (modelProfile.Length >= 2)
                 {
-                    char modelLetter = modelProfile[0]; // L veya H
+                    modelLetter = modelProfile[0]; // L veya H
                     char profileLetter = modelProfile[1]; // G veya S
 
                     // Model
@@ -847,20 +865,13 @@ namespace ERP.UI.Forms
                     // Profil Mode
                     txtProfilMode.Text = profileLetter.ToString().ToUpper();
 
-                    // Htave: H=3.25, D=4.5, M=6.5, L=9
-                    decimal htave = GetHtave(modelLetter);
-                    txtHtave.Text = htave.ToString("F2", CultureInfo.InvariantCulture);
-
-                    // 10cm Plaka Adedi: H=32, D=24, M=17, L=12
-                    int plakaAdedi10cm = GetPlakaAdedi10cm(modelLetter);
-                    txtPlakaAdedi10cm.Text = plakaAdedi10cm.ToString();
-
                     // Profil Mode Ağırlığı: G=0.5, S=0.3
                     decimal profilModeAgirligi = profileLetter == 'G' || profileLetter == 'g' ? 0.5m : 0.3m;
                     txtProfilModeAgirligi.Text = profilModeAgirligi.ToString("F1", CultureInfo.InvariantCulture);
                 }
 
                 // Plaka Ölçüsü (mm): 1422
+                decimal plakaOlcusuCM = 0;
                 if (int.TryParse(parts[3], out int plakaOlcusuMM))
                 {
                     txtPlakaOlcusuMM.Text = plakaOlcusuMM.ToString();
@@ -870,8 +881,36 @@ namespace ERP.UI.Forms
                     txtPlakaOlcusuComMM.Text = plakaOlcusuComMM.ToString();
 
                     // Plaka Ölçüsü (cm): Plaka ölçüsü com / 10
-                    decimal plakaOlcusuCM = plakaOlcusuComMM / 10.0m;
+                    plakaOlcusuCM = plakaOlcusuComMM / 10.0m;
                     txtPlakaOlcusuCM.Text = plakaOlcusuCM.ToString("F1", CultureInfo.InvariantCulture);
+                    
+                    // Hatve: Plaka ölçüsüne göre hesaplanır
+                    decimal htave = 0;
+                    var hatveOlcumu = GetHatveOlcumu(modelLetter, plakaOlcusuCM);
+                    if (hatveOlcumu.HasValue)
+                    {
+                        htave = hatveOlcumu.Value;
+                    }
+                    else
+                    {
+                        // Fallback: Eski metod
+                        htave = GetHtave(modelLetter);
+                    }
+                    txtHtave.Text = htave.ToString("F2", CultureInfo.InvariantCulture);
+
+                    // 10cm Plaka Adedi: 100 / hatve (tam bölünmüyorsa 1 ekle)
+                    decimal plakaAdedi10cmDecimal = htave > 0 ? 100m / htave : 0;
+                    int plakaAdedi10cm = 0;
+                    if (plakaAdedi10cmDecimal > 0)
+                    {
+                        int tamKisim = (int)Math.Floor(plakaAdedi10cmDecimal);
+                        // Eğer tam bölünmüyorsa (ondalık kısmı varsa) 1 ekle
+                        if (plakaAdedi10cmDecimal % 1 != 0)
+                            plakaAdedi10cm = tamKisim + 1;
+                        else
+                            plakaAdedi10cm = tamKisim;
+                    }
+                    txtPlakaAdedi10cm.Text = plakaAdedi10cm.ToString();
 
                     // Plaka Adet: Plaka ölçüsü <= 1150 ise 1, > 1150 ise 4
                     plakaAdet = plakaOlcusuMM <= 1150 ? 1 : 4;
@@ -881,13 +920,13 @@ namespace ERP.UI.Forms
                 }
 
                 // Yükseklik (mm): 1900
+                int kapakBoyuMM = 0;
                 if (int.TryParse(parts[4], out int yukseklikMM))
                 {
                     txtYukseklikMM.Text = yukseklikMM.ToString();
 
                     // Yükseklik com: 1900 <= 1800 ise 1900, > 1800 ise 1900/2
                     int yukseklikCom = yukseklikMM <= 1800 ? yukseklikMM : yukseklikMM / 2;
-                    txtYukseklikCom.Text = yukseklikCom.ToString();
 
                     // Boy Adet: Yükseklik <= 1800 ise 1, > 1800 ise 2
                     boyAdet = yukseklikMM <= 1800 ? 1 : 2;
@@ -895,9 +934,21 @@ namespace ERP.UI.Forms
                 }
 
                 // Kapak Boyu (mm): 030 -> 30
-                if (parts.Length > 5 && int.TryParse(parts[5], out int kapakBoyuMM))
+                if (parts.Length > 5 && int.TryParse(parts[5], out kapakBoyuMM))
                 {
                     txtKapakBoyuMM.Text = kapakBoyuMM.ToString();
+                }
+                
+                // Yükseklik com: Yükseklik 1800 üzerindeyse 2'ye böl, sonra kapak boyunu çıkar
+                if (int.TryParse(txtYukseklikMM.Text, out int yukseklikMMForCom))
+                {
+                    int yukseklikCom = yukseklikMMForCom <= 1800 ? yukseklikMMForCom : yukseklikMMForCom / 2;
+                    // Kapak boyunu çıkar
+                    if (kapakBoyuMM > 0)
+                    {
+                        yukseklikCom = yukseklikCom - kapakBoyuMM;
+                    }
+                    txtYukseklikCom.Text = yukseklikCom.ToString();
                 }
 
                 // Toplam Adet: Sipariş adedi * Boy adet * Plaka adet
@@ -1070,6 +1121,74 @@ namespace ERP.UI.Forms
             return 0m;
         }
 
+        private int GetKapakBoyuFromOrder(Order order)
+        {
+            // Önce txtKapakBoyuMM'den al
+            if (txtKapakBoyuMM != null && int.TryParse(txtKapakBoyuMM.Text, out int kapakBoyuMM))
+            {
+                return kapakBoyuMM;
+            }
+            
+            // Ürün kodundan kapak değerini çıkar
+            if (order != null && !string.IsNullOrEmpty(order.ProductCode))
+            {
+                var productCodeParts = order.ProductCode.Split('-');
+                if (productCodeParts.Length > 5)
+                {
+                    string kapakDegeri = productCodeParts[5];
+                    
+                    // Ürün kodunda DisplayText formatı kullanılıyor: 030, 002, 016
+                    if (kapakDegeri == "030")
+                        return 30;
+                    else if (kapakDegeri == "002")
+                        return 2;
+                    else if (kapakDegeri == "016")
+                        return 16;
+                    else if (int.TryParse(kapakDegeri, out int parsedKapak))
+                        return parsedKapak;
+                }
+            }
+            
+            return 0;
+        }
+
+        private decimal? GetHatveOlcumu(char hatveTipi, decimal plakaOlcusuCM)
+        {
+            // Plaka ölçüsünü cm cinsinden al (20, 30, 40, 50, 60, 70, 80, 100 gibi)
+            // En yakın 10'a yuvarla (örn: 21-29 -> 20, 31-39 -> 30)
+            int plakaOlcusuYuvarla = (int)Math.Round(plakaOlcusuCM / 10.0m, MidpointRounding.AwayFromZero) * 10;
+            
+            char hatveTipiUpper = char.ToUpper(hatveTipi);
+            
+            // Hatve tipi ve plaka ölçüsüne göre hatve değerini döndür
+            switch (hatveTipiUpper)
+            {
+                case 'H':
+                    // H20, H30, H40, H50: 3.10
+                    if (plakaOlcusuYuvarla == 20 || plakaOlcusuYuvarla == 30 || plakaOlcusuYuvarla == 40 || plakaOlcusuYuvarla == 50)
+                        return 3.10m;
+                    break;
+                case 'M':
+                    // M30: 6.4, M40: 6.3, M50: 6.4, M60: 6.3, M70: 6.5, M80: 6.5, M100: 6.5
+                    if (plakaOlcusuYuvarla == 30 || plakaOlcusuYuvarla == 50) return 6.4m;
+                    if (plakaOlcusuYuvarla == 40 || plakaOlcusuYuvarla == 60) return 6.3m;
+                    if (plakaOlcusuYuvarla == 70 || plakaOlcusuYuvarla == 80 || plakaOlcusuYuvarla == 100) return 6.5m;
+                    break;
+                case 'D':
+                    // D30: 4.5, D40: 4.5, D50: 4.5, D60: 4.3
+                    if (plakaOlcusuYuvarla == 30 || plakaOlcusuYuvarla == 40 || plakaOlcusuYuvarla == 50) return 4.5m;
+                    if (plakaOlcusuYuvarla == 60) return 4.3m;
+                    break;
+                case 'L':
+                    // L50: 8.7, L40: 8.7, L30: 8.7, L60: 8.65, L70: 8.65, L80: 8.65, L100: 8.65
+                    if (plakaOlcusuYuvarla == 30 || plakaOlcusuYuvarla == 40 || plakaOlcusuYuvarla == 50) return 8.7m;
+                    if (plakaOlcusuYuvarla == 60 || plakaOlcusuYuvarla == 70 || plakaOlcusuYuvarla == 80 || plakaOlcusuYuvarla == 100) return 8.65m;
+                    break;
+            }
+            
+            return null; // Bulunamadıysa null döndür
+        }
+
         private decimal CalculateGalvanizKapakAgirligi(decimal plakaOlcusuCM)
         {
             // Galvaniz kapak ağırlığı - plaka ölçüsü cm'ye göre
@@ -1178,38 +1297,32 @@ namespace ERP.UI.Forms
                 Appearance = TabAppearance.FlatButtons
             };
             cuttingTabControl.DrawMode = TabDrawMode.OwnerDrawFixed;
+            cuttingTabControl.BackColor = Color.White; // Sadece bir kez ayarla
+            
             cuttingTabControl.DrawItem += (s, e) =>
             {
                 var tabPage = cuttingTabControl.TabPages[e.Index];
                 var tabRect = cuttingTabControl.GetTabRect(e.Index);
-                var textRect = new RectangleF(tabRect.X, tabRect.Y, tabRect.Width, tabRect.Height);
                 
-                // Arka planı tamamen beyaz yap
-                e.Graphics.FillRectangle(new SolidBrush(Color.White), tabRect);
-                cuttingTabControl.BackColor = Color.White;
+                // Arka planı tamamen beyaz yap - cache'lenmiş brush kullan
+                e.Graphics.FillRectangle(_whiteBrush, tabRect);
                 
                 if ((e.State & DrawItemState.Selected) == DrawItemState.Selected)
                 {
-                    // Seçili tab için altında mavi çizgi
-                    e.Graphics.FillRectangle(new SolidBrush(ThemeColors.Primary), new Rectangle(tabRect.X, tabRect.Y + tabRect.Height - 3, tabRect.Width, 3));
+                    // Seçili tab için altında mavi çizgi - cache'lenmiş brush kullan
+                    e.Graphics.FillRectangle(_primaryBrush, new Rectangle(tabRect.X, tabRect.Y + tabRect.Height - 3, tabRect.Width, 3));
                     
-                    // Emoji ve metni çiz - TextRenderer kullan
-                    using (var font = new Font("Segoe UI Emoji", 10F))
-                    {
-                        TextRenderer.DrawText(e.Graphics, tabPage.Text, font, 
-                            tabRect, ThemeColors.Primary, 
-                            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
-                    }
+                    // Cache'lenmiş font kullan
+                    TextRenderer.DrawText(e.Graphics, tabPage.Text, _tabFont, 
+                        tabRect, ThemeColors.Primary, 
+                        TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
                 }
                 else
                 {
-                    // Seçili olmayan tab - tamamen beyaz arka plan
-                    using (var font = new Font("Segoe UI Emoji", 10F))
-                    {
-                        TextRenderer.DrawText(e.Graphics, tabPage.Text, font, 
-                            tabRect, Color.FromArgb(150, 150, 150), 
-                            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
-                    }
+                    // Cache'lenmiş font kullan
+                    TextRenderer.DrawText(e.Graphics, tabPage.Text, _tabFont, 
+                        tabRect, _inactiveTabColor, 
+                        TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
                 }
                 
                 e.DrawFocusRectangle();
@@ -1350,6 +1463,21 @@ namespace ERP.UI.Forms
             dataGridView.DefaultCellStyle.SelectionBackColor = ThemeColors.Primary;
             dataGridView.DefaultCellStyle.SelectionForeColor = Color.White;
             dataGridView.DefaultCellStyle.Font = new Font("Segoe UI", 9F);
+            
+            // DoubleBuffered özelliğini aç - scroll performansı için kritik
+            typeof(DataGridView).InvokeMember("DoubleBuffered",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.SetProperty,
+                null, dataGridView, new object[] { true });
+            
+            // Scroll event'ini optimize et - OrderListForm ile aynı
+            dataGridView.Scroll += (s, e) =>
+            {
+                if (e.ScrollOrientation == ScrollOrientation.VerticalScroll)
+                {
+                    dataGridView.Invalidate();
+                    dataGridView.Update();
+                }
+            };
 
             gridPanel.Controls.Add(dataGridView);
             
@@ -1427,33 +1555,44 @@ namespace ERP.UI.Forms
                 // Birleştir
                 var data = completedData.Cast<object>().Concat(requests.Cast<object>()).ToList();
 
-                // DataSource'u null yap (kolonlar kaybolmasın diye)
-                dataGridView.DataSource = null;
+                // Layout işlemlerini durdur - performans için kritik
+                dataGridView.SuspendLayout();
                 
-                // Kolonların var olduğundan emin ol
-                if (dataGridView.Columns.Count == 0)
+                try
                 {
-                    AddKesimColumn(dataGridView, "Hatve", "Hatve", 60);
-                    AddKesimColumn(dataGridView, "Size", "Ölçü", 70);
-                    AddKesimColumn(dataGridView, "MachineName", "Makina No", 80);
-                    AddKesimColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
-                    AddKesimColumn(dataGridView, "TotalKg", "Toplam Kg", 85);
-                    AddKesimColumn(dataGridView, "CutKg", "Kesilen Kg", 85);
-                    AddKesimColumn(dataGridView, "CuttingCount", "Kesim Adedi", 80);
-                    AddKesimColumn(dataGridView, "PlakaAdedi", "Plaka Adedi", 80);
-                    AddKesimColumn(dataGridView, "WasteKg", "Hurda Kg", 80);
-                    AddKesimColumn(dataGridView, "RemainingKg", "Kalan Kg", 80);
-                    AddKesimColumn(dataGridView, "EmployeeName", "Operatör", 120);
-                    AddKesimColumn(dataGridView, "Status", "Durum", 80);
-                }
+                    // DataSource'u null yap (kolonlar kaybolmasın diye)
+                    dataGridView.DataSource = null;
+                    
+                    // Kolonların var olduğundan emin ol
+                    if (dataGridView.Columns.Count == 0)
+                    {
+                        AddKesimColumn(dataGridView, "Hatve", "Hatve", 60);
+                        AddKesimColumn(dataGridView, "Size", "Ölçü", 70);
+                        AddKesimColumn(dataGridView, "MachineName", "Makina No", 80);
+                        AddKesimColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
+                        AddKesimColumn(dataGridView, "TotalKg", "Toplam Kg", 85);
+                        AddKesimColumn(dataGridView, "CutKg", "Kesilen Kg", 85);
+                        AddKesimColumn(dataGridView, "CuttingCount", "Kesim Adedi", 80);
+                        AddKesimColumn(dataGridView, "PlakaAdedi", "Plaka Adedi", 80);
+                        AddKesimColumn(dataGridView, "WasteKg", "Hurda Kg", 80);
+                        AddKesimColumn(dataGridView, "RemainingKg", "Kalan Kg", 80);
+                        AddKesimColumn(dataGridView, "EmployeeName", "Operatör", 120);
+                        AddKesimColumn(dataGridView, "Status", "Durum", 80);
+                    }
 
-                // Kolon başlıklarını kesinlikle göster
-                dataGridView.ColumnHeadersVisible = true;
-                dataGridView.RowHeadersVisible = false;
-                dataGridView.ColumnHeadersHeight = 40;
-                
-                // Veri kaynağını ayarla
-                dataGridView.DataSource = data;
+                    // Kolon başlıklarını kesinlikle göster
+                    dataGridView.ColumnHeadersVisible = true;
+                    dataGridView.RowHeadersVisible = false;
+                    dataGridView.ColumnHeadersHeight = 40;
+                    
+                    // Veri kaynağını ayarla
+                    dataGridView.DataSource = data;
+                }
+                finally
+                {
+                    // Layout işlemlerini devam ettir
+                    dataGridView.ResumeLayout();
+                }
                 
                 // DataSource ayarlandıktan SONRA HeaderText'leri tekrar ayarla
                 foreach (DataGridViewColumn column in dataGridView.Columns)
@@ -1854,32 +1993,43 @@ namespace ERP.UI.Forms
                 // Birleştir
                 var data = completedData.Cast<object>().Concat(requests.Cast<object>()).ToList();
 
-                // DataSource'u null yap (kolonlar kaybolmasın diye)
-                dataGridView.DataSource = null;
+                // Layout işlemlerini durdur - performans için kritik
+                dataGridView.SuspendLayout();
                 
-                // Kolonların var olduğundan emin ol
-                if (dataGridView.Columns.Count == 0)
+                try
                 {
-                    AddPresColumn(dataGridView, "Date", "Tarih", 100);
-                    AddPresColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 110);
-                    AddPresColumn(dataGridView, "Hatve", "Hatve", 60);
-                    AddPresColumn(dataGridView, "Size", "Ölçü", 70);
-                    AddPresColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
-                    AddPresColumn(dataGridView, "PressNo", "Pres No", 80);
-                    AddPresColumn(dataGridView, "Pressure", "Basınç", 80);
-                    AddPresColumn(dataGridView, "PressCount", "Pres Adedi", 85);
-                    AddPresColumn(dataGridView, "WasteAmount", "Hurda Miktarı", 100);
-                    AddPresColumn(dataGridView, "EmployeeName", "Operatör", 120);
-                    AddPresColumn(dataGridView, "Status", "Durum", 80);
-                }
+                    // DataSource'u null yap (kolonlar kaybolmasın diye)
+                    dataGridView.DataSource = null;
+                    
+                    // Kolonların var olduğundan emin ol
+                    if (dataGridView.Columns.Count == 0)
+                    {
+                        AddPresColumn(dataGridView, "Date", "Tarih", 100);
+                        AddPresColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 110);
+                        AddPresColumn(dataGridView, "Hatve", "Hatve", 60);
+                        AddPresColumn(dataGridView, "Size", "Ölçü", 70);
+                        AddPresColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
+                        AddPresColumn(dataGridView, "PressNo", "Pres No", 80);
+                        AddPresColumn(dataGridView, "Pressure", "Basınç", 80);
+                        AddPresColumn(dataGridView, "PressCount", "Pres Adedi", 85);
+                        AddPresColumn(dataGridView, "WasteAmount", "Hurda Miktarı", 100);
+                        AddPresColumn(dataGridView, "EmployeeName", "Operatör", 120);
+                        AddPresColumn(dataGridView, "Status", "Durum", 80);
+                    }
 
-                // Kolon başlıklarını kesinlikle göster
-                dataGridView.ColumnHeadersVisible = true;
-                dataGridView.RowHeadersVisible = false;
-                dataGridView.ColumnHeadersHeight = 40;
-                
-                // Veri kaynağını ayarla
-                dataGridView.DataSource = data;
+                    // Kolon başlıklarını kesinlikle göster
+                    dataGridView.ColumnHeadersVisible = true;
+                    dataGridView.RowHeadersVisible = false;
+                    dataGridView.ColumnHeadersHeight = 40;
+                    
+                    // Veri kaynağını ayarla
+                    dataGridView.DataSource = data;
+                }
+                finally
+                {
+                    // Layout işlemlerini devam ettir
+                    dataGridView.ResumeLayout();
+                }
                 
                 // DataSource ayarlandıktan SONRA HeaderText'leri tekrar ayarla
                 foreach (DataGridViewColumn column in dataGridView.Columns)
@@ -2233,6 +2383,7 @@ namespace ERP.UI.Forms
             try
             {
                 var order = _orderRepository.GetById(_orderId);
+                int kapakBoyuMM = GetKapakBoyuFromOrder(order);
                 
                 // Onaylanmış kenetleme kayıtları
                 var clampings = _clampingRepository.GetByOrderId(_orderId);
@@ -2243,7 +2394,7 @@ namespace ERP.UI.Forms
                     OrderNo = order?.TrexOrderNo ?? "",
                     Hatve = GetHatveLetter(c.Hatve),
                     Size = c.Size.ToString("F2", CultureInfo.InvariantCulture),
-                    Length = c.Length.ToString("F2", CultureInfo.InvariantCulture),
+                    Length = (c.Length - kapakBoyuMM).ToString("F2", CultureInfo.InvariantCulture),
                     ClampCount = c.ClampCount.ToString(),
                     Customer = order?.Company?.Name ?? "",
                     UsedPlateCount = c.UsedPlateCount.ToString(),
@@ -2264,7 +2415,7 @@ namespace ERP.UI.Forms
                         OrderNo = order?.TrexOrderNo ?? "",
                         Hatve = GetHatveLetter(r.Hatve),
                         Size = r.Size.ToString("F2", CultureInfo.InvariantCulture),
-                        Length = r.Length.ToString("F2", CultureInfo.InvariantCulture),
+                        Length = (r.Length - kapakBoyuMM).ToString("F2", CultureInfo.InvariantCulture),
                         ClampCount = r.ResultedClampCount?.ToString() ?? "-",
                         Customer = order?.Company?.Name ?? "",
                         UsedPlateCount = r.ActualClampCount?.ToString() ?? "-",
@@ -2278,14 +2429,19 @@ namespace ERP.UI.Forms
                 // Birleştir
                 var data = completedData.Cast<object>().Concat(requests.Cast<object>()).ToList();
 
-                // DataSource'u null yap (kolonlar kaybolmasın diye)
-                dataGridView.DataSource = null;
+                // Layout işlemlerini durdur - performans için kritik
+                dataGridView.SuspendLayout();
                 
-                // Kolonların var olduğundan emin ol
-                if (dataGridView.Columns.Count == 0)
+                try
                 {
-                    AddClampingColumn(dataGridView, "Date", "Tarih", 100);
-                    AddClampingColumn(dataGridView, "OrderNo", "Sipariş No", 90);
+                    // DataSource'u null yap (kolonlar kaybolmasın diye)
+                    dataGridView.DataSource = null;
+                    
+                    // Kolonların var olduğundan emin ol
+                    if (dataGridView.Columns.Count == 0)
+                    {
+                        AddClampingColumn(dataGridView, "Date", "Tarih", 100);
+                        AddClampingColumn(dataGridView, "OrderNo", "Sipariş No", 90);
                     AddClampingColumn(dataGridView, "Hatve", "Hatve", 60);
                     AddClampingColumn(dataGridView, "Size", "Ölçü", 70);
                     AddClampingColumn(dataGridView, "Length", "Uzunluk", 80);
@@ -2306,6 +2462,12 @@ namespace ERP.UI.Forms
                 
                 // Veri kaynağını ayarla
                 dataGridView.DataSource = data;
+                    }
+                    finally
+                    {
+                        // Layout işlemlerini devam ettir
+                        dataGridView.ResumeLayout();
+                    }
                 
                 // DataSource ayarlandıktan SONRA HeaderText'leri tekrar ayarla
                 foreach (DataGridViewColumn column in dataGridView.Columns)
@@ -2649,6 +2811,7 @@ namespace ERP.UI.Forms
             {
                 var assemblies = _assemblyRepository.GetByOrderId(_orderId);
                 var order = _orderRepository.GetById(_orderId);
+                int kapakBoyuMM = GetKapakBoyuFromOrder(order);
                 
                 var data = assemblies.Select(a => new
                 {
@@ -2657,7 +2820,7 @@ namespace ERP.UI.Forms
                     OrderNo = order?.TrexOrderNo ?? "",
                     Hatve = GetHatveLetter(a.Hatve),
                     Size = a.Size.ToString("F2", CultureInfo.InvariantCulture),
-                    Length = a.Length.ToString("F2", CultureInfo.InvariantCulture),
+                    Length = (a.Length - kapakBoyuMM).ToString("F2", CultureInfo.InvariantCulture),
                     AssemblyCount = a.AssemblyCount.ToString(),
                     Customer = order?.Company?.Name ?? "",
                     UsedClampCount = a.UsedClampCount.ToString(),
@@ -3012,14 +3175,15 @@ namespace ERP.UI.Forms
             {
                 var clamping2Requests = _clamping2RequestRepository.GetByOrderId(_orderId);
                 var order = _orderRepository.GetById(_orderId);
+                int kapakBoyuMM = GetKapakBoyuFromOrder(order);
                 
                 var data = clamping2Requests.Select(cr2 =>
                 {
                     var firstClamping = cr2.FirstClampingId.HasValue ? _clampingRepository.GetById(cr2.FirstClampingId.Value) : null;
                     var secondClamping = cr2.SecondClampingId.HasValue ? _clampingRepository.GetById(cr2.SecondClampingId.Value) : null;
                     
-                    string firstInfo = firstClamping != null ? $"{firstClamping.Size:F2} x {firstClamping.Length:F2}" : "";
-                    string secondInfo = secondClamping != null ? $"{secondClamping.Size:F2} x {secondClamping.Length:F2}" : "";
+                    string firstInfo = firstClamping != null ? $"{firstClamping.Size:F2} x {(firstClamping.Length - kapakBoyuMM):F2}" : "";
+                    string secondInfo = secondClamping != null ? $"{secondClamping.Size:F2} x {(secondClamping.Length - kapakBoyuMM):F2}" : "";
                     
                     return new
                     {
@@ -3029,7 +3193,7 @@ namespace ERP.UI.Forms
                         Hatve = GetHatveLetter(cr2.Hatve),
                         PlateThickness = cr2.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
                         ResultedSize = cr2.ResultedSize.ToString("F2", CultureInfo.InvariantCulture),
-                        ResultedLength = cr2.ResultedLength.ToString("F2", CultureInfo.InvariantCulture),
+                        ResultedLength = (cr2.ResultedLength - kapakBoyuMM).ToString("F2", CultureInfo.InvariantCulture),
                         FirstClampingInfo = firstInfo,
                         SecondClampingInfo = secondInfo,
                         Count = cr2.ResultedCount?.ToString() ?? cr2.ActualCount?.ToString() ?? cr2.RequestedCount.ToString(),
@@ -3305,6 +3469,17 @@ namespace ERP.UI.Forms
             }
         }
 
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                // Brush'ları temizle
+                _whiteBrush?.Dispose();
+                _primaryBrush?.Dispose();
+                _tabFont?.Dispose();
+            }
+            base.Dispose(disposing);
+        }
     }
 }
 
