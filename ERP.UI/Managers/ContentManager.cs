@@ -642,7 +642,7 @@ namespace ERP.UI.Managers
             {
                 ShowForm("Production");
             }
-            else if (formTag == "RuloStokTakip" || formTag == "KesilmisStokTakip" || 
+            else if (formTag == "StockTracking" || formTag == "RuloStokTakip" || formTag == "KesilmisStokTakip" || 
                      formTag == "PreslenmisStokTakip" || formTag == "KenetlenmisStokTakip")
             {
                 ShowStockTrackingContainer();

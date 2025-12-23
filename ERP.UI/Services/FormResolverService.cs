@@ -94,6 +94,7 @@ namespace ERP.UI.Services
             RegisterForm("Reports", typeof(MRPReportForm), "Raporlar"); // Ana raporlar sayfası
             RegisterForm("Settings", typeof(SettingsForm), "Ayarlar");
             RegisterForm("StockTrackingContainer", typeof(StockTrackingContainerForm), "Stok Takip");
+            RegisterForm("StockTracking", typeof(StockTrackingContainerForm), "Stok Takip");
             // Diğer formlar buraya eklenecek
         }
 

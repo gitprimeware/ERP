@@ -130,7 +130,7 @@ namespace ERP.UI.Forms
             {
                 _contentManager.ShowForm("AssemblyRequests");
             }
-            else if (formTag == "RuloStokTakip" || formTag == "KesilmisStokTakip" || 
+            else if (formTag == "StockTracking" || formTag == "RuloStokTakip" || formTag == "KesilmisStokTakip" || 
                      formTag == "PreslenmisStokTakip" || formTag == "KenetlenmisStokTakip")
             {
                 // Stok takip sayfaları için tab container göster

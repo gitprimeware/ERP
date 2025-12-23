@@ -71,11 +71,6 @@ namespace ERP.UI.Components
                 new { Title = "📦 Stok Giriş", Description = "Stok girişi ve takip işlemleri", Color = Color.FromArgb(46, 204, 113), Tag = "StockEntry" },
                 new { Title = "💰 Muhasebe", Description = "Muhasebe ve finansal işlemler", Color = Color.FromArgb(241, 196, 15), Tag = "Accounting" },
                 new { Title = "📊 Stok Ayrıntı", Description = "Detaylı stok bilgileri ve raporları", Color = Color.FromArgb(155, 89, 182), Tag = "StockDetail" },
-                new { Title = "🏭 Üretim Ayrıntı", Description = "Üretim planlama ve takip işlemleri", Color = Color.FromArgb(231, 76, 60), Tag = "Production" },
-                new { Title = "📦 Rulo Stok Takip", Description = "Rulo stok durumu ve takip işlemleri", Color = Color.FromArgb(52, 73, 94), Tag = "RuloStokTakip" },
-                new { Title = "✂️ Kesilmiş Stok Takip", Description = "Kesilmiş stok durumu ve takip işlemleri", Color = Color.FromArgb(230, 126, 34), Tag = "KesilmisStokTakip" },
-                new { Title = "📦 Preslenmiş Stok Takip", Description = "Preslenmiş stok durumu ve takip işlemleri", Color = Color.FromArgb(26, 188, 156), Tag = "PreslenmisStokTakip" },
-                new { Title = "🔗 Kenetlenmiş Stok Takip", Description = "Kenetlenmiş stok durumu ve takip işlemleri", Color = Color.FromArgb(142, 68, 173), Tag = "KenetlenmisStokTakip" },
                 new { Title = "⚡ Sarfiyat", Description = "Sarfiyat takip ve yönetimi", Color = Color.FromArgb(192, 57, 43), Tag = "Consumption" },
                 new { Title = "📋 Kesim Talepleri", Description = "Kesim talep ve takip işlemleri", Color = Color.FromArgb(52, 73, 94), Tag = "CuttingRequests" },
                 new { Title = "📋 Pres Talepleri", Description = "Pres talep ve takip işlemleri", Color = Color.FromArgb(230, 126, 34), Tag = "PressingRequests" },
@@ -98,6 +93,11 @@ namespace ERP.UI.Components
             var materialCard = CreateMaterialEntryExitCard();
             materialCard.Margin = new Padding(5);
             cardsPanel.Controls.Add(materialCard);
+
+            // Üretim Planlama (Yarı yarıya bölünmüş özel kart)
+            var productionCard = CreateProductionPlanningCard();
+            productionCard.Margin = new Padding(5);
+            cardsPanel.Controls.Add(productionCard);
 
             this.Resize += (s, e) =>
             {
@@ -340,6 +340,147 @@ namespace ERP.UI.Components
 
             card.Controls.Add(entryButton);
             card.Controls.Add(exitButton);
+
+            return card;
+        }
+
+        private Panel CreateProductionPlanningCard()
+        {
+            var card = new Panel
+            {
+                Size = new Size(240, 140),
+                BackColor = Color.White,
+                BorderStyle = BorderStyle.None,
+                Cursor = Cursors.Hand
+            };
+
+            // Hover efekti
+            card.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using (var pen = new Pen(Color.FromArgb(230, 230, 230), 1))
+                {
+                    e.Graphics.DrawRectangle(pen, 0, 0, card.Width - 1, card.Height - 1);
+                }
+            };
+
+            // Sol kenarda renkli çizgi
+            var accentLine = new Panel
+            {
+                Width = 5,
+                Height = card.Height,
+                BackColor = Color.FromArgb(231, 76, 60),
+                Location = new Point(0, 0),
+                Dock = DockStyle.Left
+            };
+            card.Controls.Add(accentLine);
+
+            // Başlık
+            var titleLabel = new Label
+            {
+                Text = "🏭 Üretim Planlama",
+                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
+                ForeColor = ThemeColors.TextPrimary,
+                AutoSize = false,
+                Location = new Point(19, 15),
+                Width = card.Width - 39,
+                Height = 25
+            };
+            card.Controls.Add(titleLabel);
+
+            // Yarı yarıya bölünmüş butonlar
+            var stockTrackingButton = new Panel
+            {
+                Location = new Point(19, 50),
+                Width = (card.Width - 39) / 2 - 5,
+                Height = 60,
+                BackColor = Color.FromArgb(231, 76, 60),
+                Cursor = Cursors.Hand
+            };
+            stockTrackingButton.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using (var brush = new SolidBrush(stockTrackingButton.BackColor))
+                {
+                    e.Graphics.FillRectangle(brush, stockTrackingButton.ClientRectangle);
+                }
+            };
+
+            var stockTrackingLabel = new Label
+            {
+                Text = "📦 Stok Takip",
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                ForeColor = Color.White,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Dock = DockStyle.Fill
+            };
+            stockTrackingButton.Controls.Add(stockTrackingLabel);
+            stockTrackingButton.Click += (s, e) => CardClicked?.Invoke(this, "StockTracking");
+            stockTrackingLabel.Click += (s, e) => CardClicked?.Invoke(this, "StockTracking");
+
+            var productionDetailButton = new Panel
+            {
+                Location = new Point(19 + (card.Width - 39) / 2 + 5, 50),
+                Width = (card.Width - 39) / 2 - 5,
+                Height = 60,
+                BackColor = Color.FromArgb(192, 57, 43),
+                Cursor = Cursors.Hand
+            };
+            productionDetailButton.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using (var brush = new SolidBrush(productionDetailButton.BackColor))
+                {
+                    e.Graphics.FillRectangle(brush, productionDetailButton.ClientRectangle);
+                }
+            };
+
+            var productionDetailLabel = new Label
+            {
+                Text = "🏭 Üretim\nAyrıntı",
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                ForeColor = Color.White,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Dock = DockStyle.Fill
+            };
+            productionDetailButton.Controls.Add(productionDetailLabel);
+            productionDetailButton.Click += (s, e) => CardClicked?.Invoke(this, "Production");
+            productionDetailLabel.Click += (s, e) => CardClicked?.Invoke(this, "Production");
+
+            // Hover efekti
+            card.MouseEnter += (s, e) =>
+            {
+                card.BackColor = Color.FromArgb(250, 250, 250);
+            };
+            card.MouseLeave += (s, e) =>
+            {
+                card.BackColor = Color.White;
+            };
+
+            stockTrackingButton.MouseEnter += (s, e) =>
+            {
+                stockTrackingButton.BackColor = Color.FromArgb(192, 57, 43);
+                stockTrackingButton.Invalidate();
+            };
+            stockTrackingButton.MouseLeave += (s, e) =>
+            {
+                stockTrackingButton.BackColor = Color.FromArgb(231, 76, 60);
+                stockTrackingButton.Invalidate();
+            };
+
+            productionDetailButton.MouseEnter += (s, e) =>
+            {
+                productionDetailButton.BackColor = Color.FromArgb(169, 50, 38);
+                productionDetailButton.Invalidate();
+            };
+            productionDetailButton.MouseLeave += (s, e) =>
+            {
+                productionDetailButton.BackColor = Color.FromArgb(192, 57, 43);
+                productionDetailButton.Invalidate();
+            };
+
+            card.Controls.Add(stockTrackingButton);
+            card.Controls.Add(productionDetailButton);
 
             return card;
         }
