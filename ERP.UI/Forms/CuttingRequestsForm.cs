@@ -99,9 +99,6 @@ namespace ERP.UI.Forms
             
             AddCuttingRequestColumn("Hatve", "Hatve", 80);
             AddCuttingRequestColumn("Size", "Ölçü", 80);
-            AddCuttingRequestColumn("Length", "Uzunluk", 80);
-            AddCuttingRequestColumn("KapakTipi", "Kapak Tipi", 100);
-            AddCuttingRequestColumn("ProfilTipi", "Profil Tipi", 100);
             AddCuttingRequestColumn("PlateThickness", "Plaka Kalınlığı", 120);
             AddCuttingRequestColumn("SerialNumber", "Rulo Seri No", 120);
             AddCuttingRequestColumn("RequestedPlateCount", "İstenen Kesim", 120);
@@ -117,6 +114,18 @@ namespace ERP.UI.Forms
             };
             colActualCutCount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             _dataGridView.Columns.Add(colActualCutCount);
+            
+            // Hurda Adedi - buton kolonu (dialog açmak için)
+            var colWasteCount = new DataGridViewButtonColumn
+            {
+                HeaderText = "Hurda Adedi",
+                Name = "WasteCount",
+                Width = 120,
+                Text = "Gir",
+                UseColumnTextForButtonValue = false // Dinamik buton metni için false
+            };
+            colWasteCount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            _dataGridView.Columns.Add(colWasteCount);
             
             // Rulo Bitti - checkbox
             var colIsRollFinished = new DataGridViewCheckBoxColumn
@@ -206,60 +215,16 @@ namespace ERP.UI.Forms
                 
                 var data = requests.Select(r =>
                 {
-                    var order = orders.FirstOrDefault(o => o.Id == r.OrderId);
-                    
-                    // Ürün kodundan bilgileri parse et
-                    string kapakTipi = "";
-                    string profilTipi = "";
-                    decimal uzunluk = 0;
-                    
-                    if (order != null && !string.IsNullOrEmpty(order.ProductCode))
-                    {
-                        var parts = order.ProductCode.Split('-');
-                        if (parts.Length >= 3)
-                        {
-                            string modelProfile = parts[2];
-                            if (modelProfile.Length >= 2)
-                            {
-                                profilTipi = modelProfile[1].ToString().ToUpper();
-                            }
-                        }
-                        
-                        // Kapak tipi: 5. parça (030 -> 30)
-                        if (parts.Length >= 6 && int.TryParse(parts[5], out int kapakBoyuMM))
-                        {
-                            kapakTipi = kapakBoyuMM.ToString();
-                        }
-                        
-                        // Uzunluk: Yükseklik (4. parça)
-                        if (parts.Length >= 5 && int.TryParse(parts[4], out int yukseklikMM))
-                        {
-                            // Yükseklik <= 1800 ise aynı, > 1800 ise /2
-                            int yukseklikCom = yukseklikMM <= 1800 ? yukseklikMM : yukseklikMM / 2;
-                            // Kapak değeri çıkar
-                            if (parts.Length >= 6 && int.TryParse(parts[5], out int kapakMM))
-                            {
-                                uzunluk = (yukseklikCom - kapakMM) / 10.0m;
-                            }
-                            else
-                            {
-                                uzunluk = yukseklikCom / 10.0m;
-                            }
-                        }
-                    }
-                    
                     return new
                     {
                         Id = r.Id,
                         Hatve = GetHatveLetter(r.Hatve),
                         Size = r.Size.ToString("F1", CultureInfo.InvariantCulture),
-                        Length = uzunluk.ToString("F1", CultureInfo.InvariantCulture),
-                        KapakTipi = kapakTipi,
-                        ProfilTipi = profilTipi,
                         PlateThickness = r.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
                         SerialNumber = r.SerialNo?.SerialNumber ?? "",
                         RequestedPlateCount = r.RequestedPlateCount.ToString(),
                         ActualCutCount = r.ActualCutCount.HasValue ? r.ActualCutCount.Value.ToString() : "",
+                        WasteCount = r.WasteCount.HasValue ? r.WasteCount.Value.ToString() : "0",
                         IsRollFinished = r.IsRollFinished,
                         Status = r.Status
                     };
@@ -281,28 +246,52 @@ namespace ERP.UI.Forms
 
         private void DataGridView_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
         {
-            // Sadece ActualCutCount buton kolonu için
-            if (_dataGridView.Columns[e.ColumnIndex].Name == "ActualCutCount" && e.RowIndex >= 0)
+            var columnName = _dataGridView.Columns[e.ColumnIndex].Name;
+            if ((columnName == "ActualCutCount" || columnName == "WasteCount") && e.RowIndex >= 0)
             {
                 var row = _dataGridView.Rows[e.RowIndex];
                 if (row.DataBoundItem != null)
                 {
                     var item = row.DataBoundItem;
-                    var actualCutCountProperty = item.GetType().GetProperty("ActualCutCount");
-                    if (actualCutCountProperty != null)
+                    
+                    if (columnName == "ActualCutCount")
                     {
-                        var actualCutCountValue = actualCutCountProperty.GetValue(item)?.ToString();
-                        
-                        // Eğer değer varsa "Girildi (X)" göster, yoksa "Gir" göster
-                        if (!string.IsNullOrWhiteSpace(actualCutCountValue))
+                        var actualCutCountProperty = item.GetType().GetProperty("ActualCutCount");
+                        if (actualCutCountProperty != null)
                         {
-                            e.Value = $"Girildi ({actualCutCountValue})";
-                            e.FormattingApplied = true;
+                            var actualCutCountValue = actualCutCountProperty.GetValue(item)?.ToString();
+                            
+                            // Eğer değer varsa "Girildi (X)" göster, yoksa "Gir" göster
+                            if (!string.IsNullOrWhiteSpace(actualCutCountValue))
+                            {
+                                e.Value = $"Girildi ({actualCutCountValue})";
+                                e.FormattingApplied = true;
+                            }
+                            else
+                            {
+                                e.Value = "Gir";
+                                e.FormattingApplied = true;
+                            }
                         }
-                        else
+                    }
+                    else if (columnName == "WasteCount")
+                    {
+                        var wasteCountProperty = item.GetType().GetProperty("WasteCount");
+                        if (wasteCountProperty != null)
                         {
-                            e.Value = "Gir";
-                            e.FormattingApplied = true;
+                            var wasteCountValue = wasteCountProperty.GetValue(item)?.ToString();
+                            
+                            // Eğer değer varsa ve 0 değilse "Girildi (X)" göster, yoksa veya 0 ise "Gir" göster
+                            if (!string.IsNullOrWhiteSpace(wasteCountValue) && wasteCountValue != "0")
+                            {
+                                e.Value = $"Girildi ({wasteCountValue})";
+                                e.FormattingApplied = true;
+                            }
+                            else
+                            {
+                                e.Value = "Gir";
+                                e.FormattingApplied = true;
+                            }
                         }
                     }
                 }
@@ -316,7 +305,7 @@ namespace ERP.UI.Forms
                 return;
 
             var columnName = _dataGridView.Columns[e.ColumnIndex].Name;
-            if (columnName != "ActualCutCount")
+            if (columnName != "ActualCutCount" && columnName != "WasteCount")
                 return;
 
             try
@@ -342,19 +331,115 @@ namespace ERP.UI.Forms
                     return;
 
                 // Dialog aç
-                int? actualCutCount = ShowActualCutCountDialog(request);
-                if (actualCutCount.HasValue)
+                if (columnName == "ActualCutCount")
                 {
-                    request.ActualCutCount = actualCutCount.Value;
-                    request.Status = "Kesimde"; // İşçi kesim adedini girdiğinde durum "Kesimde" olur
-                    _cuttingRequestRepository.Update(request);
-                    LoadData(); // Verileri yeniden yükle
+                    int? actualCutCount = ShowActualCutCountDialog(request);
+                    if (actualCutCount.HasValue)
+                    {
+                        request.ActualCutCount = actualCutCount.Value;
+                        request.Status = "Kesimde"; // İşçi kesim adedini girdiğinde durum "Kesimde" olur
+                        _cuttingRequestRepository.Update(request);
+                        LoadData(); // Verileri yeniden yükle
+                    }
+                }
+                else if (columnName == "WasteCount")
+                {
+                    int? wasteCount = ShowWasteCountDialog(request);
+                    if (wasteCount.HasValue)
+                    {
+                        request.WasteCount = wasteCount.Value;
+                        _cuttingRequestRepository.Update(request);
+                        LoadData(); // Verileri yeniden yükle
+                    }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Kesim adedi girilirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                string errorMessage = columnName == "WasteCount" 
+                    ? "Hurda adedi girilirken hata oluştu: " 
+                    : "Kesim adedi girilirken hata oluştu: ";
+                MessageBox.Show(errorMessage + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private int? ShowWasteCountDialog(CuttingRequest request)
+        {
+            using (var dialog = new Form
+            {
+                Text = "Hurda Adedi",
+                Width = 400,
+                Height = 200,
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                BackColor = ThemeColors.Background
+            })
+            {
+                var lblInfo = new Label
+                {
+                    Text = "Hurda adedi girin:",
+                    Location = new Point(20, 20),
+                    Width = 350,
+                    Height = 40,
+                    AutoSize = false,
+                    Font = new Font("Segoe UI", 10F)
+                };
+
+                var lblAdet = new Label
+                {
+                    Text = "Hurda Adedi:",
+                    Location = new Point(20, 90),
+                    AutoSize = true,
+                    Font = new Font("Segoe UI", 10F)
+                };
+
+                var txtAdet = new NumericUpDown
+                {
+                    Location = new Point(150, 87),
+                    Width = 200,
+                    Minimum = 0,
+                    Maximum = 999999,
+                    Value = request.WasteCount ?? 0,
+                    DecimalPlaces = 0,
+                    Font = new Font("Segoe UI", 10F)
+                };
+
+                var btnOk = new Button
+                {
+                    Text = "Tamam",
+                    DialogResult = DialogResult.OK,
+                    Location = new Point(200, 130),
+                    Width = 80,
+                    BackColor = ThemeColors.Success,
+                    ForeColor = Color.White,
+                    FlatStyle = FlatStyle.Flat
+                };
+                btnOk.FlatAppearance.BorderSize = 0;
+
+                var btnCancel = new Button
+                {
+                    Text = "İptal",
+                    DialogResult = DialogResult.Cancel,
+                    Location = new Point(290, 130),
+                    Width = 80,
+                    BackColor = ThemeColors.Secondary,
+                    ForeColor = Color.White,
+                    FlatStyle = FlatStyle.Flat
+                };
+                btnCancel.FlatAppearance.BorderSize = 0;
+
+                dialog.Controls.AddRange(new Control[] { lblInfo, lblAdet, txtAdet, btnOk, btnCancel });
+                dialog.AcceptButton = btnOk;
+                dialog.CancelButton = btnCancel;
+
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    return (int)txtAdet.Value;
+                }
+            }
+
+            return null;
         }
 
         private int? ShowActualCutCountDialog(CuttingRequest request)
@@ -470,12 +555,11 @@ namespace ERP.UI.Forms
                     return;
 
                 // Rulo bitti durumunu kaydet
-                if (row.Cells["IsRollFinished"] != null)
+                if (columnName == "IsRollFinished" && row.Cells["IsRollFinished"] != null)
                 {
                     request.IsRollFinished = (bool)(row.Cells["IsRollFinished"].Value ?? false);
+                    _cuttingRequestRepository.Update(request);
                 }
-
-                _cuttingRequestRepository.Update(request);
             }
             catch (Exception ex)
             {

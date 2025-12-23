@@ -17,13 +17,15 @@ namespace ERP.DAL.Repositories
             {
                 connection.Open();
                 
-                // PlakaAdedi kolonunun varlığını kontrol et
+                // PlakaAdedi ve WasteCount kolonlarının varlığını kontrol et
                 bool hasPlakaAdediColumn = ColumnExists(connection, "Cuttings", "PlakaAdedi");
+                bool hasWasteCountColumn = ColumnExists(connection, "Cuttings", "WasteCount");
                 
                 string plakaAdediColumn = hasPlakaAdediColumn ? "c.PlakaAdedi," : "";
+                string wasteCountColumn = hasWasteCountColumn ? "c.WasteCount," : "";
                 
                 var query = $@"SELECT c.Id, c.OrderId, c.Hatve, c.Size, c.MachineId, c.SerialNoId,
-                             c.TotalKg, c.CutKg, c.CuttingCount, {plakaAdediColumn} c.WasteKg, c.RemainingKg, c.EmployeeId, c.CuttingDate,
+                             c.TotalKg, c.CutKg, c.CuttingCount, {plakaAdediColumn} {wasteCountColumn} c.WasteKg, c.RemainingKg, c.EmployeeId, c.CuttingDate,
                              c.CreatedDate, c.ModifiedDate, c.IsActive,
                              sn.SerialNumber as SerialNumber,
                              m.Name as MachineName,
@@ -41,7 +43,7 @@ namespace ERP.DAL.Repositories
                     {
                         while (reader.Read())
                         {
-                            cuttings.Add(MapToCutting(reader, hasPlakaAdediColumn));
+                            cuttings.Add(MapToCutting(reader, hasPlakaAdediColumn, hasWasteCountColumn));
                         }
                     }
                 }
@@ -77,13 +79,15 @@ namespace ERP.DAL.Repositories
             {
                 connection.Open();
                 
-                // PlakaAdedi kolonunun varlığını kontrol et
+                // PlakaAdedi ve WasteCount kolonlarının varlığını kontrol et
                 bool hasPlakaAdediColumn = ColumnExists(connection, "Cuttings", "PlakaAdedi");
+                bool hasWasteCountColumn = ColumnExists(connection, "Cuttings", "WasteCount");
                 
                 string plakaAdediColumn = hasPlakaAdediColumn ? "c.PlakaAdedi," : "";
+                string wasteCountColumn = hasWasteCountColumn ? "c.WasteCount," : "";
                 
                 var query = $@"SELECT c.Id, c.OrderId, c.Hatve, c.Size, c.MachineId, c.SerialNoId,
-                             c.TotalKg, c.CutKg, c.CuttingCount, {plakaAdediColumn} c.WasteKg, c.RemainingKg, c.EmployeeId, c.CuttingDate,
+                             c.TotalKg, c.CutKg, c.CuttingCount, {plakaAdediColumn} {wasteCountColumn} c.WasteKg, c.RemainingKg, c.EmployeeId, c.CuttingDate,
                              c.CreatedDate, c.ModifiedDate, c.IsActive,
                              sn.SerialNumber as SerialNumber,
                              m.Name as MachineName,
@@ -103,7 +107,7 @@ namespace ERP.DAL.Repositories
                     {
                         while (reader.Read())
                         {
-                            cuttings.Add(MapToCutting(reader, hasPlakaAdediColumn));
+                            cuttings.Add(MapToCutting(reader, hasPlakaAdediColumn, hasWasteCountColumn));
                         }
                     }
                 }
@@ -122,20 +126,23 @@ namespace ERP.DAL.Repositories
             {
                 connection.Open();
                 
-                // PlakaAdedi kolonunun varlığını kontrol et
+                // PlakaAdedi ve WasteCount kolonlarının varlığını kontrol et
                 bool hasPlakaAdediColumn = ColumnExists(connection, "Cuttings", "PlakaAdedi");
+                bool hasWasteCountColumn = ColumnExists(connection, "Cuttings", "WasteCount");
                 
                 string plakaAdediInsert = hasPlakaAdediColumn ? "PlakaAdedi," : "";
                 string plakaAdediValue = hasPlakaAdediColumn ? "@PlakaAdedi," : "";
+                string wasteCountInsert = hasWasteCountColumn ? "WasteCount," : "";
+                string wasteCountValue = hasWasteCountColumn ? "@WasteCount," : "";
                 
                 var query = $@"INSERT INTO Cuttings (Id, OrderId, Hatve, Size, MachineId, SerialNoId,
-                             TotalKg, CutKg, CuttingCount, {plakaAdediInsert} WasteKg, RemainingKg, EmployeeId, CuttingDate, CreatedDate, IsActive) 
+                             TotalKg, CutKg, CuttingCount, {plakaAdediInsert} {wasteCountInsert} WasteKg, RemainingKg, EmployeeId, CuttingDate, CreatedDate, IsActive) 
                              VALUES (@Id, @OrderId, @Hatve, @Size, @MachineId, @SerialNoId,
-                             @TotalKg, @CutKg, @CuttingCount, {plakaAdediValue} @WasteKg, @RemainingKg, @EmployeeId, @CuttingDate, @CreatedDate, @IsActive)";
+                             @TotalKg, @CutKg, @CuttingCount, {plakaAdediValue} {wasteCountValue} @WasteKg, @RemainingKg, @EmployeeId, @CuttingDate, @CreatedDate, @IsActive)";
                 
                 using (var command = new SqlCommand(query, connection))
                 {
-                    AddCuttingParameters(command, cutting, hasPlakaAdediColumn);
+                    AddCuttingParameters(command, cutting, hasPlakaAdediColumn, hasWasteCountColumn);
                     command.ExecuteNonQuery();
                 }
             }
@@ -151,10 +158,12 @@ namespace ERP.DAL.Repositories
             {
                 connection.Open();
                 
-                // PlakaAdedi kolonunun varlığını kontrol et
+                // PlakaAdedi ve WasteCount kolonlarının varlığını kontrol et
                 bool hasPlakaAdediColumn = ColumnExists(connection, "Cuttings", "PlakaAdedi");
+                bool hasWasteCountColumn = ColumnExists(connection, "Cuttings", "WasteCount");
                 
                 string plakaAdediUpdate = hasPlakaAdediColumn ? "PlakaAdedi = @PlakaAdedi," : "";
+                string wasteCountUpdate = hasWasteCountColumn ? "WasteCount = @WasteCount," : "";
                 
                 var query = $@"UPDATE Cuttings SET 
                              OrderId = @OrderId,
@@ -166,6 +175,7 @@ namespace ERP.DAL.Repositories
                              CutKg = @CutKg,
                              CuttingCount = @CuttingCount,
                              {plakaAdediUpdate}
+                             {wasteCountUpdate}
                              WasteKg = @WasteKg,
                              RemainingKg = @RemainingKg,
                              EmployeeId = @EmployeeId,
@@ -175,7 +185,7 @@ namespace ERP.DAL.Repositories
                 
                 using (var command = new SqlCommand(query, connection))
                 {
-                    AddCuttingParameters(command, cutting, hasPlakaAdediColumn);
+                    AddCuttingParameters(command, cutting, hasPlakaAdediColumn, hasWasteCountColumn);
                     command.Parameters.AddWithValue("@ModifiedDate", cutting.ModifiedDate);
                     command.ExecuteNonQuery();
                 }
@@ -188,13 +198,15 @@ namespace ERP.DAL.Repositories
             {
                 connection.Open();
                 
-                // PlakaAdedi kolonunun varlığını kontrol et
+                // PlakaAdedi ve WasteCount kolonlarının varlığını kontrol et
                 bool hasPlakaAdediColumn = ColumnExists(connection, "Cuttings", "PlakaAdedi");
+                bool hasWasteCountColumn = ColumnExists(connection, "Cuttings", "WasteCount");
                 
                 string plakaAdediColumn = hasPlakaAdediColumn ? "c.PlakaAdedi," : "";
+                string wasteCountColumn = hasWasteCountColumn ? "c.WasteCount," : "";
                 
                 var query = $@"SELECT c.Id, c.OrderId, c.Hatve, c.Size, c.MachineId, c.SerialNoId,
-                             c.TotalKg, c.CutKg, c.CuttingCount, {plakaAdediColumn} c.WasteKg, c.RemainingKg, c.EmployeeId, c.CuttingDate,
+                             c.TotalKg, c.CutKg, c.CuttingCount, {plakaAdediColumn} {wasteCountColumn} c.WasteKg, c.RemainingKg, c.EmployeeId, c.CuttingDate,
                              c.CreatedDate, c.ModifiedDate, c.IsActive,
                              sn.SerialNumber as SerialNumber,
                              m.Name as MachineName,
@@ -213,7 +225,7 @@ namespace ERP.DAL.Repositories
                     {
                         if (reader.Read())
                         {
-                            return MapToCutting(reader, hasPlakaAdediColumn);
+                            return MapToCutting(reader, hasPlakaAdediColumn, hasWasteCountColumn);
                         }
                     }
                 }
@@ -238,7 +250,7 @@ namespace ERP.DAL.Repositories
             }
         }
 
-        private Cutting MapToCutting(SqlDataReader reader, bool hasPlakaAdediColumn = true)
+        private Cutting MapToCutting(SqlDataReader reader, bool hasPlakaAdediColumn = true, bool hasWasteCountColumn = true)
         {
             var cutting = new Cutting
             {
@@ -249,6 +261,7 @@ namespace ERP.DAL.Repositories
                 CutKg = reader.GetDecimal("CutKg"),
                 CuttingCount = reader.GetInt32("CuttingCount"),
                 PlakaAdedi = hasPlakaAdediColumn && !reader.IsDBNull("PlakaAdedi") ? reader.GetInt32("PlakaAdedi") : 0,
+                WasteCount = GetWasteCountValue(reader, hasWasteCountColumn),
                 WasteKg = reader.GetDecimal("WasteKg"),
                 RemainingKg = reader.GetDecimal("RemainingKg"),
                 CuttingDate = reader.GetDateTime("CuttingDate"),
@@ -305,7 +318,25 @@ namespace ERP.DAL.Repositories
             return cutting;
         }
 
-        private void AddCuttingParameters(SqlCommand command, Cutting cutting, bool includePlakaAdedi = true)
+        private int? GetWasteCountValue(SqlDataReader reader, bool hasWasteCountColumn)
+        {
+            if (!hasWasteCountColumn)
+                return null;
+
+            try
+            {
+                int ordinal = reader.GetOrdinal("WasteCount");
+                if (reader.IsDBNull(ordinal))
+                    return null;
+                return reader.GetInt32(ordinal);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private void AddCuttingParameters(SqlCommand command, Cutting cutting, bool includePlakaAdedi = true, bool includeWasteCount = true)
         {
             command.Parameters.AddWithValue("@Id", cutting.Id);
             command.Parameters.AddWithValue("@OrderId", cutting.OrderId.HasValue ? (object)cutting.OrderId.Value : DBNull.Value);
@@ -322,6 +353,10 @@ namespace ERP.DAL.Repositories
                 command.Parameters.AddWithValue("@PlakaAdedi", cutting.PlakaAdedi);
             }
             
+            if (includeWasteCount)
+            {
+                command.Parameters.AddWithValue("@WasteCount", cutting.WasteCount.HasValue ? (object)cutting.WasteCount.Value : DBNull.Value);
+            }
             command.Parameters.AddWithValue("@WasteKg", cutting.WasteKg);
             command.Parameters.AddWithValue("@RemainingKg", cutting.RemainingKg);
             command.Parameters.AddWithValue("@EmployeeId", cutting.EmployeeId.HasValue ? (object)cutting.EmployeeId.Value : DBNull.Value);

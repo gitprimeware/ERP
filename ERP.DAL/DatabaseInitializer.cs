@@ -429,6 +429,7 @@ namespace ERP.DAL
                         [TotalKg] DECIMAL(18,3) NOT NULL,
                         [CutKg] DECIMAL(18,3) NOT NULL,
                         [CuttingCount] INT NOT NULL DEFAULT 0,
+                        [WasteCount] INT NULL,
                         [WasteKg] DECIMAL(18,3) NOT NULL DEFAULT 0,
                         [RemainingKg] DECIMAL(18,3) NOT NULL,
                         [EmployeeId] UNIQUEIDENTIFIER NULL,
@@ -530,6 +531,18 @@ namespace ERP.DAL
                             ALTER TABLE [dbo].[Cuttings]
                             ADD CONSTRAINT FK_Cuttings_Employees FOREIGN KEY ([EmployeeId]) REFERENCES [Employees]([Id])
                         END
+                    END
+                    
+                    -- WasteCount kolonu ekle
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Cuttings]') AND name = 'WasteCount')
+                    BEGIN
+                        BEGIN TRY
+                            ALTER TABLE [dbo].[Cuttings] ADD [WasteCount] INT NULL
+                            PRINT 'Cuttings tablosuna WasteCount kolonu eklendi.'
+                        END TRY
+                        BEGIN CATCH
+                            PRINT 'Cuttings tablosuna WasteCount kolonu eklenirken hata oluştu: ' + ERROR_MESSAGE()
+                        END CATCH
                     END
                     
                     -- PlakaAdedi kolonu ekle
@@ -757,6 +770,7 @@ namespace ERP.DAL
                         [RemainingKg] DECIMAL(18,3) NOT NULL,
                         [EmployeeId] UNIQUEIDENTIFIER NULL,
                         [ActualCutCount] INT NULL,
+                        [WasteCount] INT NULL,
                         [IsRollFinished] BIT NOT NULL DEFAULT 0,
                         [Status] NVARCHAR(50) NOT NULL DEFAULT 'Beklemede',
                         [RequestDate] DATETIME NOT NULL,

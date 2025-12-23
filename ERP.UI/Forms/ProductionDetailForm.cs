@@ -1437,8 +1437,8 @@ namespace ERP.UI.Forms
             AddKesimColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
             AddKesimColumn(dataGridView, "TotalKg", "Toplam Kg", 85);
             AddKesimColumn(dataGridView, "CutKg", "Kesilen Kg", 85);
-            AddKesimColumn(dataGridView, "CuttingCount", "Kesim Adedi", 80);
-            AddKesimColumn(dataGridView, "PlakaAdedi", "Plaka Adedi", 80);
+            AddKesimColumn(dataGridView, "CuttingCount", "Kesilen Plaka Adedi", 120);
+            AddKesimColumn(dataGridView, "WasteCount", "Hurda Plaka Adedi", 120);
             AddKesimColumn(dataGridView, "WasteKg", "Hurda Kg", 80);
             AddKesimColumn(dataGridView, "RemainingKg", "Kalan Kg", 80);
             AddKesimColumn(dataGridView, "EmployeeName", "Operatör", 120);
@@ -1525,7 +1525,7 @@ namespace ERP.UI.Forms
                     TotalKg = c.TotalKg.ToString("F3", CultureInfo.InvariantCulture),
                     CutKg = c.CutKg.ToString("F3", CultureInfo.InvariantCulture),
                     CuttingCount = c.CuttingCount.ToString(),
-                    PlakaAdedi = c.PlakaAdedi.ToString(),
+                    WasteCount = c.WasteCount.HasValue ? c.WasteCount.Value.ToString() : "-",
                     WasteKg = c.WasteKg.ToString("F3", CultureInfo.InvariantCulture),
                     RemainingKg = c.RemainingKg.ToString("F3", CultureInfo.InvariantCulture),
                     EmployeeName = c.Employee != null ? $"{c.Employee.FirstName} {c.Employee.LastName}" : "",
@@ -1545,8 +1545,10 @@ namespace ERP.UI.Forms
                         TotalKg = "-",
                         CutKg = "-",
                         CuttingCount = r.ActualCutCount?.ToString() ?? "-",
-                        PlakaAdedi = r.RequestedPlateCount.ToString(),
-                        WasteKg = "-",
+                        WasteCount = r.WasteCount?.ToString() ?? "-",
+                        WasteKg = r.WasteCount.HasValue && r.OnePlateWeight > 0 
+                            ? (r.WasteCount.Value * r.OnePlateWeight).ToString("F3", CultureInfo.InvariantCulture) 
+                            : "-",
                         RemainingKg = r.RemainingKg.ToString("F3", CultureInfo.InvariantCulture),
                         EmployeeName = r.Employee != null ? $"{r.Employee.FirstName} {r.Employee.LastName}" : "-",
                         Status = GetShortStatus(r.Status)
@@ -1572,8 +1574,8 @@ namespace ERP.UI.Forms
                         AddKesimColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
                         AddKesimColumn(dataGridView, "TotalKg", "Toplam Kg", 85);
                         AddKesimColumn(dataGridView, "CutKg", "Kesilen Kg", 85);
-                        AddKesimColumn(dataGridView, "CuttingCount", "Kesim Adedi", 80);
-                        AddKesimColumn(dataGridView, "PlakaAdedi", "Plaka Adedi", 80);
+                        AddKesimColumn(dataGridView, "CuttingCount", "Kesilen Plaka Adedi", 120);
+                        AddKesimColumn(dataGridView, "WasteCount", "Hurda Plaka Adedi", 120);
                         AddKesimColumn(dataGridView, "WasteKg", "Hurda Kg", 80);
                         AddKesimColumn(dataGridView, "RemainingKg", "Kalan Kg", 80);
                         AddKesimColumn(dataGridView, "EmployeeName", "Operatör", 120);
@@ -1608,8 +1610,8 @@ namespace ERP.UI.Forms
                         case "SerialNumber": column.HeaderText = "Rulo Seri No"; break;
                         case "TotalKg": column.HeaderText = "Toplam Kg"; break;
                         case "CutKg": column.HeaderText = "Kesilen Kg"; break;
-                        case "CuttingCount": column.HeaderText = "Kesim Adedi"; break;
-                        case "PlakaAdedi": column.HeaderText = "Plaka Adedi"; break;
+                        case "CuttingCount": column.HeaderText = "Kesilen Plaka Adedi"; break;
+                        case "WasteCount": column.HeaderText = "Hurda Plaka Adedi"; break;
                         case "WasteKg": column.HeaderText = "Hurda Kg"; break;
                         case "RemainingKg": column.HeaderText = "Kalan Kg"; break;
                         case "EmployeeName": column.HeaderText = "Operatör"; break;
@@ -1754,20 +1756,26 @@ namespace ERP.UI.Forms
                 
                 decimal totalEntryKg = materialEntries.Sum(me => me.Quantity);
                 
-                // Bu seri no için daha önce kesilen kg'ları hesapla (sadece tamamlananlar, gerçek kesilen adede göre)
+                // Hurda kg hesapla: hurda adedi * plaka ağırlığı
+                decimal wasteKg = selectedRequest.WasteCount.HasValue 
+                    ? selectedRequest.WasteCount.Value * selectedRequest.OnePlateWeight 
+                    : 0;
+                
+                // Bu seri no için daha önce kesilen kg'ları hesapla (sadece tamamlananlar, gerçek kesilen adede göre + hurda)
                 var previousCutKg = _cuttingRequestRepository.GetAll()
                     .Where(cr => cr.SerialNoId == selectedRequest.SerialNoId && cr.IsActive && cr.Status == "Tamamlandı" && cr.Id != selectedRequest.Id)
                     .Sum(cr => 
                     {
                         int actualCount = cr.ActualCutCount ?? cr.RequestedPlateCount;
-                        return cr.OnePlateWeight * actualCount;
+                        decimal prevWasteKg = cr.WasteCount.HasValue ? cr.WasteCount.Value * cr.OnePlateWeight : 0;
+                        return cr.OnePlateWeight * actualCount + prevWasteKg;
                     });
                 
-                // Mevcut stok = Toplam giriş - Daha önce kesilenler
+                // Mevcut stok = Toplam giriş - Daha önce kesilenler (kesilen kg + hurda kg)
                 decimal currentStockKg = totalEntryKg - previousCutKg;
                 
-                // Kalan kg = Mevcut stok - Bu kesimde kesilen kg
-                decimal remainingKg = currentStockKg - actualCutKg;
+                // Kalan kg = Mevcut stok - Bu kesimde kesilen kg - Bu kesimde hurda kg
+                decimal remainingKg = currentStockKg - actualCutKg - wasteKg;
 
                 var cutting = new Cutting
                 {
@@ -1778,10 +1786,11 @@ namespace ERP.UI.Forms
                     SerialNoId = selectedRequest.SerialNoId,
                     TotalKg = currentStockKg, // Mevcut stok
                     CutKg = actualCutKg, // Gerçek kesilen kg
-                    CuttingCount = 1,
+                    CuttingCount = actualCutCountValue, // Kesim adedi (gerçek kesilen adet)
                     PlakaAdedi = actualCutCountValue,
-                    WasteKg = 0,
-                    RemainingKg = remainingKg, // Gerçek kesilen adede göre kalan
+                    WasteCount = selectedRequest.WasteCount, // Hurda plaka adedi
+                    WasteKg = wasteKg, // Hurda kg: hurda adedi * plaka ağırlığı
+                    RemainingKg = remainingKg, // Gerçek kesilen adede göre kalan (hurda dahil)
                     EmployeeId = selectedRequest.EmployeeId,
                     CuttingDate = DateTime.Now
                 };

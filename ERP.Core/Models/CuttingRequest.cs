@@ -26,6 +26,7 @@ namespace ERP.Core.Models
         public Employee? Employee { get; set; }
         
         public int? ActualCutCount { get; set; } // Gerçekte kesilen adet (işçi tarafından girilir)
+        public int? WasteCount { get; set; } // Hurda adedi (işçi tarafından girilir)
         public bool IsRollFinished { get; set; } // Rulo bitti mi? (işçi tarafından işaretlenir)
         
         public string Status { get; set; } = "Beklemede"; // Durum: Beklemede, Kesimde, Tamamlandı, İptal

@@ -18,7 +18,7 @@ namespace ERP.DAL.Repositories
                 connection.Open();
                 var query = @"SELECT cr.Id, cr.OrderId, cr.Hatve, cr.Size, cr.PlateThickness, cr.MachineId, cr.SerialNoId,
                              cr.RequestedPlateCount, cr.OnePlateWeight, cr.TotalRequiredPlateWeight, cr.RemainingKg,
-                             cr.EmployeeId, cr.ActualCutCount, cr.IsRollFinished, cr.Status, cr.RequestDate, cr.CompletionDate,
+                             cr.EmployeeId, cr.ActualCutCount, cr.WasteCount, cr.IsRollFinished, cr.Status, cr.RequestDate, cr.CompletionDate,
                              cr.CreatedDate, cr.ModifiedDate, cr.IsActive,
                              sn.SerialNumber as SerialNumber,
                              m.Name as MachineName,
@@ -56,7 +56,7 @@ namespace ERP.DAL.Repositories
                 connection.Open();
                 var query = @"SELECT cr.Id, cr.OrderId, cr.Hatve, cr.Size, cr.PlateThickness, cr.MachineId, cr.SerialNoId,
                              cr.RequestedPlateCount, cr.OnePlateWeight, cr.TotalRequiredPlateWeight, cr.RemainingKg,
-                             cr.EmployeeId, cr.ActualCutCount, cr.IsRollFinished, cr.Status, cr.RequestDate, cr.CompletionDate,
+                             cr.EmployeeId, cr.ActualCutCount, cr.WasteCount, cr.IsRollFinished, cr.Status, cr.RequestDate, cr.CompletionDate,
                              cr.CreatedDate, cr.ModifiedDate, cr.IsActive,
                              sn.SerialNumber as SerialNumber,
                              m.Name as MachineName,
@@ -96,7 +96,7 @@ namespace ERP.DAL.Repositories
                 connection.Open();
                 var query = @"SELECT cr.Id, cr.OrderId, cr.Hatve, cr.Size, cr.PlateThickness, cr.MachineId, cr.SerialNoId,
                              cr.RequestedPlateCount, cr.OnePlateWeight, cr.TotalRequiredPlateWeight, cr.RemainingKg,
-                             cr.EmployeeId, cr.ActualCutCount, cr.IsRollFinished, cr.Status, cr.RequestDate, cr.CompletionDate,
+                             cr.EmployeeId, cr.ActualCutCount, cr.WasteCount, cr.IsRollFinished, cr.Status, cr.RequestDate, cr.CompletionDate,
                              cr.CreatedDate, cr.ModifiedDate, cr.IsActive,
                              sn.SerialNumber as SerialNumber,
                              m.Name as MachineName,
@@ -132,7 +132,7 @@ namespace ERP.DAL.Repositories
                 connection.Open();
                 var query = @"SELECT cr.Id, cr.OrderId, cr.Hatve, cr.Size, cr.PlateThickness, cr.MachineId, cr.SerialNoId,
                              cr.RequestedPlateCount, cr.OnePlateWeight, cr.TotalRequiredPlateWeight, cr.RemainingKg,
-                             cr.EmployeeId, cr.ActualCutCount, cr.IsRollFinished, cr.Status, cr.RequestDate, cr.CompletionDate,
+                             cr.EmployeeId, cr.ActualCutCount, cr.WasteCount, cr.IsRollFinished, cr.Status, cr.RequestDate, cr.CompletionDate,
                              cr.CreatedDate, cr.ModifiedDate, cr.IsActive,
                              sn.SerialNumber as SerialNumber,
                              m.Name as MachineName,
@@ -176,11 +176,11 @@ namespace ERP.DAL.Repositories
                 connection.Open();
                 var query = @"INSERT INTO CuttingRequests (Id, OrderId, Hatve, Size, PlateThickness, MachineId, SerialNoId,
                              RequestedPlateCount, OnePlateWeight, TotalRequiredPlateWeight, RemainingKg,
-                             EmployeeId, ActualCutCount, IsRollFinished, Status, RequestDate, CompletionDate,
+                             EmployeeId, ActualCutCount, WasteCount, IsRollFinished, Status, RequestDate, CompletionDate,
                              CreatedDate, IsActive) 
                              VALUES (@Id, @OrderId, @Hatve, @Size, @PlateThickness, @MachineId, @SerialNoId,
                              @RequestedPlateCount, @OnePlateWeight, @TotalRequiredPlateWeight, @RemainingKg,
-                             @EmployeeId, @ActualCutCount, @IsRollFinished, @Status, @RequestDate, @CompletionDate,
+                             @EmployeeId, @ActualCutCount, @WasteCount, @IsRollFinished, @Status, @RequestDate, @CompletionDate,
                              @CreatedDate, @IsActive)";
                 
                 using (var command = new SqlCommand(query, connection))
@@ -213,6 +213,7 @@ namespace ERP.DAL.Repositories
                              RemainingKg = @RemainingKg,
                              EmployeeId = @EmployeeId,
                              ActualCutCount = @ActualCutCount,
+                             WasteCount = @WasteCount,
                              IsRollFinished = @IsRollFinished,
                              Status = @Status,
                              RequestDate = @RequestDate,
@@ -324,6 +325,11 @@ namespace ERP.DAL.Repositories
                 request.ActualCutCount = reader.GetInt32("ActualCutCount");
             }
 
+            if (!reader.IsDBNull("WasteCount"))
+            {
+                request.WasteCount = reader.GetInt32("WasteCount");
+            }
+
             if (!reader.IsDBNull("CompletionDate"))
             {
                 request.CompletionDate = reader.GetDateTime("CompletionDate");
@@ -347,6 +353,7 @@ namespace ERP.DAL.Repositories
             command.Parameters.AddWithValue("@RemainingKg", request.RemainingKg);
             command.Parameters.AddWithValue("@EmployeeId", request.EmployeeId.HasValue ? (object)request.EmployeeId.Value : DBNull.Value);
             command.Parameters.AddWithValue("@ActualCutCount", request.ActualCutCount.HasValue ? (object)request.ActualCutCount.Value : DBNull.Value);
+            command.Parameters.AddWithValue("@WasteCount", request.WasteCount.HasValue ? (object)request.WasteCount.Value : DBNull.Value);
             command.Parameters.AddWithValue("@IsRollFinished", request.IsRollFinished);
             command.Parameters.AddWithValue("@Status", request.Status);
             command.Parameters.AddWithValue("@RequestDate", request.RequestDate);
