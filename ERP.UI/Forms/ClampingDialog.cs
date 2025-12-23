@@ -15,10 +15,11 @@ namespace ERP.UI.Forms
         private ComboBox _cmbHatve;
         private ComboBox _cmbSize;
         private TextBox _txtLength;
+        private TextBox _txtResultedCount; // Kaç tane preslenmiş oluşacağı
         private ComboBox _cmbSerialNo;
         private ComboBox _cmbPressing;
         private ComboBox _cmbMachine;
-        private TextBox _txtUsedPlateCount;
+        private TextBox _txtUsedPlateCount; // Kullanılacak Preslenmiş Adet (otomatik hesaplanacak)
         private ComboBox _cmbEmployee;
         private Button _btnAddEmployee;
         private Button _btnSave;
@@ -130,6 +131,7 @@ namespace ERP.UI.Forms
                 Font = new Font("Segoe UI", 10F)
             };
             _cmbHatve.SelectedIndexChanged += FilterPressings;
+            _cmbHatve.SelectedIndexChanged += (s, e) => CalculateUsedPlateCount(); // Hatve değiştiğinde hesaplamayı tetikle
             this.Controls.Add(lblHatve);
             this.Controls.Add(_cmbHatve);
             yPos += spacing;
@@ -151,6 +153,7 @@ namespace ERP.UI.Forms
                 Font = new Font("Segoe UI", 10F)
             };
             _cmbSize.SelectedIndexChanged += FilterPressings;
+            _cmbSize.SelectedIndexChanged += (s, e) => CalculateUsedPlateCount(); // Size değiştiğinde hesaplamayı tetikle
             this.Controls.Add(lblSize);
             this.Controls.Add(_cmbSize);
             yPos += spacing;
@@ -172,6 +175,27 @@ namespace ERP.UI.Forms
             };
             this.Controls.Add(lblLength);
             this.Controls.Add(_txtLength);
+            _txtLength.TextChanged += TxtLength_TextChanged;
+            yPos += spacing;
+
+            // Adet (Kaç tane preslenmiş oluşacağı)
+            var lblResultedCount = new Label
+            {
+                Text = "Adet:",
+                Location = new Point(20, yPos),
+                Width = labelWidth,
+                Font = new Font("Segoe UI", 10F)
+            };
+            _txtResultedCount = new TextBox
+            {
+                Location = new Point(150, yPos - 3),
+                Width = controlWidth,
+                Height = controlHeight,
+                Font = new Font("Segoe UI", 10F)
+            };
+            _txtResultedCount.TextChanged += TxtResultedCount_TextChanged;
+            this.Controls.Add(lblResultedCount);
+            this.Controls.Add(_txtResultedCount);
             yPos += spacing;
 
             // Rulo Seri No (Readonly)
@@ -215,10 +239,10 @@ namespace ERP.UI.Forms
             this.Controls.Add(_cmbMachine);
             yPos += spacing;
 
-            // İstenen Kenetleme Adedi (Mühendis tarafından girilecek)
+            // Kullanılacak Preslenmiş Adet (Otomatik hesaplanacak)
             var lblUsedPlateCount = new Label
             {
-                Text = "İstenen Kenetleme Adedi:",
+                Text = "Kullanılacak Preslenmiş Adet:",
                 Location = new Point(20, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold)
@@ -228,7 +252,9 @@ namespace ERP.UI.Forms
                 Location = new Point(150, yPos - 3),
                 Width = controlWidth,
                 Height = controlHeight,
-                Font = new Font("Segoe UI", 10F)
+                Font = new Font("Segoe UI", 10F),
+                ReadOnly = true,
+                BackColor = Color.FromArgb(255, 240, 248, 255)
             };
             this.Controls.Add(lblUsedPlateCount);
             this.Controls.Add(_txtUsedPlateCount);
@@ -358,18 +384,22 @@ namespace ERP.UI.Forms
                     .Where(p => p.PressCount > 0 && p.IsActive)
                     .ToList();
 
-                // Farklı Hatve değerlerini al
+                // Farklı Hatve değerlerini al ve H, D, M, L olarak göster
                 var hatveValues = allPressings
                     .Select(p => p.Hatve)
                     .Distinct()
                     .OrderBy(h => h)
                     .ToList();
                 _cmbHatve.Items.Clear();
-                _cmbHatve.Items.Add(""); // Boş seçenek
                 foreach (var hatve in hatveValues)
                 {
-                    _cmbHatve.Items.Add(hatve.ToString("F2", CultureInfo.InvariantCulture));
+                    // Hatve değerini harfe çevir (gösterim için)
+                    string hatveDisplay = GetHatveLetter(hatve);
+                    // Değer olarak sayısal hatve'yi sakla (obj olarak)
+                    _cmbHatve.Items.Add(new { Display = hatveDisplay, Value = hatve });
                 }
+                _cmbHatve.DisplayMember = "Display";
+                _cmbHatve.ValueMember = "Value";
 
                 // Farklı Size değerlerini al
                 var sizeValues = allPressings
@@ -410,7 +440,7 @@ namespace ERP.UI.Forms
                 _cmbPressing.Items.Clear();
                 
                 // Hatve, Ölçü, Plaka Kalınlığı seçildiyse filtreleme yap
-                if (_cmbHatve.SelectedItem == null || string.IsNullOrWhiteSpace(_cmbHatve.SelectedItem.ToString()) ||
+                if (_cmbHatve.SelectedItem == null ||
                     _cmbSize.SelectedItem == null || string.IsNullOrWhiteSpace(_cmbSize.SelectedItem.ToString()) ||
                     _cmbPlateThickness.SelectedItem == null || string.IsNullOrWhiteSpace(_cmbPlateThickness.SelectedItem.ToString()))
                 {
@@ -419,7 +449,8 @@ namespace ERP.UI.Forms
                     return;
                 }
 
-                if (!decimal.TryParse(_cmbHatve.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out decimal hatve) ||
+                decimal hatve = GetHatveValue(_cmbHatve);
+                if (hatve == 0 ||
                     !decimal.TryParse(_cmbSize.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out decimal size) ||
                     !decimal.TryParse(_cmbPlateThickness.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out decimal plateThickness))
                 {
@@ -455,19 +486,23 @@ namespace ERP.UI.Forms
                 
                 foreach (var pressing in filteredList)
                 {
-                    // Daha önce kenetlenmiş plaka adedini hesapla (tamamlanmış kenetleme taleplerinden)
-                    var usedPlateCount = _clampingRequestRepository.GetAll()
+                    // Tamamlanmış kenetleme taleplerinden kullanılanları hesapla
+                    var completedUsedPlateCount = _clampingRequestRepository.GetAll()
                         .Where(cr => cr.PressingId == pressing.Id && cr.IsActive && cr.Status == "Tamamlandı")
                         .Sum(cr => cr.ActualClampCount ?? cr.RequestedClampCount);
                     
-                    // Ayrıca eski Clamping kayıtlarından da kullanılanları hesapla (geriye dönük uyumluluk için)
-                    var oldUsedPlateCount = _clampingRepository.GetAll()
-                        .Where(c => c.PressingId == pressing.Id && c.IsActive)
-                        .Sum(c => c.UsedPlateCount);
+                    // Beklemede olan kenetleme taleplerinden rezerve edilenleri hesapla (RequestedClampCount)
+                    var pendingReservedPlateCount = _clampingRequestRepository.GetAll()
+                        .Where(cr => cr.PressingId == pressing.Id && cr.IsActive && cr.Status != "Tamamlandı" && cr.Status != "İptal")
+                        .Sum(cr => cr.RequestedClampCount);
                     
-                    var totalUsedCount = usedPlateCount + oldUsedPlateCount;
+                    // NOT: Clamping kayıtlarını saymıyoruz çünkü onlar zaten ClampingRequest'lerden oluşturuluyor (çift sayım olur)
+                    // Eğer eski sistemden kalma Clamping kayıtları varsa (PressingId olmayan), onlar farklı bir mantıkla işlenmeli
+                    
+                    var totalUsedCount = completedUsedPlateCount + pendingReservedPlateCount;
                     var availablePlateCount = pressing.PressCount - totalUsedCount;
                     
+                    // Kalan stok varsa göster (kısmen kullanılmış olsa bile)
                     if (availablePlateCount > 0)
                     {
                         // Sipariş bilgisini al
@@ -477,7 +512,7 @@ namespace ERP.UI.Forms
                         _cmbPressing.Items.Add(new 
                         { 
                             Id = pressing.Id, 
-                            DisplayText = $"Pres #{pressing.PressingDate:dd.MM.yyyy}{orderInfo} - {pressing.PressCount} adet (Kalan: {availablePlateCount})",
+                            DisplayText = $"Pres #{orderInfo} - {pressing.PressCount} adet (Kalan: {availablePlateCount})",
                             Pressing = pressing
                         });
                     }
@@ -664,12 +699,13 @@ namespace ERP.UI.Forms
                     OrderId = orderId,
                     PressingId = pressingId,
                     PlateThickness = decimal.Parse(_cmbPlateThickness.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture),
-                    Hatve = decimal.Parse(_cmbHatve.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture),
+                    Hatve = GetHatveValue(_cmbHatve),
                     Size = decimal.Parse(_cmbSize.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture),
                     Length = decimal.Parse(_txtLength.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
                     SerialNoId = pressing?.SerialNoId,
                     MachineId = _cmbMachine.SelectedItem != null ? GetSelectedId(_cmbMachine) : (Guid?)null,
-                    RequestedClampCount = int.Parse(_txtUsedPlateCount.Text), // İstenen Kenetleme Adedi
+                    RequestedClampCount = int.Parse(_txtUsedPlateCount.Text), // Kullanılacak Preslenmiş Adet (otomatik hesaplanan)
+                    ResultedClampCount = int.Parse(_txtResultedCount.Text), // Adet (kullanıcının girdiği)
                     EmployeeId = _cmbEmployee.SelectedItem != null ? GetSelectedId(_cmbEmployee) : (Guid?)null,
                     Status = "Beklemede",
                     RequestDate = DateTime.Now
@@ -694,7 +730,7 @@ namespace ERP.UI.Forms
                 return false;
             }
 
-            if (_cmbHatve.SelectedItem == null || string.IsNullOrWhiteSpace(_cmbHatve.SelectedItem.ToString()))
+            if (_cmbHatve.SelectedItem == null || GetHatveValue(_cmbHatve) == 0)
             {
                 MessageBox.Show("Lütfen hatve seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
@@ -718,30 +754,40 @@ namespace ERP.UI.Forms
                 return false;
             }
 
-            if (string.IsNullOrWhiteSpace(_txtUsedPlateCount.Text) || !int.TryParse(_txtUsedPlateCount.Text, out int requestedClampCount) || requestedClampCount <= 0)
+            if (string.IsNullOrWhiteSpace(_txtResultedCount.Text) || !int.TryParse(_txtResultedCount.Text, out int resultedCount) || resultedCount <= 0)
             {
-                MessageBox.Show("Lütfen geçerli bir istenen kenetleme adedi giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Lütfen geçerli bir adet giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
 
-            // Preslenmiş stok kontrolü
+            if (string.IsNullOrWhiteSpace(_txtUsedPlateCount.Text) || !int.TryParse(_txtUsedPlateCount.Text, out int requestedClampCount) || requestedClampCount <= 0)
+            {
+                MessageBox.Show("Kullanılacak preslenmiş adet hesaplanamadı. Lütfen uzunluk, adet ve hatve değerlerini kontrol ediniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+
+            // Preslenmiş stok kontrolü - kullanıcı zaten düşmüş halini yazıyor, bu yüzden sadece kontrol ediyoruz, düşme yapmıyoruz
+            // Not: Stok düşmesi ProductionDetailForm'da kenetleme onaylanırken yapılıyor
             var pressingId = GetSelectedId(_cmbPressing);
             var pressing = _pressingRepository.GetAll().FirstOrDefault(p => p.Id == pressingId);
             if (pressing != null)
             {
                 // Tamamlanmış kenetleme taleplerinden kullanılanları hesapla
-                var usedPlateCount = _clampingRequestRepository.GetAll()
+                var completedUsedPlateCount = _clampingRequestRepository.GetAll()
                     .Where(cr => cr.PressingId == pressingId && cr.IsActive && cr.Status == "Tamamlandı")
                     .Sum(cr => cr.ActualClampCount ?? cr.RequestedClampCount);
                 
-                // Eski Clamping kayıtlarından da kullanılanları hesapla
-                var oldUsedPlateCount = _clampingRepository.GetAll()
-                    .Where(c => c.PressingId == pressingId && c.IsActive)
-                    .Sum(c => c.UsedPlateCount);
+                // Beklemede olan kenetleme taleplerinden rezerve edilenleri hesapla (RequestedClampCount)
+                var pendingReservedPlateCount = _clampingRequestRepository.GetAll()
+                    .Where(cr => cr.PressingId == pressingId && cr.IsActive && cr.Status != "Tamamlandı" && cr.Status != "İptal")
+                    .Sum(cr => cr.RequestedClampCount);
                 
-                var totalUsedCount = usedPlateCount + oldUsedPlateCount;
+                // NOT: Clamping kayıtlarını saymıyoruz çünkü onlar zaten ClampingRequest'lerden oluşturuluyor (çift sayım olur)
+                
+                var totalUsedCount = completedUsedPlateCount + pendingReservedPlateCount;
                 var availablePlateCount = pressing.PressCount - totalUsedCount;
                 
+                // Kullanıcı zaten düşmüş halini yazıyor (RequestedClampCount), bu yüzden sadece kontrol ediyoruz
                 if (requestedClampCount > availablePlateCount)
                 {
                     MessageBox.Show($"İstenen kenetleme adedi kalan preslenmiş plaka adedinden fazla olamaz! (Kalan: {availablePlateCount}, İstenen: {requestedClampCount})", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -759,6 +805,158 @@ namespace ERP.UI.Forms
 
             var idProperty = comboBox.SelectedItem.GetType().GetProperty("Id");
             return (Guid)idProperty.GetValue(comboBox.SelectedItem);
+        }
+
+        private string GetHatveLetter(decimal hatveValue)
+        {
+            // Hatve değerlerini harfe çevir: 3.25=H, 4.5=D, 6.5=M, 9=L
+            const decimal tolerance = 0.1m;
+            
+            if (Math.Abs(hatveValue - 3.25m) < tolerance || Math.Abs(hatveValue - 3.10m) < tolerance)
+                return "H";
+            else if (Math.Abs(hatveValue - 4.5m) < tolerance || Math.Abs(hatveValue - 4.3m) < tolerance)
+                return "D";
+            else if (Math.Abs(hatveValue - 6.5m) < tolerance || Math.Abs(hatveValue - 6.3m) < tolerance || Math.Abs(hatveValue - 6.4m) < tolerance)
+                return "M";
+            else if (Math.Abs(hatveValue - 9m) < tolerance || Math.Abs(hatveValue - 8.7m) < tolerance || Math.Abs(hatveValue - 8.65m) < tolerance)
+                return "L";
+            else
+                return hatveValue.ToString("F2", CultureInfo.InvariantCulture); // Eğer tanınmazsa sayısal göster
+        }
+
+        private decimal GetHatveValue(ComboBox cmbHatve)
+        {
+            if (cmbHatve.SelectedItem == null)
+                return 0;
+
+            string selectedItemStr = cmbHatve.SelectedItem.ToString();
+            if (string.IsNullOrWhiteSpace(selectedItemStr) || selectedItemStr == "")
+                return 0;
+
+            // Eğer obje ise Value property'sinden al
+            var valueProperty = cmbHatve.SelectedItem.GetType().GetProperty("Value");
+            if (valueProperty != null)
+            {
+                return (decimal)valueProperty.GetValue(cmbHatve.SelectedItem);
+            }
+
+            // Eğer string ise parse et (geriye dönük uyumluluk için)
+            if (decimal.TryParse(selectedItemStr, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal hatve))
+            {
+                return hatve;
+            }
+
+            return 0;
+        }
+
+        private void TxtLength_TextChanged(object sender, EventArgs e)
+        {
+            CalculateUsedPlateCount();
+        }
+
+        private void TxtResultedCount_TextChanged(object sender, EventArgs e)
+        {
+            CalculateUsedPlateCount();
+        }
+
+        private void CalculateUsedPlateCount()
+        {
+            try
+            {
+                // Uzunluk ve Adet girilmiş mi kontrol et
+                if (string.IsNullOrWhiteSpace(_txtLength.Text) || string.IsNullOrWhiteSpace(_txtResultedCount.Text))
+                {
+                    _txtUsedPlateCount.Text = "";
+                    return;
+                }
+
+                if (!decimal.TryParse(_txtLength.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal length) || length <= 0)
+                {
+                    _txtUsedPlateCount.Text = "";
+                    return;
+                }
+
+                if (!int.TryParse(_txtResultedCount.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out int resultedCount) || resultedCount <= 0)
+                {
+                    _txtUsedPlateCount.Text = "";
+                    return;
+                }
+
+                // Hatve değerini al
+                decimal hatve = GetHatveValue(_cmbHatve);
+                if (hatve == 0)
+                {
+                    _txtUsedPlateCount.Text = "";
+                    return;
+                }
+
+                // Size (plaka ölçüsü) al - dinamik hatve hesaplama için
+                decimal plakaOlcusuCM = 0;
+                if (_cmbSize.SelectedItem != null && 
+                    decimal.TryParse(_cmbSize.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out plakaOlcusuCM))
+                {
+                    // Hatve tipini belirle
+                    string hatveLetter = GetHatveLetter(hatve);
+                    if (!string.IsNullOrEmpty(hatveLetter) && (hatveLetter == "H" || hatveLetter == "D" || hatveLetter == "M" || hatveLetter == "L"))
+                    {
+                        char hatveTipi = hatveLetter[0];
+                        // Dinamik hatve hesapla (rapor tarafındaki gibi)
+                        var hatveOlcumu = GetHatveOlcumu(hatveTipi, plakaOlcusuCM);
+                        if (hatveOlcumu.HasValue)
+                        {
+                            hatve = hatveOlcumu.Value;
+                        }
+                    }
+                }
+
+                // Hesaplama: (Uzunluk / Hatve) yukarı yuvarla * Adet
+                decimal birTaneIcinDeger = length / hatve;
+                int birTaneIcinYuvarlanmis = (int)Math.Ceiling(birTaneIcinDeger);
+                int kullanilacakAdet = birTaneIcinYuvarlanmis * resultedCount;
+
+                _txtUsedPlateCount.Text = kullanilacakAdet.ToString();
+            }
+            catch
+            {
+                _txtUsedPlateCount.Text = "";
+            }
+        }
+
+        private decimal? GetHatveOlcumu(char hatveTipi, decimal plakaOlcusuCM)
+        {
+            // Plaka ölçüsünü cm cinsinden al (20, 30, 40, 50, 60, 70, 80, 100 gibi)
+            // En yakın 10'a yuvarla (örn: 21-29 -> 20, 31-39 -> 30)
+            int plakaOlcusuYuvarla = (int)Math.Round(plakaOlcusuCM / 10.0m, MidpointRounding.AwayFromZero) * 10;
+            
+            char hatveTipiUpper = char.ToUpper(hatveTipi);
+            
+            // Hatve tipi ve plaka ölçüsüne göre hatve değerini döndür
+            switch (hatveTipiUpper)
+            {
+                case 'H':
+                    // H20, H30, H40, H50: 3.10
+                    if (plakaOlcusuYuvarla == 20 || plakaOlcusuYuvarla == 30 || plakaOlcusuYuvarla == 40 || plakaOlcusuYuvarla == 50)
+                        return 3.10m;
+                    break;
+                case 'M':
+                    // M30: 6.4, M40: 6.3, M50: 6.4, M60: 6.3, M70: 6.5, M80: 6.5, M100: 6.5
+                    if (plakaOlcusuYuvarla == 30 || plakaOlcusuYuvarla == 50) return 6.4m;
+                    if (plakaOlcusuYuvarla == 40 || plakaOlcusuYuvarla == 60) return 6.3m;
+                    if (plakaOlcusuYuvarla == 70 || plakaOlcusuYuvarla == 80 || plakaOlcusuYuvarla == 100) return 6.5m;
+                    break;
+                case 'D':
+                    // D30: 4.5, D40: 4.5, D50: 4.5, D60: 4.3
+                    if (plakaOlcusuYuvarla == 30 || plakaOlcusuYuvarla == 40 || plakaOlcusuYuvarla == 50) return 4.5m;
+                    if (plakaOlcusuYuvarla == 60) return 4.3m;
+                    break;
+                case 'L':
+                    // L30: 8.7, L40: 8.7, L50: 8.7, L60: 8.65, L70: 8.65, L80: 8.65, L100: 8.65
+                    if (plakaOlcusuYuvarla == 30 || plakaOlcusuYuvarla == 40 || plakaOlcusuYuvarla == 50) return 8.7m;
+                    if (plakaOlcusuYuvarla == 60 || plakaOlcusuYuvarla == 70 || plakaOlcusuYuvarla == 80 || plakaOlcusuYuvarla == 100) return 8.65m;
+                    break;
+            }
+            
+            return null; // Eğer eşleşme bulunamazsa null döndür
         }
     }
 }

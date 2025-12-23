@@ -706,10 +706,26 @@ namespace ERP.UI.Forms
                 // Yükseklik (mm) - Rapor için kapaksız yükseklik kullanılır
                 int yukseklikMM = raporYukseklikMM > 0 ? raporYukseklikMM : 0;
                 
-                // Eğer raporYukseklikMM hesaplanamadıysa, direkt yükseklikMM'den al
-                if (yukseklikMM == 0 && int.TryParse(txtYukseklikMM.Text, out int yukseklikMMFromText))
+                // Eğer raporYukseklikMM hesaplanamadıysa, txtYukseklikCom kullan (kapak boyu çıkarılmış)
+                if (yukseklikMM == 0 && txtYukseklikCom != null && int.TryParse(txtYukseklikCom.Text, out int yukseklikComFromText))
                 {
-                    yukseklikMM = yukseklikMMFromText;
+                    yukseklikMM = yukseklikComFromText;
+                }
+                // Eğer txtYukseklikCom da yoksa, yükseklikMM'den kapak boyunu çıkar
+                else if (yukseklikMM == 0 && int.TryParse(txtYukseklikMM.Text, out int yukseklikMMFromText))
+                {
+                    // Yükseklik 1800 üzerindeyse 2'ye böl
+                    int yukseklikCom = yukseklikMMFromText <= 1800 ? yukseklikMMFromText : yukseklikMMFromText / 2;
+                    
+                    // Kapak boyunu çıkar
+                    if (txtKapakBoyuMM != null && int.TryParse(txtKapakBoyuMM.Text, out int kapakBoyuMM))
+                    {
+                        yukseklikMM = yukseklikCom - kapakBoyuMM;
+                    }
+                    else
+                    {
+                        yukseklikMM = yukseklikCom;
+                    }
                 }
                 
                 if (yukseklikMM > 0 &&
@@ -2365,7 +2381,7 @@ namespace ERP.UI.Forms
             AddClampingColumn(dataGridView, "Hatve", "Hatve", 60);
             AddClampingColumn(dataGridView, "Size", "Ölçü", 70);
             AddClampingColumn(dataGridView, "Length", "Uzunluk", 80);
-            AddClampingColumn(dataGridView, "ClampCount", "Adet", 70);
+            AddClampingColumn(dataGridView, "ClampCount", "Adet", 70, readOnly: false); // Editable - sadece bekleyen talepler için
             AddClampingColumn(dataGridView, "Customer", "Müşteri", 130);
             AddClampingColumn(dataGridView, "UsedPlateCount", "Kullanılan Plaka Adedi", 140);
             AddClampingColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 110);
@@ -2405,12 +2421,18 @@ namespace ERP.UI.Forms
             // Event handler
             btnEkle.Click += (s, e) => BtnClampingEkle_Click(dataGridView);
             btnOnayla.Click += (s, e) => BtnClampingRequestOnayla_Click(dataGridView);
+            
+            // CellValueChanged event'i - Adet değiştiğinde kaydet (sadece bekleyen talepler için)
+            dataGridView.CellValueChanged += (s, e) => ClampingDataGridView_CellValueChanged(s, e, dataGridView);
+            
+            // CellBeginEdit event'i - Sadece bekleyen talepler için editable yap
+            dataGridView.CellBeginEdit += (s, e) => ClampingDataGridView_CellBeginEdit(s, e, dataGridView);
 
             // Verileri yükle
             LoadClampingData(dataGridView);
         }
 
-        private void AddClampingColumn(DataGridView dgv, string dataPropertyName, string headerText, int width)
+        private void AddClampingColumn(DataGridView dgv, string dataPropertyName, string headerText, int width, bool readOnly = true)
         {
             var column = new DataGridViewTextBoxColumn
             {
@@ -2419,7 +2441,7 @@ namespace ERP.UI.Forms
                 Name = dataPropertyName,
                 Width = width,
                 Visible = true,
-                ReadOnly = true
+                ReadOnly = readOnly
             };
             dgv.Columns.Add(column);
         }
@@ -2429,9 +2451,9 @@ namespace ERP.UI.Forms
             try
             {
                 var order = _orderRepository.GetById(_orderId);
-                int kapakBoyuMM = GetKapakBoyuFromOrder(order);
                 
                 // Onaylanmış kenetleme kayıtları
+                // NOT: Kenetlemede kapaksız üretim yapıldığı için uzunluktan kapak boyu çıkarılmıyor
                 var clampings = _clampingRepository.GetByOrderId(_orderId);
                 var completedData = clampings.Select(c => new
                 {
@@ -2440,7 +2462,7 @@ namespace ERP.UI.Forms
                     OrderNo = order?.TrexOrderNo ?? "",
                     Hatve = GetHatveLetter(c.Hatve),
                     Size = c.Size.ToString("F2", CultureInfo.InvariantCulture),
-                    Length = (c.Length - kapakBoyuMM).ToString("F2", CultureInfo.InvariantCulture),
+                    Length = c.Length.ToString("F2", CultureInfo.InvariantCulture), // Kapaksız - doğrudan uzunluk
                     ClampCount = c.ClampCount.ToString(),
                     Customer = order?.Company?.Name ?? "",
                     UsedPlateCount = c.UsedPlateCount.ToString(),
@@ -2452,6 +2474,7 @@ namespace ERP.UI.Forms
                 }).ToList();
 
                 // Bekleyen kenetleme talepleri
+                // NOT: Kenetlemede kapaksız üretim yapıldığı için uzunluktan kapak boyu çıkarılmıyor
                 var requests = _clampingRequestRepository.GetByOrderId(_orderId)
                     .Where(r => r.Status != "Tamamlandı" && r.Status != "İptal")
                     .Select(r => new
@@ -2461,7 +2484,7 @@ namespace ERP.UI.Forms
                         OrderNo = order?.TrexOrderNo ?? "",
                         Hatve = GetHatveLetter(r.Hatve),
                         Size = r.Size.ToString("F2", CultureInfo.InvariantCulture),
-                        Length = (r.Length - kapakBoyuMM).ToString("F2", CultureInfo.InvariantCulture),
+                        Length = r.Length.ToString("F2", CultureInfo.InvariantCulture), // Kapaksız - doğrudan uzunluk
                         ClampCount = r.ResultedClampCount?.ToString() ?? "-",
                         Customer = order?.Company?.Name ?? "",
                         UsedPlateCount = r.ActualClampCount?.ToString() ?? "-",
@@ -2491,7 +2514,7 @@ namespace ERP.UI.Forms
                     AddClampingColumn(dataGridView, "Hatve", "Hatve", 60);
                     AddClampingColumn(dataGridView, "Size", "Ölçü", 70);
                     AddClampingColumn(dataGridView, "Length", "Uzunluk", 80);
-                    AddClampingColumn(dataGridView, "ClampCount", "Adet", 70);
+                    AddClampingColumn(dataGridView, "ClampCount", "Adet", 70, readOnly: false); // Editable - sadece bekleyen talepler için
                     AddClampingColumn(dataGridView, "Customer", "Müşteri", 130);
                     AddClampingColumn(dataGridView, "UsedPlateCount", "Kullanılan Plaka Adedi", 140);
                     AddClampingColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 110);
@@ -2721,6 +2744,107 @@ namespace ERP.UI.Forms
             catch (Exception ex)
             {
                 MessageBox.Show("Kenetleme talebi onaylanırken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void ClampingDataGridView_CellBeginEdit(object sender, DataGridViewCellCancelEventArgs e, DataGridView dataGridView)
+        {
+            // Sadece ClampCount kolonu için ve sadece bekleyen talepler için editable yap
+            if (e.ColumnIndex < 0 || e.RowIndex < 0)
+                return;
+
+            var columnName = dataGridView.Columns[e.ColumnIndex].Name;
+            if (columnName != "ClampCount")
+            {
+                e.Cancel = true;
+                return;
+            }
+
+            // Tamamlanmış kayıtlar için düzenlemeyi engelle
+            var row = dataGridView.Rows[e.RowIndex];
+            if (row.DataBoundItem != null)
+            {
+                var item = row.DataBoundItem;
+                var statusProperty = item.GetType().GetProperty("Status");
+                if (statusProperty != null)
+                {
+                    var status = statusProperty.GetValue(item)?.ToString();
+                    if (status == "Tamam" || status == "Tamamlandı")
+                    {
+                        e.Cancel = true; // Tamamlanmış kayıtlar düzenlenemez
+                        return;
+                    }
+                }
+            }
+        }
+
+        private void ClampingDataGridView_CellValueChanged(object sender, DataGridViewCellEventArgs e, DataGridView dataGridView)
+        {
+            // Sadece ClampCount kolonu için kaydet
+            if (e.RowIndex < 0 || e.ColumnIndex < 0)
+                return;
+
+            var columnName = dataGridView.Columns[e.ColumnIndex].Name;
+            if (columnName != "ClampCount")
+                return;
+
+            try
+            {
+                var row = dataGridView.Rows[e.RowIndex];
+                if (row.DataBoundItem == null)
+                    return;
+
+                // Id'yi al
+                Guid requestId = Guid.Empty;
+                var item = row.DataBoundItem;
+                var idProperty = item.GetType().GetProperty("Id");
+                if (idProperty != null)
+                {
+                    requestId = (Guid)idProperty.GetValue(item);
+                }
+
+                if (requestId == Guid.Empty)
+                    return;
+
+                // Status kontrolü - sadece bekleyen talepler için kaydet
+                var statusProperty = item.GetType().GetProperty("Status");
+                if (statusProperty != null)
+                {
+                    var status = statusProperty.GetValue(item)?.ToString();
+                    if (status == "Tamam" || status == "Tamamlandı")
+                    {
+                        LoadClampingData(dataGridView); // Veriyi yeniden yükle
+                        return; // Tamamlanmış kayıtlar güncellenemez
+                    }
+                }
+
+                var request = _clampingRequestRepository.GetById(requestId);
+                if (request == null)
+                    return;
+
+                // Yeni değeri al
+                var newValueStr = dataGridView.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString();
+                if (string.IsNullOrWhiteSpace(newValueStr) || newValueStr == "-")
+                {
+                    request.ResultedClampCount = null;
+                }
+                else if (int.TryParse(newValueStr, out int newValue))
+                {
+                    request.ResultedClampCount = newValue;
+                }
+                else
+                {
+                    MessageBox.Show("Lütfen geçerli bir sayı giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    LoadClampingData(dataGridView); // Veriyi yeniden yükle
+                    return;
+                }
+
+                _clampingRequestRepository.Update(request);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Adet kaydedilirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                LoadClampingData(dataGridView); // Hata durumunda veriyi yeniden yükle
             }
         }
 

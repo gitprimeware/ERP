@@ -95,47 +95,38 @@ namespace ERP.UI.Forms
             };
 
             // Kolonları ekle
-            // Id kolonu (gizli)
-            var colId = new DataGridViewTextBoxColumn
-            {
-                DataPropertyName = "Id",
-                HeaderText = "Id",
-                Name = "Id",
-                Width = 0,
-                Visible = false
-            };
-            _dataGridView.Columns.Add(colId);
+            // Id kolonu kaldırıldı (görünür değil, sadece veri erişimi için LoadData'da anonymous object'te tutuluyor)
             
             AddClampingRequestColumn("Hatve", "Hatve", 80);
             AddClampingRequestColumn("Size", "Ölçü", 80);
             AddClampingRequestColumn("PlateThickness", "Plaka Kalınlığı", 120);
             AddClampingRequestColumn("Length", "Uzunluk", 100);
             AddClampingRequestColumn("SerialNumber", "Rulo Seri No", 120);
-            AddClampingRequestColumn("RequestedClampCount", "İstenen Kenetleme", 150);
+            AddClampingRequestColumn("RequestedClampCount", "Kullanılacak Pres Sayısı", 150);
             
-            // Kaç Tane Preslenmiş Kenetleneceği - buton kolonu
+            // Kullanılan Pres Adedi - buton kolonu
             var colActualClampCount = new DataGridViewButtonColumn
             {
-                HeaderText = "Kaç Tane Preslenmiş Kenetleneceği",
+                HeaderText = "Kullanılan Pres Adedi",
                 Name = "ActualClampCount",
-                Width = 200,
+                Width = 180,
                 Text = "Gir",
                 UseColumnTextForButtonValue = false // Dinamik buton metni için false
             };
             colActualClampCount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             _dataGridView.Columns.Add(colActualClampCount);
             
-            // Kaç Tane Oluştu - buton kolonu
-            var colResultedClampCount = new DataGridViewButtonColumn
+            // Adet - readonly TextBox kolonu (ClampingDialog'dan RequestedClampCount gelir)
+            var colAdet = new DataGridViewTextBoxColumn
             {
-                HeaderText = "Kaç Tane Oluştu",
-                Name = "ResultedClampCount",
+                DataPropertyName = "Adet",
+                HeaderText = "Adet",
+                Name = "Adet",
                 Width = 150,
-                Text = "Gir",
-                UseColumnTextForButtonValue = false // Dinamik buton metni için false
+                ReadOnly = true // Sabit - ClampingDialog'dan gelir
             };
-            colResultedClampCount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            _dataGridView.Columns.Add(colResultedClampCount);
+            colAdet.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            _dataGridView.Columns.Add(colAdet);
             
             AddClampingRequestColumn("Status", "Durum", 100);
 
@@ -219,7 +210,7 @@ namespace ERP.UI.Forms
                         SerialNumber = r.SerialNo?.SerialNumber ?? "",
                         RequestedClampCount = r.RequestedClampCount.ToString(),
                         ActualClampCount = r.ActualClampCount.HasValue ? r.ActualClampCount.Value.ToString() : "",
-                        ResultedClampCount = r.ResultedClampCount.HasValue ? r.ResultedClampCount.Value.ToString() : "",
+                        Adet = r.ResultedClampCount?.ToString() ?? "", // ClampingDialog'dan gelen Adet (_txtResultedCount)
                         Status = r.Status
                     };
                 }).ToList();
@@ -269,26 +260,7 @@ namespace ERP.UI.Forms
                             }
                         }
                     }
-                    // ResultedClampCount buton kolonu için
-                    else if (columnName == "ResultedClampCount")
-                    {
-                        var resultedClampCountProperty = item.GetType().GetProperty("ResultedClampCount");
-                        if (resultedClampCountProperty != null)
-                        {
-                            var resultedClampCountValue = resultedClampCountProperty.GetValue(item)?.ToString();
-                            
-                            if (!string.IsNullOrWhiteSpace(resultedClampCountValue))
-                            {
-                                e.Value = $"Girildi ({resultedClampCountValue})";
-                                e.FormattingApplied = true;
-                            }
-                            else
-                            {
-                                e.Value = "Gir";
-                                e.FormattingApplied = true;
-                            }
-                        }
-                    }
+                    // ResultedClampCount artık buton değil, TextBox - formatting'e gerek yok
                 }
             }
         }
@@ -299,7 +271,7 @@ namespace ERP.UI.Forms
                 return;
 
             var columnName = _dataGridView.Columns[e.ColumnIndex].Name;
-            if (columnName != "ActualClampCount" && columnName != "ResultedClampCount")
+            if (columnName != "ActualClampCount")
                 return;
 
             try
@@ -331,17 +303,6 @@ namespace ERP.UI.Forms
                     if (actualClampCount.HasValue)
                     {
                         request.ActualClampCount = actualClampCount.Value;
-                        request.Status = "Kenetmede";
-                        _clampingRequestRepository.Update(request);
-                        LoadData();
-                    }
-                }
-                else if (columnName == "ResultedClampCount")
-                {
-                    int? resultedClampCount = ShowResultedClampCountDialog(request);
-                    if (resultedClampCount.HasValue)
-                    {
-                        request.ResultedClampCount = resultedClampCount.Value;
                         request.Status = "Kenetmede";
                         _clampingRequestRepository.Update(request);
                         LoadData();
@@ -393,86 +354,6 @@ namespace ERP.UI.Forms
                     Minimum = 0,
                     Maximum = 999999,
                     Value = request.ActualClampCount ?? request.RequestedClampCount,
-                    DecimalPlaces = 0,
-                    Font = new Font("Segoe UI", 10F)
-                };
-
-                var btnOk = new Button
-                {
-                    Text = "Tamam",
-                    DialogResult = DialogResult.OK,
-                    Location = new Point(200, 130),
-                    Width = 80,
-                    BackColor = ThemeColors.Success,
-                    ForeColor = Color.White,
-                    FlatStyle = FlatStyle.Flat
-                };
-                btnOk.FlatAppearance.BorderSize = 0;
-
-                var btnCancel = new Button
-                {
-                    Text = "İptal",
-                    DialogResult = DialogResult.Cancel,
-                    Location = new Point(290, 130),
-                    Width = 80,
-                    BackColor = ThemeColors.Secondary,
-                    ForeColor = Color.White,
-                    FlatStyle = FlatStyle.Flat
-                };
-                btnCancel.FlatAppearance.BorderSize = 0;
-
-                dialog.Controls.AddRange(new Control[] { lblInfo, lblAdet, txtAdet, btnOk, btnCancel });
-                dialog.AcceptButton = btnOk;
-                dialog.CancelButton = btnCancel;
-
-                if (dialog.ShowDialog() == DialogResult.OK)
-                {
-                    return (int)txtAdet.Value;
-                }
-            }
-
-            return null;
-        }
-
-        private int? ShowResultedClampCountDialog(ClampingRequest request)
-        {
-            using (var dialog = new Form
-            {
-                Text = "Kaç Tane Oluştu",
-                Width = 400,
-                Height = 200,
-                StartPosition = FormStartPosition.CenterParent,
-                FormBorderStyle = FormBorderStyle.FixedDialog,
-                MaximizeBox = false,
-                MinimizeBox = false,
-                BackColor = ThemeColors.Background
-            })
-            {
-                var lblInfo = new Label
-                {
-                    Text = $"Kenetlenecek: {request.ActualClampCount?.ToString() ?? "-"} adet\n\nKaç tane kenetlenmiş oluştu?",
-                    Location = new Point(20, 20),
-                    Width = 350,
-                    Height = 60,
-                    AutoSize = false,
-                    Font = new Font("Segoe UI", 10F)
-                };
-
-                var lblAdet = new Label
-                {
-                    Text = "Oluşan Adet:",
-                    Location = new Point(20, 90),
-                    AutoSize = true,
-                    Font = new Font("Segoe UI", 10F)
-                };
-
-                var txtAdet = new NumericUpDown
-                {
-                    Location = new Point(150, 87),
-                    Width = 200,
-                    Minimum = 0,
-                    Maximum = 999999,
-                    Value = request.ResultedClampCount ?? (request.ActualClampCount ?? 0),
                     DecimalPlaces = 0,
                     Font = new Font("Segoe UI", 10F)
                 };
