@@ -617,25 +617,25 @@ namespace ERP.UI.Forms
                 {
                     var parsedData = ParseProductCodeForTable(o.ProductCode);
                     return new
-                    {
-                        o.Id,
-                        o.TrexOrderNo,
-                        o.ProductCode,
+            {
+                o.Id,
+                o.TrexOrderNo,
+                o.ProductCode,
                         Hatve = parsedData.Hatve,
                         PlakaOlcusu = parsedData.PlakaOlcusu,
                         Yukseklik = parsedData.Yukseklik,
                         Kapak = parsedData.Kapak,
                         Profil = parsedData.Profil,
-                        o.Quantity,
+                o.Quantity,
                         LamelThickness = o.LamelThickness.HasValue ? o.LamelThickness.Value.ToString("0.000", System.Globalization.CultureInfo.GetCultureInfo("tr-TR")) : "",
                         CompanyName = o.Company?.Name ?? "",
                         TermDate = o.TermDate.ToString("dd.MM.yyyy", System.Globalization.CultureInfo.GetCultureInfo("tr-TR")),
                         StatusText = GetStatusText(o),
-                        o.Status,
+                o.Status,
                         IsInProduction = o.Status == "Üretimde",
                         IsStockOrder = o.IsStockOrder
                     };
-                }).ToList();
+            }).ToList();
 
             _dataGridView.Tag = orders; // Orijinal order listesini sakla
 

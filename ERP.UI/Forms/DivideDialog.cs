@@ -13,6 +13,8 @@ namespace ERP.UI.Forms
     {
         private ComboBox _cmbPlateThickness;
         private ComboBox _cmbHatve;
+        private ComboBox _cmbSize;
+        private ComboBox _cmbLength;
         private DataGridView _dgvClampings;
         private ComboBox _cmbClamping;
         private TextBox _txtFirstLength;
@@ -107,6 +109,48 @@ namespace ERP.UI.Forms
             _cmbHatve.SelectedIndexChanged += FilterClampings;
             this.Controls.Add(lblHatve);
             this.Controls.Add(_cmbHatve);
+            yPos += spacing;
+
+            // Ölçü (ComboBox - tablodaki değerlerden)
+            var lblSize = new Label
+            {
+                Text = "Ölçü:",
+                Location = new Point(20, yPos),
+                Width = labelWidth,
+                Font = new Font("Segoe UI", 10F)
+            };
+            _cmbSize = new ComboBox
+            {
+                Location = new Point(150, yPos - 3),
+                Width = controlWidth,
+                Height = controlHeight,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 10F)
+            };
+            _cmbSize.SelectedIndexChanged += FilterClampings;
+            this.Controls.Add(lblSize);
+            this.Controls.Add(_cmbSize);
+            yPos += spacing;
+
+            // Uzunluk (ComboBox - tablodaki değerlerden)
+            var lblLength = new Label
+            {
+                Text = "Uzunluk:",
+                Location = new Point(20, yPos),
+                Width = labelWidth,
+                Font = new Font("Segoe UI", 10F)
+            };
+            _cmbLength = new ComboBox
+            {
+                Location = new Point(150, yPos - 3),
+                Width = controlWidth,
+                Height = controlHeight,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 10F)
+            };
+            _cmbLength.SelectedIndexChanged += FilterClampings;
+            this.Controls.Add(lblLength);
+            this.Controls.Add(_cmbLength);
             yPos += spacing;
 
             // Kenetlenmiş Ürünler Listesi
@@ -394,6 +438,32 @@ namespace ERP.UI.Forms
                 {
                     _cmbHatve.Items.Add(h.ToString("F2", CultureInfo.InvariantCulture));
                 }
+
+                // Ölçü değerlerini al (distinct)
+                var sizes = allClampings
+                    .Select(c => c.Size)
+                    .Distinct()
+                    .OrderBy(x => x)
+                    .ToList();
+                
+                _cmbSize.Items.Clear();
+                foreach (var s in sizes)
+                {
+                    _cmbSize.Items.Add(s.ToString("F2", CultureInfo.InvariantCulture));
+                }
+
+                // Uzunluk değerlerini al (distinct)
+                var lengths = allClampings
+                    .Select(c => c.Length)
+                    .Distinct()
+                    .OrderBy(x => x)
+                    .ToList();
+                
+                _cmbLength.Items.Clear();
+                foreach (var l in lengths)
+                {
+                    _cmbLength.Items.Add(l.ToString("F2", CultureInfo.InvariantCulture));
+                }
             }
             catch (Exception ex)
             {
@@ -418,10 +488,13 @@ namespace ERP.UI.Forms
 
                 var allClampings = _clampingRepository.GetAll();
 
+                // Filtreleme: Lamel kalınlığı, hatve, ölçü ve uzunluk ile filtrele
                 var filteredList = allClampings
                     .Where(c => c.IsActive && 
                            Math.Abs(c.PlateThickness - selectedPlateThickness) < 0.001m &&
-                           Math.Abs(c.Hatve - selectedHatve) < 0.01m)
+                           Math.Abs(c.Hatve - selectedHatve) < 0.01m &&
+                           (_cmbSize.SelectedItem == null || Math.Abs(c.Size - decimal.Parse(_cmbSize.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture)) < 0.1m) &&
+                           (_cmbLength.SelectedItem == null || Math.Abs(c.Length - decimal.Parse(_cmbLength.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture)) < 1.0m))
                     .ToList();
 
                 var displayData = filteredList.Select(c =>

@@ -406,7 +406,7 @@ namespace ERP.UI.Forms
                 // Montaj işlemlerinden kullanılan kenet adedini hesapla
                 var allAssemblies = _assemblyRepository.GetAll();
                 var usedClampCountByClampingId = allAssemblies
-                    .Where(a => a.ClampingId.HasValue)
+                    .Where(a => a.IsActive && a.ClampingId.HasValue)
                     .GroupBy(a => a.ClampingId.Value)
                     .ToDictionary(g => g.Key, g => g.Sum(a => a.UsedClampCount));
 

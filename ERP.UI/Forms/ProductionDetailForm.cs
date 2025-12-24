@@ -2979,46 +2979,83 @@ namespace ERP.UI.Forms
         {
             try
             {
-                var assemblies = _assemblyRepository.GetByOrderId(_orderId);
                 var order = _orderRepository.GetById(_orderId);
                 int kapakBoyuMM = GetKapakBoyuFromOrder(order);
                 
-                var data = assemblies.Select(a => new
+                // Onaylanmış montaj kayıtları
+                var assemblies = _assemblyRepository.GetByOrderId(_orderId);
+                var completedData = assemblies.Select(a => new
                 {
-                    a.Id,
+                    Id = a.Id,
                     Date = a.AssemblyDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
                     OrderNo = order?.TrexOrderNo ?? "",
                     Hatve = GetHatveLetter(a.Hatve),
                     Size = a.Size.ToString("F2", CultureInfo.InvariantCulture),
-                    Length = (a.Length - kapakBoyuMM).ToString("F2", CultureInfo.InvariantCulture),
+                    Length = (a.Length * 10.0m - kapakBoyuMM).ToString("F2", CultureInfo.InvariantCulture), // Length CM olarak saklanıyor, MM'ye çevirip kapak çıkar
                     AssemblyCount = a.AssemblyCount.ToString(),
                     Customer = order?.Company?.Name ?? "",
                     UsedClampCount = a.UsedClampCount.ToString(),
                     PlateThickness = a.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
                     SerialNumber = a.SerialNo?.SerialNumber ?? "",
-                    EmployeeName = a.Employee != null ? $"{a.Employee.FirstName} {a.Employee.LastName}" : ""
+                    EmployeeName = a.Employee != null ? $"{a.Employee.FirstName} {a.Employee.LastName}" : "",
+                    Status = GetShortStatus("Tamamlandı")
                 }).ToList();
 
-                // DataSource'u null yap (kolonlar kaybolmasın diye)
-                dataGridView.DataSource = null;
-                
-                // Kolonların var olduğundan emin ol
-                if (dataGridView.Columns.Count == 0)
-                {
-                    AddAssemblyColumn(dataGridView, "Date", "Tarih", 100);
-                    AddAssemblyColumn(dataGridView, "OrderNo", "Sipariş No", 90);
-                    AddAssemblyColumn(dataGridView, "Hatve", "Hatve", 60);
-                    AddAssemblyColumn(dataGridView, "Size", "Ölçü", 70);
-                    AddAssemblyColumn(dataGridView, "Length", "Uzunluk", 80);
-                    AddAssemblyColumn(dataGridView, "AssemblyCount", "Montaj Adedi", 90);
-                    AddAssemblyColumn(dataGridView, "Customer", "Müşteri", 130);
-                    AddAssemblyColumn(dataGridView, "UsedClampCount", "Kullanılan Kenet Adedi", 140);
-                    AddAssemblyColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 110);
-                    AddAssemblyColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
-                    AddAssemblyColumn(dataGridView, "EmployeeName", "Operatör", 120);
-                }
+                // Bekleyen montaj talepleri
+                var requests = _assemblyRequestRepository.GetByOrderId(_orderId)
+                    .Where(r => r.Status != "Tamamlandı" && r.Status != "İptal")
+                    .Select(r => new
+                    {
+                        Id = r.Id,
+                        Date = r.RequestDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
+                        OrderNo = order?.TrexOrderNo ?? "",
+                        Hatve = GetHatveLetter(r.Hatve),
+                        Size = r.Size.ToString("F2", CultureInfo.InvariantCulture),
+                        Length = (r.Length * 10.0m - kapakBoyuMM).ToString("F2", CultureInfo.InvariantCulture), // Length CM olarak saklanıyor, MM'ye çevirip kapak çıkar
+                        AssemblyCount = r.ResultedAssemblyCount?.ToString() ?? "-",
+                        Customer = order?.Company?.Name ?? "",
+                        UsedClampCount = r.ActualClampCount?.ToString() ?? "-",
+                        PlateThickness = r.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
+                        SerialNumber = r.SerialNo?.SerialNumber ?? "-",
+                        EmployeeName = r.Employee != null ? $"{r.Employee.FirstName} {r.Employee.LastName}" : "-",
+                        Status = GetShortStatus(r.Status)
+                    }).ToList();
 
-                dataGridView.DataSource = data;
+                // Birleştir
+                var data = completedData.Cast<object>().Concat(requests.Cast<object>()).ToList();
+
+                // Layout işlemlerini durdur - performans için kritik
+                dataGridView.SuspendLayout();
+                
+                try
+                {
+                    // DataSource'u null yap (kolonlar kaybolmasın diye)
+                    dataGridView.DataSource = null;
+                    
+                    // Kolonların var olduğundan emin ol
+                    if (dataGridView.Columns.Count == 0)
+                    {
+                        AddAssemblyColumn(dataGridView, "Date", "Tarih", 100);
+                        AddAssemblyColumn(dataGridView, "OrderNo", "Sipariş No", 90);
+                        AddAssemblyColumn(dataGridView, "Hatve", "Hatve", 60);
+                        AddAssemblyColumn(dataGridView, "Size", "Ölçü", 70);
+                        AddAssemblyColumn(dataGridView, "Length", "Uzunluk", 80);
+                        AddAssemblyColumn(dataGridView, "AssemblyCount", "Montaj Adedi", 90);
+                        AddAssemblyColumn(dataGridView, "Customer", "Müşteri", 130);
+                        AddAssemblyColumn(dataGridView, "UsedClampCount", "Kullanılan Kenet Adedi", 140);
+                        AddAssemblyColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 110);
+                        AddAssemblyColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
+                        AddAssemblyColumn(dataGridView, "EmployeeName", "Operatör", 120);
+                        AddAssemblyColumn(dataGridView, "Status", "Durum", 80);
+                    }
+
+                    // Veri kaynağını ayarla
+                    dataGridView.DataSource = data;
+                }
+                finally
+                {
+                    dataGridView.ResumeLayout();
+                }
             }
             catch (Exception ex)
             {
@@ -3352,8 +3389,8 @@ namespace ERP.UI.Forms
                     var firstClamping = cr2.FirstClampingId.HasValue ? _clampingRepository.GetById(cr2.FirstClampingId.Value) : null;
                     var secondClamping = cr2.SecondClampingId.HasValue ? _clampingRepository.GetById(cr2.SecondClampingId.Value) : null;
                     
-                    string firstInfo = firstClamping != null ? $"{firstClamping.Size:F2} x {(firstClamping.Length - kapakBoyuMM):F2}" : "";
-                    string secondInfo = secondClamping != null ? $"{secondClamping.Size:F2} x {(secondClamping.Length - kapakBoyuMM):F2}" : "";
+                    string firstInfo = firstClamping != null ? $"{firstClamping.Size:F2} x {firstClamping.Length:F2}" : "";
+                    string secondInfo = secondClamping != null ? $"{secondClamping.Size:F2} x {secondClamping.Length:F2}" : "";
                     
                     return new
                     {
@@ -3363,7 +3400,7 @@ namespace ERP.UI.Forms
                         Hatve = GetHatveLetter(cr2.Hatve),
                         PlateThickness = cr2.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
                         ResultedSize = cr2.ResultedSize.ToString("F2", CultureInfo.InvariantCulture),
-                        ResultedLength = (cr2.ResultedLength - kapakBoyuMM).ToString("F2", CultureInfo.InvariantCulture),
+                        ResultedLength = cr2.ResultedLength.ToString("F2", CultureInfo.InvariantCulture),
                         FirstClampingInfo = firstInfo,
                         SecondClampingInfo = secondInfo,
                         Count = cr2.ResultedCount?.ToString() ?? cr2.ActualCount?.ToString() ?? cr2.RequestedCount.ToString(),

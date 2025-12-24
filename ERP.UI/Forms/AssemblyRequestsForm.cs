@@ -97,16 +97,7 @@ namespace ERP.UI.Forms
             };
 
             // Kolonları ekle
-            // Id kolonu (gizli)
-            var colId = new DataGridViewTextBoxColumn
-            {
-                DataPropertyName = "Id",
-                HeaderText = "Id",
-                Name = "Id",
-                Width = 0,
-                Visible = false
-            };
-            _dataGridView.Columns.Add(colId);
+            // Id kolonu kaldırıldı (görünür değil, sadece veri erişimi için LoadData'da anonymous object'te tutuluyor)
             
             AddAssemblyRequestColumn("TermDate", "Termin Tarihi", 120);
             AddAssemblyRequestColumn("TrexOrderNo", "Trex Kodu", 120);
@@ -358,54 +349,15 @@ namespace ERP.UI.Forms
                     return;
                 }
 
-                // ActualClampCount ve ResultedAssemblyCount değerlerini set et
+                // ActualClampCount ve ResultedAssemblyCount değerlerini set et (sadece bilgi giriliyor, onay ProductionDetailForm'da yapılacak)
                 request.ActualClampCount = montajlanacakKenet;
                 request.ResultedAssemblyCount = olusanMontaj;
-
-                // Onaylama mesajı
-                var result = MessageBox.Show(
-                    $"Montaj talebi onaylanacak:\n\n" +
-                    $"Montajlanacak Kenet (kenetlenmiş stoktan): {montajlanacakKenet} adet\n" +
-                    $"Oluşan Montaj (montajlanmış stoğa): {olusanMontaj} adet\n\n" +
-                    $"Onaylamak istediğinize emin misiniz?",
-                    "Montaj Talebi Onayla",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Question);
-
-                if (result != DialogResult.Yes)
-                {
-                    // Kullanıcı iptal etti, checkbox'ı geri al
-                    LoadData();
-                    return;
-                }
-
-                // Durumu "Tamamlandı" yap
-                request.Status = "Tamamlandı";
-                request.CompletionDate = DateTime.Now;
+                
+                // Durum değişmeyecek, "Beklemede" kalacak
+                // Assembly kaydı oluşturulmayacak (ProductionDetailForm'da onaylandığında oluşturulacak)
                 _assemblyRequestRepository.Update(request);
 
-                // Montaj kaydı oluştur (Assembly) - ResultedAssemblyCount montajlanmış stoğa eklenecek
-                var assembly = new Assembly
-                {
-                    OrderId = request.OrderId,
-                    ClampingId = request.ClampingId,
-                    PlateThickness = request.PlateThickness,
-                    Hatve = request.Hatve,
-                    Size = request.Size,
-                    Length = request.Length,
-                    SerialNoId = request.SerialNoId,
-                    MachineId = request.MachineId,
-                    AssemblyCount = olusanMontaj, // Oluşan montaj adedi
-                    UsedClampCount = montajlanacakKenet, // Montajlanacak kenet adedi
-                    EmployeeId = request.EmployeeId,
-                    AssemblyDate = DateTime.Now
-                };
-                
-                // AssemblyRepository'yi kullanarak kaydet
-                var assemblyRepository = new AssemblyRepository();
-                assemblyRepository.Insert(assembly);
-
-                MessageBox.Show("Montaj talebi onaylandı ve montaj kaydı oluşturuldu!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show($"Bilgiler kaydedildi. Onay için Üretim Ayrıntı sayfasındaki Montaj tab'ından 'Montaj Onayla' butonunu kullanın.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                 // Verileri yeniden yükle
                 LoadData();

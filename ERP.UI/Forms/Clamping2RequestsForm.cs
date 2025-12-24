@@ -95,16 +95,7 @@ namespace ERP.UI.Forms
             };
 
             // Kolonları ekle
-            // Id kolonu (gizli)
-            var colId = new DataGridViewTextBoxColumn
-            {
-                DataPropertyName = "Id",
-                HeaderText = "Id",
-                Name = "Id",
-                Width = 0,
-                Visible = false
-            };
-            _dataGridView.Columns.Add(colId);
+            // Id kolonu kaldırıldı (görünür değil, sadece veri erişimi için LoadData'da anonymous object'te tutuluyor)
             
             AddClamping2RequestColumn("Hatve", "Hatve", 80);
             AddClamping2RequestColumn("PlateThickness", "Lamel Kalınlığı", 120);

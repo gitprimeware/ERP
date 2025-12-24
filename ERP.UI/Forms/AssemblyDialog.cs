@@ -475,8 +475,7 @@ namespace ERP.UI.Forms
                 // Form alanlarından filtreleme değerlerini al
                 if (string.IsNullOrWhiteSpace(_cmbHatve.Text) || 
                     string.IsNullOrWhiteSpace(_cmbSize.Text) || 
-                    string.IsNullOrWhiteSpace(_cmbPlateThickness.Text) ||
-                    string.IsNullOrWhiteSpace(_txtLength.Text))
+                    string.IsNullOrWhiteSpace(_cmbPlateThickness.Text))
                 {
                     _cmbClamping.Enabled = false;
                     return;
@@ -484,26 +483,22 @@ namespace ERP.UI.Forms
 
                 if (!decimal.TryParse(_cmbHatve.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal hatve) ||
                     !decimal.TryParse(_cmbSize.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal size) ||
-                    !decimal.TryParse(_cmbPlateThickness.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal plateThickness) ||
-                    !decimal.TryParse(_txtLength.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal lengthMM))
+                    !decimal.TryParse(_cmbPlateThickness.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal plateThickness))
                 {
                     _cmbClamping.Enabled = false;
                     return;
                 }
 
-                // Uzunluk artık MM olarak giriliyor (veritabanında mm cinsinden saklanıyor)
-
                 // TÜM kenetlenmiş stokları yükle (sadece belirli bir siparişe ait değil, stoktan da kullanılabilir)
                 var allClampings = _clampingRepository.GetAll();
                 
-                // Filtreleme: Hatve, Ölçü, Plaka Kalınlığı, Uzunluk - tam eşleşme (combo box'dan seçildiği için)
+                // Filtreleme: Hatve, Ölçü, Plaka Kalınlığı (uzunluk filtresi kaldırıldı - farklı uzunluklardan da kullanılabilir)
                 var filteredClampings = allClampings.Where(c => 
                     c.ClampCount > 0 && 
                     c.IsActive &&
                     Math.Abs(c.Hatve - hatve) < 0.01m &&
                     Math.Abs(c.Size - size) < 0.1m &&
-                    Math.Abs(c.PlateThickness - plateThickness) < 0.001m &&
-                    Math.Abs(c.Length - lengthMM) < 1.0m); // MM cinsinden tolerance (1mm = 0.1cm)
+                    Math.Abs(c.PlateThickness - plateThickness) < 0.001m);
                 
                 var filteredList = filteredClampings.OrderByDescending(c => c.ClampingDate).ToList();
                 
@@ -536,7 +531,7 @@ namespace ERP.UI.Forms
                         _cmbClamping.Items.Add(new 
                         { 
                             Id = clamping.Id, 
-                            DisplayText = $"Kenet #{clamping.ClampingDate:dd.MM.yyyy}{orderInfo} - {clamping.ClampCount} adet (Kalan: {availableClampCount})",
+                            DisplayText = $"Kenet #{orderInfo} - {clamping.ClampCount} adet (Kalan: {availableClampCount})",
                             Clamping = clamping
                         });
                     }
@@ -620,7 +615,7 @@ namespace ERP.UI.Forms
                         _cmbClamping.Items.Add(new 
                         { 
                             Id = clamping.Id, 
-                            DisplayText = $"Kenet #{clamping.ClampingDate:dd.MM.yyyy}{orderInfo} - {clamping.ClampCount} adet (Kalan: {availableClampCount})",
+                            DisplayText = $"Kenet #{orderInfo} - {clamping.ClampCount} adet (Kalan: {availableClampCount})",
                             Clamping = clamping
                         });
                     }
