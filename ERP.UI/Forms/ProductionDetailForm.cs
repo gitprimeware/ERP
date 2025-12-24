@@ -80,6 +80,7 @@ namespace ERP.UI.Forms
         private PressingRepository _pressingRepository;
         private ClampingRepository _clampingRepository;
         private AssemblyRepository _assemblyRepository;
+        private PackagingRepository _packagingRepository;
         private MachineRepository _machineRepository;
         private SerialNoRepository _serialNoRepository;
         private EmployeeRepository _employeeRepository;
@@ -104,6 +105,7 @@ namespace ERP.UI.Forms
             _pressingRepository = new PressingRepository();
             _clampingRepository = new ClampingRepository();
             _assemblyRepository = new AssemblyRepository();
+            _packagingRepository = new PackagingRepository();
             _machineRepository = new MachineRepository();
             _serialNoRepository = new SerialNoRepository();
             _employeeRepository = new EmployeeRepository();
@@ -837,6 +839,20 @@ namespace ERP.UI.Forms
 
         private void BtnMuhasebeyeGonder_Click(object sender, EventArgs e)
         {
+            // Paketleme kontrolü
+            var packagings = _packagingRepository.GetByOrderId(_orderId);
+            bool hasCompletedPackaging = packagings.Any(p => p.IsActive);
+            
+            if (!hasCompletedPackaging)
+            {
+                MessageBox.Show(
+                    "Bu siparişi muhasebeye göndermek için önce paketleme işleminin tamamlanmış olması gerekir.",
+                    "Uyarı",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+            
             var result = MessageBox.Show(
                 $"Sipariş {_order?.TrexOrderNo} muhasebeye gönderilecek. Emin misiniz?",
                 "Muhasebeye Gönder",
@@ -1378,6 +1394,13 @@ namespace ERP.UI.Forms
             tabMontaj.UseVisualStyleBackColor = false;
             CreateAssemblyTab(tabMontaj);
             cuttingTabControl.TabPages.Add(tabMontaj);
+
+            var tabPaketleme = new TabPage("📦 Paketleme");
+            tabPaketleme.Padding = new Padding(20);
+            tabPaketleme.BackColor = Color.White;
+            tabPaketleme.UseVisualStyleBackColor = false;
+            CreatePackagingTab(tabPaketleme);
+            cuttingTabControl.TabPages.Add(tabPaketleme);
 
             contentPanel.Controls.Add(cuttingTabControl);
         }
@@ -3240,6 +3263,387 @@ namespace ERP.UI.Forms
             catch (Exception ex)
             {
                 MessageBox.Show("Montaj talebi onaylanırken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void CreatePackagingTab(TabPage tab)
+        {
+            // Ana panel - TableLayoutPanel kullan
+            var mainPanel = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 2,
+                BackColor = Color.White,
+                Padding = new Padding(20)
+            };
+            mainPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            mainPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F)); // Buton paneli için sabit yükseklik
+            mainPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F)); // Grid paneli için kalan alan
+
+            // Buton paneli - Üstte
+            var buttonPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Height = 50,
+                Padding = new Padding(0, 5, 20, 5),
+                BackColor = Color.White
+            };
+
+            // Onayla butonu
+            var btnOnayla = ButtonFactory.CreateActionButton("✅ Onayla Paketle", ThemeColors.Success, Color.White, 150, 35);
+            btnOnayla.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnOnayla.Location = new Point(buttonPanel.Width - 150, 5);
+            buttonPanel.Controls.Add(btnOnayla);
+
+            // DataGridView paneli
+            var gridPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(0),
+                BackColor = Color.White
+            };
+
+            // DataGridView
+            var dataGridView = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                ReadOnly = true,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                MultiSelect = false,
+                BackgroundColor = Color.White,
+                BorderStyle = BorderStyle.None,
+                AutoGenerateColumns = false,
+                ColumnHeadersVisible = true,
+                RowHeadersVisible = false,
+                GridColor = Color.White,
+                CellBorderStyle = DataGridViewCellBorderStyle.None
+            };
+
+            // Kolonları ekle
+            AddPackagingColumn(dataGridView, "Date", "Tarih", 100);
+            AddPackagingColumn(dataGridView, "OrderNo", "Sipariş No", 90);
+            AddPackagingColumn(dataGridView, "Hatve", "Hatve", 60);
+            AddPackagingColumn(dataGridView, "Size", "Ölçü", 70);
+            AddPackagingColumn(dataGridView, "Length", "Uzunluk", 80);
+            AddPackagingColumn(dataGridView, "ProductType", "Ürün Türü", 100);
+            AddPackagingColumn(dataGridView, "Profil", "Profil", 80);
+            AddPackagingColumn(dataGridView, "PackagingCount", "Paketleme Adedi", 120);
+            AddPackagingColumn(dataGridView, "Customer", "Müşteri", 130);
+            AddPackagingColumn(dataGridView, "UsedAssemblyCount", "Kullanılan Montaj Adedi", 160);
+            AddPackagingColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 110);
+            AddPackagingColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
+            AddPackagingColumn(dataGridView, "EmployeeName", "Operatör", 120);
+
+            // Stil ayarları
+            dataGridView.ColumnHeadersVisible = true;
+            dataGridView.RowHeadersVisible = false;
+            dataGridView.EnableHeadersVisualStyles = false;
+            dataGridView.ColumnHeadersHeight = 40;
+            dataGridView.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            dataGridView.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
+            
+            dataGridView.ColumnHeadersDefaultCellStyle.BackColor = ThemeColors.Primary;
+            dataGridView.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            dataGridView.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            dataGridView.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dataGridView.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.False;
+
+            dataGridView.DefaultCellStyle.BackColor = Color.White;
+            dataGridView.BackgroundColor = Color.White;
+            dataGridView.DefaultCellStyle.ForeColor = ThemeColors.TextPrimary;
+            dataGridView.DefaultCellStyle.SelectionBackColor = ThemeColors.Primary;
+            dataGridView.DefaultCellStyle.SelectionForeColor = Color.White;
+            dataGridView.DefaultCellStyle.Font = new Font("Segoe UI", 9F);
+
+            gridPanel.Controls.Add(dataGridView);
+            
+            // TableLayoutPanel'e ekle
+            mainPanel.Controls.Add(buttonPanel, 0, 0);
+            mainPanel.Controls.Add(gridPanel, 0, 1);
+            
+            tab.Controls.Add(mainPanel);
+
+            // Event handler
+            btnOnayla.Click += (s, e) => BtnPackagingOnayla_Click(dataGridView);
+
+            // Verileri yükle
+            LoadPackagingData(dataGridView);
+        }
+
+        private void AddPackagingColumn(DataGridView dgv, string dataPropertyName, string headerText, int width)
+        {
+            var column = new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = dataPropertyName,
+                HeaderText = headerText,
+                Name = dataPropertyName,
+                Width = width,
+                Visible = true,
+                ReadOnly = true
+            };
+            dgv.Columns.Add(column);
+        }
+
+        private void LoadPackagingData(DataGridView dataGridView)
+        {
+            try
+            {
+                var order = _orderRepository.GetById(_orderId);
+                int kapakBoyuMM = GetKapakBoyuFromOrder(order);
+                
+                // Ürün türü ve profil bilgilerini al
+                string productType = order?.ProductType ?? "";
+                string profil = "";
+                if (order != null && !string.IsNullOrEmpty(order.ProductCode))
+                {
+                    var parts = order.ProductCode.Split('-');
+                    if (parts.Length >= 3 && parts[2].Length >= 2)
+                    {
+                        profil = parts[2].Substring(1, 1).ToUpper(); // Profil harfi (örn: LG -> G)
+                    }
+                }
+
+                // Onaylanmış paketleme kayıtları
+                var packagings = _packagingRepository.GetByOrderId(_orderId);
+                var completedData = packagings.Select(p => new
+                {
+                    Id = p.Id,
+                    Date = p.PackagingDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
+                    OrderNo = order?.TrexOrderNo ?? "",
+                    Hatve = GetHatveLetter(p.Hatve),
+                    Size = p.Size.ToString("F2", CultureInfo.InvariantCulture),
+                    Length = (p.Length * 10.0m + kapakBoyuMM).ToString("F2", CultureInfo.InvariantCulture), // Uzunluk + kapak boyu
+                    ProductType = productType,
+                    Profil = profil,
+                    PackagingCount = p.PackagingCount.ToString(),
+                    Customer = order?.Company?.Name ?? "",
+                    UsedAssemblyCount = p.UsedAssemblyCount.ToString(),
+                    PlateThickness = p.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
+                    SerialNumber = p.SerialNo?.SerialNumber ?? "",
+                    EmployeeName = p.Employee != null ? $"{p.Employee.FirstName} {p.Employee.LastName}" : ""
+                }).ToList();
+
+                // Tamamlanmış montaj kayıtları (henüz paketlenmemiş olanlar)
+                var assemblies = _assemblyRepository.GetByOrderId(_orderId);
+                var packagedAssemblyIds = packagings.Where(p => p.AssemblyId.HasValue).Select(p => p.AssemblyId.Value).ToList();
+                var unpackagedAssemblies = assemblies.Where(a => !packagedAssemblyIds.Contains(a.Id)).ToList();
+                
+                var pendingData = unpackagedAssemblies.Select(a => new
+                {
+                    Id = a.Id,
+                    Date = a.AssemblyDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
+                    OrderNo = order?.TrexOrderNo ?? "",
+                    Hatve = GetHatveLetter(a.Hatve),
+                    Size = a.Size.ToString("F2", CultureInfo.InvariantCulture),
+                    Length = (a.Length * 10.0m + kapakBoyuMM).ToString("F2", CultureInfo.InvariantCulture), // Uzunluk + kapak boyu
+                    ProductType = productType,
+                    Profil = profil,
+                    PackagingCount = "-",
+                    Customer = order?.Company?.Name ?? "",
+                    UsedAssemblyCount = a.AssemblyCount.ToString(),
+                    PlateThickness = a.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
+                    SerialNumber = a.SerialNo?.SerialNumber ?? "",
+                    EmployeeName = a.Employee != null ? $"{a.Employee.FirstName} {a.Employee.LastName}" : ""
+                }).ToList();
+
+                // Birleştir
+                var data = completedData.Cast<object>().Concat(pendingData.Cast<object>()).ToList();
+
+                // Layout işlemlerini durdur - performans için kritik
+                dataGridView.SuspendLayout();
+                
+                try
+                {
+                    // DataSource'u null yap (kolonlar kaybolmasın diye)
+                    dataGridView.DataSource = null;
+                    
+                    // Kolonların var olduğundan emin ol
+                    if (dataGridView.Columns.Count == 0)
+                    {
+                        AddPackagingColumn(dataGridView, "Date", "Tarih", 100);
+                        AddPackagingColumn(dataGridView, "OrderNo", "Sipariş No", 90);
+                        AddPackagingColumn(dataGridView, "Hatve", "Hatve", 60);
+                        AddPackagingColumn(dataGridView, "Size", "Ölçü", 70);
+                        AddPackagingColumn(dataGridView, "Length", "Uzunluk", 80);
+                        AddPackagingColumn(dataGridView, "ProductType", "Ürün Türü", 100);
+                        AddPackagingColumn(dataGridView, "Profil", "Profil", 80);
+                        AddPackagingColumn(dataGridView, "PackagingCount", "Paketleme Adedi", 120);
+                        AddPackagingColumn(dataGridView, "Customer", "Müşteri", 130);
+                        AddPackagingColumn(dataGridView, "UsedAssemblyCount", "Kullanılan Montaj Adedi", 160);
+                        AddPackagingColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 110);
+                        AddPackagingColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
+                        AddPackagingColumn(dataGridView, "EmployeeName", "Operatör", 120);
+                    }
+
+                    // Veri kaynağını ayarla
+                    dataGridView.DataSource = data;
+                }
+                finally
+                {
+                    dataGridView.ResumeLayout();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Paketleme verileri yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BtnPackagingOnayla_Click(DataGridView dataGridView)
+        {
+            try
+            {
+                if (dataGridView.SelectedRows.Count == 0)
+                {
+                    MessageBox.Show("Lütfen paketlenecek montaj kaydını seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                var selectedRow = dataGridView.SelectedRows[0];
+                var dataItem = selectedRow.DataBoundItem;
+                if (dataItem == null)
+                {
+                    MessageBox.Show("Geçersiz satır seçildi.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Id'yi al
+                Guid assemblyId = Guid.Empty;
+                var idProperty = dataItem.GetType().GetProperty("Id");
+                if (idProperty != null)
+                {
+                    assemblyId = (Guid)idProperty.GetValue(dataItem);
+                }
+
+                if (assemblyId == Guid.Empty)
+                {
+                    MessageBox.Show("Montaj kaydı bulunamadı.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                var assembly = _assemblyRepository.GetById(assemblyId);
+                if (assembly == null)
+                {
+                    MessageBox.Show("Montaj kaydı bulunamadı.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Paketleme adedini sor
+                using (var inputDialog = new Form
+                {
+                    Text = "Paketleme Adedi",
+                    Width = 350,
+                    Height = 200,
+                    StartPosition = FormStartPosition.CenterParent,
+                    FormBorderStyle = FormBorderStyle.FixedDialog,
+                    MaximizeBox = false,
+                    MinimizeBox = false
+                })
+                {
+                    var lblPrompt = new Label
+                    {
+                        Text = $"Kullanılacak Montaj Adedi: {assembly.AssemblyCount}\n\nPaketleme Adedi:",
+                        Location = new Point(20, 20),
+                        Width = 300,
+                        Height = 60,
+                        Font = new Font("Segoe UI", 10F)
+                    };
+
+                    var txtPackagingCount = new NumericUpDown
+                    {
+                        Location = new Point(20, 80),
+                        Width = 290,
+                        Minimum = 1,
+                        Maximum = assembly.AssemblyCount,
+                        Value = assembly.AssemblyCount,
+                        Font = new Font("Segoe UI", 10F)
+                    };
+
+                    var btnOK = new Button
+                    {
+                        Text = "Tamam",
+                        Location = new Point(150, 120),
+                        Width = 80,
+                        Height = 35,
+                        DialogResult = DialogResult.OK,
+                        BackColor = ThemeColors.Primary,
+                        ForeColor = Color.White,
+                        FlatStyle = FlatStyle.Flat,
+                        Font = new Font("Segoe UI", 10F, FontStyle.Bold)
+                    };
+                    btnOK.FlatAppearance.BorderSize = 0;
+
+                    var btnCancel = new Button
+                    {
+                        Text = "İptal",
+                        Location = new Point(240, 120),
+                        Width = 80,
+                        Height = 35,
+                        DialogResult = DialogResult.Cancel,
+                        BackColor = Color.Gray,
+                        ForeColor = Color.White,
+                        FlatStyle = FlatStyle.Flat,
+                        Font = new Font("Segoe UI", 10F)
+                    };
+                    btnCancel.FlatAppearance.BorderSize = 0;
+
+                    inputDialog.Controls.Add(lblPrompt);
+                    inputDialog.Controls.Add(txtPackagingCount);
+                    inputDialog.Controls.Add(btnOK);
+                    inputDialog.Controls.Add(btnCancel);
+                    inputDialog.AcceptButton = btnOK;
+                    inputDialog.CancelButton = btnCancel;
+
+                    if (inputDialog.ShowDialog() == DialogResult.OK)
+                    {
+                        int packagingCount = (int)txtPackagingCount.Value;
+                        int usedAssemblyCount = packagingCount; // Kullanılan montaj adedi = paketleme adedi
+
+                        // Onaylama işlemi
+                        var result = MessageBox.Show(
+                            $"Paketleme işlemi onaylanacak:\n\n" +
+                            $"Kullanılacak Montaj Adedi: {usedAssemblyCount}\n" +
+                            $"Paketleme Adedi: {packagingCount}\n\n" +
+                            $"Onaylamak istediğinize emin misiniz?",
+                            "Paketleme Onayla",
+                            MessageBoxButtons.YesNo,
+                            MessageBoxIcon.Question);
+
+                        if (result != DialogResult.Yes)
+                            return;
+
+                        // Paketleme kaydı oluştur
+                        var packaging = new Packaging
+                        {
+                            OrderId = assembly.OrderId,
+                            AssemblyId = assembly.Id,
+                            PlateThickness = assembly.PlateThickness,
+                            Hatve = assembly.Hatve,
+                            Size = assembly.Size,
+                            Length = assembly.Length,
+                            SerialNoId = assembly.SerialNoId,
+                            MachineId = assembly.MachineId,
+                            PackagingCount = packagingCount,
+                            UsedAssemblyCount = usedAssemblyCount,
+                            EmployeeId = assembly.EmployeeId,
+                            PackagingDate = DateTime.Now
+                        };
+                        _packagingRepository.Insert(packaging);
+
+                        MessageBox.Show("Paketleme işlemi tamamlandı!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                        // Verileri yeniden yükle
+                        LoadPackagingData(dataGridView);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Paketleme onaylanırken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

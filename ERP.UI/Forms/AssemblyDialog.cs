@@ -466,6 +466,31 @@ namespace ERP.UI.Forms
             }
         }
 
+        private int GetKapakBoyuFromOrder()
+        {
+            var order = _orderRepository.GetById(_orderId);
+            if (order == null || string.IsNullOrEmpty(order.ProductCode))
+                return 0;
+
+            var parts = order.ProductCode.Split('-');
+            if (parts.Length > 5)
+            {
+                string kapakDegeri = parts[5];
+                
+                // Ürün kodunda DisplayText formatı kullanılıyor: 030, 002, 016
+                if (kapakDegeri == "030")
+                    return 30;
+                else if (kapakDegeri == "002")
+                    return 2;
+                else if (kapakDegeri == "016")
+                    return 16;
+                else if (int.TryParse(kapakDegeri, out int parsedKapak))
+                    return parsedKapak;
+            }
+            
+            return 0;
+        }
+
         private void LoadClampingsBasedOnOrder()
         {
             try
@@ -475,7 +500,8 @@ namespace ERP.UI.Forms
                 // Form alanlarından filtreleme değerlerini al
                 if (string.IsNullOrWhiteSpace(_cmbHatve.Text) || 
                     string.IsNullOrWhiteSpace(_cmbSize.Text) || 
-                    string.IsNullOrWhiteSpace(_cmbPlateThickness.Text))
+                    string.IsNullOrWhiteSpace(_cmbPlateThickness.Text) ||
+                    string.IsNullOrWhiteSpace(_txtLength.Text))
                 {
                     _cmbClamping.Enabled = false;
                     return;
@@ -483,22 +509,29 @@ namespace ERP.UI.Forms
 
                 if (!decimal.TryParse(_cmbHatve.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal hatve) ||
                     !decimal.TryParse(_cmbSize.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal size) ||
-                    !decimal.TryParse(_cmbPlateThickness.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal plateThickness))
+                    !decimal.TryParse(_cmbPlateThickness.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal plateThickness) ||
+                    !decimal.TryParse(_txtLength.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal lengthMM))
                 {
                     _cmbClamping.Enabled = false;
                     return;
                 }
 
+                // Uzunluk filtresi: Ürün uzunluğundan kapak boyu çıkarılacak
+                int kapakBoyuMM = GetKapakBoyuFromOrder();
+                decimal kapaksizUzunlukMM = lengthMM - kapakBoyuMM;
+                decimal kapaksizUzunlukCM = kapaksizUzunlukMM / 10.0m; // MM'yi CM'ye çevir
+
                 // TÜM kenetlenmiş stokları yükle (sadece belirli bir siparişe ait değil, stoktan da kullanılabilir)
                 var allClampings = _clampingRepository.GetAll();
                 
-                // Filtreleme: Hatve, Ölçü, Plaka Kalınlığı (uzunluk filtresi kaldırıldı - farklı uzunluklardan da kullanılabilir)
+                // Filtreleme: Hatve, Ölçü, Plaka Kalınlığı, Uzunluk (kapaksız uzunluk ile karşılaştırılacak)
                 var filteredClampings = allClampings.Where(c => 
                     c.ClampCount > 0 && 
                     c.IsActive &&
                     Math.Abs(c.Hatve - hatve) < 0.01m &&
                     Math.Abs(c.Size - size) < 0.1m &&
-                    Math.Abs(c.PlateThickness - plateThickness) < 0.001m);
+                    Math.Abs(c.PlateThickness - plateThickness) < 0.001m &&
+                    Math.Abs(c.Length - kapaksizUzunlukMM) < 0.1m); // CM cinsinden tolerance (0.1cm = 1mm)
                 
                 var filteredList = filteredClampings.OrderByDescending(c => c.ClampingDate).ToList();
                 

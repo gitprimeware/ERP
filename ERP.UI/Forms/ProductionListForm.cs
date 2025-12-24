@@ -19,6 +19,7 @@ namespace ERP.UI.Forms
         private OrderRepository _orderRepository;
         private CompanyRepository _companyRepository;
         private AssemblyRepository _assemblyRepository;
+        private PackagingRepository _packagingRepository;
         private ClampingRequestRepository _clampingRequestRepository;
         private bool _isTableView = true; // Default tablo görünümü
         private ToolTip _actionToolTip;
@@ -45,6 +46,7 @@ namespace ERP.UI.Forms
             _orderRepository = new OrderRepository();
             _companyRepository = new CompanyRepository();
             _assemblyRepository = new AssemblyRepository();
+            _packagingRepository = new PackagingRepository();
             _clampingRequestRepository = new ClampingRequestRepository();
             _actionToolTip = new ToolTip();
             _actionToolTip.IsBalloon = false;
@@ -105,7 +107,7 @@ namespace ERP.UI.Forms
             {
                 new { Color = Color.FromArgb(244, 67, 54), Text = "İşlem Yok" },
                 new { Color = Color.FromArgb(255, 193, 7), Text = "Kenetleme" },
-                new { Color = Color.FromArgb(33, 150, 243), Text = "Montaj" },
+                new { Color = Color.FromArgb(33, 150, 243), Text = "Paketleme" },
                 new { Color = Color.FromArgb(76, 175, 80), Text = "Gönderildi" }
             };
             
@@ -779,6 +781,20 @@ namespace ERP.UI.Forms
                                 ProductionDetailRequested?.Invoke(this, order.Id);
                                 break;
                             case 2: // 💰 Muhasebeye Gönder
+                                // Paketleme kontrolü
+                                var packagings = _packagingRepository.GetByOrderId(order.Id);
+                                bool hasCompletedPackaging = packagings.Any(p => p.IsActive);
+                                
+                                if (!hasCompletedPackaging)
+                                {
+                                    MessageBox.Show(
+                                        "Bu siparişi muhasebeye göndermek için önce paketleme işleminin tamamlanmış olması gerekir.",
+                                        "Uyarı",
+                                        MessageBoxButtons.OK,
+                                        MessageBoxIcon.Warning);
+                                    break;
+                                }
+                                
                                 var result = MessageBox.Show(
                                     $"Sipariş {order.TrexOrderNo} muhasebeye gönderilecek. Emin misiniz?",
                                     "Muhasebeye Gönder",
@@ -1021,6 +1037,20 @@ namespace ERP.UI.Forms
                 btnSendToAccounting.Location = new Point(225, yPos);
                 btnSendToAccounting.Click += (s, e) =>
                 {
+                    // Paketleme kontrolü
+                    var packagings = _packagingRepository.GetByOrderId(order.Id);
+                    bool hasCompletedPackaging = packagings.Any(p => p.IsActive);
+                    
+                    if (!hasCompletedPackaging)
+                    {
+                        MessageBox.Show(
+                            "Bu siparişi muhasebeye göndermek için önce paketleme işleminin tamamlanmış olması gerekir.",
+                            "Uyarı",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning);
+                        return;
+                    }
+                    
                     var result = MessageBox.Show(
                         $"Sipariş {order.TrexOrderNo} muhasebeye gönderilecek. Emin misiniz?",
                         "Muhasebeye Gönder",
@@ -1107,14 +1137,14 @@ namespace ERP.UI.Forms
                 }
                 else if (status == "Üretimde")
                 {
-                    // Montaj işlemi yapılmış mı kontrol et
-                    var assemblies = _assemblyRepository.GetByOrderId(orderId);
-                    bool hasCompletedAssembly = assemblies.Any(a => a.IsActive);
+                    // Paketleme işlemi yapılmış mı kontrol et
+                    var packagings = _packagingRepository.GetByOrderId(orderId);
+                    bool hasCompletedPackaging = packagings.Any(p => p.IsActive);
                     
-                    // Montaj yapılmışsa mavi
-                    if (hasCompletedAssembly)
+                    // Paketleme yapılmışsa mavi
+                    if (hasCompletedPackaging)
                     {
-                        rowColor = Color.FromArgb(120, 33, 150, 243); // Mavi - Montaj
+                        rowColor = Color.FromArgb(120, 33, 150, 243); // Mavi - Paketleme
                     }
                     else
                     {
@@ -1301,14 +1331,14 @@ namespace ERP.UI.Forms
                     }
                     else if (status == "Üretimde")
                     {
-                        // Montaj işlemi yapılmış mı kontrol et
-                        var assemblies = _assemblyRepository.GetByOrderId(orderId);
-                        bool hasCompletedAssembly = assemblies.Any(a => a.IsActive);
+                        // Paketleme işlemi yapılmış mı kontrol et
+                        var packagings = _packagingRepository.GetByOrderId(orderId);
+                        bool hasCompletedPackaging = packagings.Any(p => p.IsActive);
                         
-                        // Montaj yapılmışsa mavi
-                        if (hasCompletedAssembly)
+                        // Paketleme yapılmışsa mavi
+                        if (hasCompletedPackaging)
                         {
-                            rowBgColor = Color.FromArgb(120, 33, 150, 243); // Mavi - Montaj
+                            rowBgColor = Color.FromArgb(120, 33, 150, 243); // Mavi - Paketleme
                         }
                         else
                         {
@@ -1503,13 +1533,13 @@ namespace ERP.UI.Forms
                 return order.Status;
             }
             
-            // Montaj işlemi yapılmış mı kontrol et
-            var assemblies = _assemblyRepository.GetByOrderId(order.Id);
-            bool hasCompletedAssembly = assemblies.Any(a => a.IsActive);
+            // Paketleme işlemi yapılmış mı kontrol et
+            var packagings = _packagingRepository.GetByOrderId(order.Id);
+            bool hasCompletedPackaging = packagings.Any(p => p.IsActive);
             
-            if (hasCompletedAssembly)
+            if (hasCompletedPackaging)
             {
-                return "Montaj";
+                return "Paketleme";
             }
             
             // Kenetleme işlemi yapılmış mı kontrol et
