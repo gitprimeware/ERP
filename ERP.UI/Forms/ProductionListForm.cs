@@ -333,8 +333,9 @@ namespace ERP.UI.Forms
             }
         }
 
-        private (string Hatve, string PlakaOlcusu, string Yukseklik, string Kapak, string Profil) ParseProductCodeForTable(string productCode)
+        private (string Hatve, string PlakaOlcusu, string Yukseklik, string Kapak, string Profil) ParseProductCodeForTable(Order order)
         {
+            string productCode = order?.ProductCode;
             if (string.IsNullOrEmpty(productCode))
                 return ("", "", "", "", "");
 
@@ -403,16 +404,26 @@ namespace ERP.UI.Forms
                     }
                 }
 
-                // Yükseklik: Yükseklik com'dan kapak boyunu çıkar
-                // Yükseklik <= 1800 ise Yükseklik, > 1800 ise Yükseklik/2, sonra kapak boyunu çıkar
+                // Yükseklik: SP ürünleri için kapak boyunu çıkar, YM ürünleri için çıkarma (YM'de montaj yapılmıyor)
+                // TrexOrderNo formatı: SP-YYYY-XXXX veya YM-YYYY-XXXX
+                bool isSP = !string.IsNullOrEmpty(order?.TrexOrderNo) && order.TrexOrderNo.StartsWith("SP-", StringComparison.OrdinalIgnoreCase);
+                
                 if (parts.Length >= 5 && int.TryParse(parts[4], out int yukseklikMM))
                 {
                     // Yükseklik com hesaplama
                     int yukseklikCom = yukseklikMM <= 1800 ? yukseklikMM : yukseklikMM / 2;
                     
-                    // Kapak boyunu çıkar
-                    int yukseklikSon = yukseklikCom - kapakBoyuMM;
-                    yukseklik = yukseklikSon.ToString();
+                    // SP ürünleri için kapak boyunu çıkar, YM ürünleri için çıkarma
+                    if (isSP)
+                    {
+                        int yukseklikSon = yukseklikCom - kapakBoyuMM;
+                        yukseklik = yukseklikSon.ToString();
+                    }
+                    else
+                    {
+                        // YM ürünleri için kapak boyu çıkarılmaz
+                        yukseklik = yukseklikCom.ToString();
+                    }
                 }
 
                 return (hatve, plakaOlcusu, yukseklik, kapak, profil);
@@ -617,7 +628,7 @@ namespace ERP.UI.Forms
                 // DataSource için özel bir liste oluştur - Ürün kodundan parse edilen değerlerle
                 var dataSource = orders.Select(o => 
                 {
-                    var parsedData = ParseProductCodeForTable(o.ProductCode);
+                    var parsedData = ParseProductCodeForTable(o);
                     return new
             {
                 o.Id,
@@ -1774,7 +1785,7 @@ namespace ERP.UI.Forms
 
                 var filteredData = originalOrders.Select(o => 
                 {
-                    var parsedData = ParseProductCodeForTable(o.ProductCode);
+                    var parsedData = ParseProductCodeForTable(o);
                     return new
                     {
                         o.Id,

@@ -16,6 +16,8 @@ namespace ERP.UI.Forms
         private DataGridView _dataGridView;
         private ClampingRepository _clampingRepository;
         private AssemblyRepository _assemblyRepository;
+        private AssemblyRequestRepository _assemblyRequestRepository;
+        private Clamping2RequestRepository _clamping2RequestRepository;
         private OrderRepository _orderRepository;
         private CompanyRepository _companyRepository;
         
@@ -33,6 +35,8 @@ namespace ERP.UI.Forms
         {
             _clampingRepository = new ClampingRepository();
             _assemblyRepository = new AssemblyRepository();
+            _assemblyRequestRepository = new AssemblyRequestRepository();
+            _clamping2RequestRepository = new Clamping2RequestRepository();
             _orderRepository = new OrderRepository();
             _companyRepository = new CompanyRepository();
             InitializeCustomComponents();
@@ -320,6 +324,14 @@ namespace ERP.UI.Forms
 
             _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
             {
+                DataPropertyName = "UsedInClamping2",
+                HeaderText = "KENETLEME 2'DE KULLANILAN (USED IN CLAMPING 2)",
+                Name = "UsedInClamping2",
+                Width = 220
+            });
+
+            _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
+            {
                 DataPropertyName = "Customer",
                 HeaderText = "MÜŞTERİ (CUSTOMER)",
                 Name = "Customer",
@@ -403,12 +415,30 @@ namespace ERP.UI.Forms
                 // Filtreleme uygula
                 clampings = ApplyFilters(clampings, orders);
 
-                // Montaj işlemlerinden kullanılan kenet adedini hesapla
+                // Montaj işlemlerinden kullanılan kenet adedini hesapla (hem Assembly hem AssemblyRequest'lerden)
                 var allAssemblies = _assemblyRepository.GetAll();
-                var usedClampCountByClampingId = allAssemblies
+                var usedClampCountFromAssembly = allAssemblies
                     .Where(a => a.IsActive && a.ClampingId.HasValue)
                     .GroupBy(a => a.ClampingId.Value)
                     .ToDictionary(g => g.Key, g => g.Sum(a => a.UsedClampCount));
+                
+                var allAssemblyRequests = _assemblyRequestRepository.GetAll();
+                var usedClampCountFromAssemblyRequests = allAssemblyRequests
+                    .Where(ar => ar.IsActive && ar.ClampingId.HasValue && ar.Status == "Tamamlandı")
+                    .GroupBy(ar => ar.ClampingId.Value)
+                    .ToDictionary(g => g.Key, g => g.Sum(ar => ar.ActualClampCount ?? ar.RequestedAssemblyCount));
+
+                // Kenetleme 2 işlemlerinden kullanılan kenet adedini hesapla (hem FirstClampingId hem SecondClampingId'den)
+                var allClamping2Requests = _clamping2RequestRepository.GetAll();
+                var usedClampCountFromClamping2AsFirst = allClamping2Requests
+                    .Where(cr2 => cr2.IsActive && cr2.FirstClampingId.HasValue)
+                    .GroupBy(cr2 => cr2.FirstClampingId.Value)
+                    .ToDictionary(g => g.Key, g => g.Sum(cr2 => cr2.ActualCount ?? cr2.RequestedCount));
+                
+                var usedClampCountFromClamping2AsSecond = allClamping2Requests
+                    .Where(cr2 => cr2.IsActive && cr2.SecondClampingId.HasValue)
+                    .GroupBy(cr2 => cr2.SecondClampingId.Value)
+                    .ToDictionary(g => g.Key, g => g.Sum(cr2 => cr2.ActualCount ?? cr2.RequestedCount));
 
                 var data = clampings.Select(c =>
                 {
@@ -416,13 +446,28 @@ namespace ERP.UI.Forms
                     
                     // Bu kenet için montaj işlemlerinde kullanılan adeti hesapla
                     int usedInAssembly = 0;
-                    if (usedClampCountByClampingId.ContainsKey(c.Id))
+                    if (usedClampCountFromAssembly.ContainsKey(c.Id))
                     {
-                        usedInAssembly = usedClampCountByClampingId[c.Id];
+                        usedInAssembly += usedClampCountFromAssembly[c.Id];
+                    }
+                    if (usedClampCountFromAssemblyRequests.ContainsKey(c.Id))
+                    {
+                        usedInAssembly += usedClampCountFromAssemblyRequests[c.Id];
                     }
                     
-                    // Kalan adet = Toplam kenet adedi - Montajda kullanılan adet
-                    int kalanAdet = c.ClampCount - usedInAssembly;
+                    // Bu kenet için kenetleme 2 işlemlerinde kullanılan adeti hesapla
+                    int usedInClamping2 = 0;
+                    if (usedClampCountFromClamping2AsFirst.ContainsKey(c.Id))
+                    {
+                        usedInClamping2 += usedClampCountFromClamping2AsFirst[c.Id];
+                    }
+                    if (usedClampCountFromClamping2AsSecond.ContainsKey(c.Id))
+                    {
+                        usedInClamping2 += usedClampCountFromClamping2AsSecond[c.Id];
+                    }
+                    
+                    // Kalan adet = Toplam kenet adedi - Montajda kullanılan adet - Kenetleme 2'de kullanılan adet
+                    int kalanAdet = c.ClampCount - usedInAssembly - usedInClamping2;
                     
                     // Hatve değerini harf ile göster
                     string hatveDisplay = GetHatveDisplay(c.Hatve);
@@ -437,6 +482,7 @@ namespace ERP.UI.Forms
                         ClampCount = c.ClampCount.ToString(),
                         KalanAdet = kalanAdet > 0 ? kalanAdet.ToString() : "0",
                         UsedInAssembly = usedInAssembly > 0 ? usedInAssembly.ToString() : "0",
+                        UsedInClamping2 = usedInClamping2 > 0 ? usedInClamping2.ToString() : "0",
                         Customer = order?.Company?.Name ?? "",
                         UsedPlateCount = c.UsedPlateCount.ToString(),
                         PlateThickness = c.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
