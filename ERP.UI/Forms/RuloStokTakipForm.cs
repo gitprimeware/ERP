@@ -17,7 +17,7 @@ namespace ERP.UI.Forms
         private MaterialEntryRepository _materialEntryRepository;
         private SerialNoRepository _serialNoRepository;
         private CuttingRepository _cuttingRepository;
-        
+
         // Filtreleme kontrolleri
         private ComboBox _cmbRuloSeriNo;
         private ComboBox _cmbMalzeme;

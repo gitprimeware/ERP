@@ -14,7 +14,7 @@ namespace ERP.UI.Forms
         private ComboBox _cmbPlateThickness;
         private ComboBox _cmbHatve;
         private ComboBox _cmbSize;
-        private TextBox _txtLength;
+        private ComboBox _cmbLength;
         private ComboBox _cmbSerialNo;
         private ComboBox _cmbClamping;
         private ComboBox _cmbMachine;
@@ -151,7 +151,7 @@ namespace ERP.UI.Forms
             this.Controls.Add(_cmbSize);
             yPos += spacing;
 
-            // Uzunluk (ReadOnly - kenetlenmiş plakadan otomatik gelecek)
+            // Uzunluk (Seçilebilir - sipariş uzunluğundan kapak boyu çıkarılmış)
             var lblLength = new Label
             {
                 Text = "Uzunluk:",
@@ -159,15 +159,16 @@ namespace ERP.UI.Forms
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F)
             };
-            _txtLength = new TextBox
+            _cmbLength = new ComboBox
             {
                 Location = new Point(150, yPos - 3),
                 Width = controlWidth,
                 Height = controlHeight,
+                DropDownStyle = ComboBoxStyle.DropDown,
                 Font = new Font("Segoe UI", 10F)
             };
             this.Controls.Add(lblLength);
-            this.Controls.Add(_txtLength);
+            this.Controls.Add(_cmbLength);
             yPos += spacing;
 
             // Rulo Seri No (Readonly)
@@ -439,13 +440,34 @@ namespace ERP.UI.Forms
                         _cmbPlateThickness.Text = plateThicknessText;
                 }
                 
-                // Uzunluk bilgisini siparişten al (MM olarak göster)
+                // Uzunluk bilgisini siparişten al (kapak boyu çıkarılmış, MM olarak göster)
                 if (parts.Length >= 5 && int.TryParse(parts[4], out int yukseklikMM))
                 {
                     // Yükseklik com: <= 1800 ise aynı, > 1800 ise /2
                     int yukseklikComMM = yukseklikMM <= 1800 ? yukseklikMM : yukseklikMM / 2;
-                    // MM olarak göster (CM'ye çevirmeden direkt MM)
-                    _txtLength.Text = yukseklikComMM.ToString("F2", CultureInfo.InvariantCulture);
+                    
+                    // Kapak boyu çıkarılmış uzunluk (montajlanmamış kenet ararken kapaksız uzunluğu arıyoruz)
+                    int kapakBoyuMM = GetKapakBoyuFromOrder();
+                    decimal kapaksizUzunlukMM = yukseklikComMM - kapakBoyuMM;
+                    
+                    // ComboBox'a tüm mevcut uzunluk değerlerini ekle (CM'den MM'ye çevirerek)
+                    var allLengths = _clampingRepository.GetAll()
+                        .Select(c => c.Length * 10.0m) // CM'yi MM'ye çevir
+                        .Distinct()
+                        .OrderBy(l => l)
+                        .ToList();
+                    _cmbLength.Items.Clear();
+                    foreach (var l in allLengths)
+                    {
+                        _cmbLength.Items.Add(l.ToString("F2", CultureInfo.InvariantCulture));
+                    }
+                    
+                    // Sipariş uzunluğundan (kapak boyu çıkarılmış) değeri seç
+                    var lengthText = kapaksizUzunlukMM.ToString("F2", CultureInfo.InvariantCulture);
+                    if (_cmbLength.Items.Contains(lengthText))
+                        _cmbLength.SelectedItem = lengthText;
+                    else
+                        _cmbLength.Text = lengthText;
                 }
             }
             catch (Exception ex)
@@ -501,7 +523,7 @@ namespace ERP.UI.Forms
                 if (string.IsNullOrWhiteSpace(_cmbHatve.Text) || 
                     string.IsNullOrWhiteSpace(_cmbSize.Text) || 
                     string.IsNullOrWhiteSpace(_cmbPlateThickness.Text) ||
-                    string.IsNullOrWhiteSpace(_txtLength.Text))
+                    string.IsNullOrWhiteSpace(_cmbLength.Text))
                 {
                     _cmbClamping.Enabled = false;
                     return;
@@ -510,28 +532,27 @@ namespace ERP.UI.Forms
                 if (!decimal.TryParse(_cmbHatve.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal hatve) ||
                     !decimal.TryParse(_cmbSize.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal size) ||
                     !decimal.TryParse(_cmbPlateThickness.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal plateThickness) ||
-                    !decimal.TryParse(_txtLength.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal lengthMM))
+                    !decimal.TryParse(_cmbLength.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal lengthMM))
                 {
                     _cmbClamping.Enabled = false;
                     return;
                 }
 
-                // Uzunluk filtresi: Ürün uzunluğundan kapak boyu çıkarılacak
-                int kapakBoyuMM = GetKapakBoyuFromOrder();
-                decimal kapaksizUzunlukMM = lengthMM - kapakBoyuMM;
-                decimal kapaksizUzunlukCM = kapaksizUzunlukMM / 10.0m; // MM'yi CM'ye çevir
+                // Uzunluk filtresi: ComboBox'tan seçilen uzunluk zaten sipariş uzunluğundan kapak boyu çıkarılmış (MM cinsinden)
+                // Kenet uzunluğu CM cinsinden saklandığı için MM'yi CM'ye çevir
+                decimal kapaksizUzunlukCM = lengthMM / 10.0m; // MM'yi CM'ye çevir
 
                 // TÜM kenetlenmiş stokları yükle (sadece belirli bir siparişe ait değil, stoktan da kullanılabilir)
                 var allClampings = _clampingRepository.GetAll();
                 
-                // Filtreleme: Hatve, Ölçü, Plaka Kalınlığı, Uzunluk (kapaksız uzunluk ile karşılaştırılacak)
+                // Filtreleme: Hatve, Ölçü, Plaka Kalınlığı, Uzunluk (kapaksız uzunluk CM cinsinden karşılaştırılacak)
                 var filteredClampings = allClampings.Where(c => 
                     c.ClampCount > 0 && 
                     c.IsActive &&
                     Math.Abs(c.Hatve - hatve) < 0.01m &&
                     Math.Abs(c.Size - size) < 0.1m &&
                     Math.Abs(c.PlateThickness - plateThickness) < 0.001m &&
-                    Math.Abs(c.Length - kapaksizUzunlukMM) < 0.1m); // CM cinsinden tolerance (0.1cm = 1mm)
+                    Math.Abs(c.Length - lengthMM) < 0.1m); // CM cinsinden tolerance (0.1cm = 1mm)
                 
                 var filteredList = filteredClampings.OrderByDescending(c => c.ClampingDate).ToList();
                 
@@ -845,7 +866,7 @@ namespace ERP.UI.Forms
                     Hatve = decimal.Parse(_cmbHatve.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
                     Size = decimal.Parse(_cmbSize.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
                     // Uzunluk MM olarak giriliyor, CM'ye çevirip kaydet (veritabanında CM olarak saklanıyor)
-                    Length = decimal.Parse(_txtLength.Text, NumberStyles.Any, CultureInfo.InvariantCulture) / 10.0m,
+                    Length = decimal.Parse(_cmbLength.Text, NumberStyles.Any, CultureInfo.InvariantCulture) / 10.0m,
                     SerialNoId = clamping?.SerialNoId,
                     MachineId = _cmbMachine.SelectedItem != null ? GetSelectedId(_cmbMachine) : (Guid?)null,
                     RequestedAssemblyCount = int.Parse(_txtRequestedAssemblyCount.Text),
@@ -912,7 +933,7 @@ namespace ERP.UI.Forms
                 return false;
             }
 
-            if (string.IsNullOrWhiteSpace(_txtLength.Text) || !decimal.TryParse(_txtLength.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal length) || length <= 0)
+            if (string.IsNullOrWhiteSpace(_cmbLength.Text) || !decimal.TryParse(_cmbLength.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal length) || length <= 0)
             {
                 MessageBox.Show("Uzunluk bilgisi yüklenemedi. Lütfen tekrar deneyiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;

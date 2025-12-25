@@ -3014,7 +3014,7 @@ namespace ERP.UI.Forms
                     OrderNo = order?.TrexOrderNo ?? "",
                     Hatve = GetHatveLetter(a.Hatve),
                     Size = a.Size.ToString("F2", CultureInfo.InvariantCulture),
-                    Length = (a.Length * 10.0m - kapakBoyuMM).ToString("F2", CultureInfo.InvariantCulture), // Length CM olarak saklanıyor, MM'ye çevirip kapak çıkar
+                    Length = (a.Length * 10.0m).ToString("F2", CultureInfo.InvariantCulture), // Length CM olarak saklanıyor (kapaksız), MM'ye çevir
                     AssemblyCount = a.AssemblyCount.ToString(),
                     Customer = order?.Company?.Name ?? "",
                     UsedClampCount = a.UsedClampCount.ToString(),
@@ -3034,7 +3034,7 @@ namespace ERP.UI.Forms
                         OrderNo = order?.TrexOrderNo ?? "",
                         Hatve = GetHatveLetter(r.Hatve),
                         Size = r.Size.ToString("F2", CultureInfo.InvariantCulture),
-                        Length = (r.Length * 10.0m - kapakBoyuMM).ToString("F2", CultureInfo.InvariantCulture), // Length CM olarak saklanıyor, MM'ye çevirip kapak çıkar
+                        Length = (r.Length * 10.0m).ToString("F2", CultureInfo.InvariantCulture), // Length CM olarak saklanıyor (kapaksız), MM'ye çevir
                         AssemblyCount = r.ResultedAssemblyCount?.ToString() ?? "-",
                         Customer = order?.Company?.Name ?? "",
                         UsedClampCount = r.ActualClampCount?.ToString() ?? "-",
