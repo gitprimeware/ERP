@@ -84,6 +84,9 @@ namespace ERP.UI.Forms
         private MachineRepository _machineRepository;
         private SerialNoRepository _serialNoRepository;
         private EmployeeRepository _employeeRepository;
+        private CoverStockRepository _coverStockRepository;
+        private SideProfileStockRepository _sideProfileStockRepository;
+        private SideProfileRemnantRepository _sideProfileRemnantRepository;
         private Order _order;
 
         public event EventHandler BackRequested;
@@ -109,6 +112,9 @@ namespace ERP.UI.Forms
             _machineRepository = new MachineRepository();
             _serialNoRepository = new SerialNoRepository();
             _employeeRepository = new EmployeeRepository();
+            _coverStockRepository = new CoverStockRepository();
+            _sideProfileStockRepository = new SideProfileStockRepository();
+            _sideProfileRemnantRepository = new SideProfileRemnantRepository();
             InitializeCustomComponents();
         }
 
@@ -1151,6 +1157,152 @@ namespace ERP.UI.Forms
 
             // Eşleşme bulunamazsa 0 döndür
             return 0m;
+        }
+
+        private void ConsumeCoverStock(Order order, int yapilanAdet)
+        {
+            try
+            {
+                if (order == null || string.IsNullOrEmpty(order.ProductCode))
+                    return;
+
+                var parts = order.ProductCode.Split('-');
+                
+                // Profil tipi (S=Standart, G=Geniş)
+                string profileType = "";
+                if (parts.Length >= 3)
+                {
+                    string modelProfile = parts[2];
+                    if (modelProfile.Length >= 2)
+                    {
+                        char profileLetter = modelProfile[1];
+                        profileType = profileLetter == 'S' || profileLetter == 's' ? "Standart" : "Geniş";
+                    }
+                }
+
+                // Plaka ölçüsü
+                int plateSizeMM = 0;
+                if (parts.Length >= 4 && int.TryParse(parts[3], out int plakaOlcusuMM))
+                {
+                    plateSizeMM = plakaOlcusuMM <= 1150 ? plakaOlcusuMM : plakaOlcusuMM / 2;
+                }
+
+                // Kapak boyu
+                int coverLengthMM = GetKapakBoyuFromOrder(order);
+
+                if (!string.IsNullOrEmpty(profileType) && plateSizeMM > 0 && coverLengthMM > 0)
+                {
+                    // CoverStock'tan bul
+                    var coverStock = _coverStockRepository.GetByProperties(profileType, plateSizeMM, coverLengthMM);
+                    if (coverStock != null)
+                    {
+                        // Her adet için 2 tane kapak kullanılacak
+                        int neededCoverCount = yapilanAdet * 2;
+                        
+                        if (coverStock.Quantity >= neededCoverCount)
+                        {
+                            coverStock.Quantity -= neededCoverCount;
+                            _coverStockRepository.Update(coverStock);
+                        }
+                        else
+                        {
+                            MessageBox.Show($"Yetersiz kapak stoku! Gereken: {neededCoverCount}, Mevcut: {coverStock.Quantity}", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Kapak stoku tüketilirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void ConsumeSideProfileStock(Order order, Clamping clamping, int yapilanAdet)
+        {
+            try
+            {
+                // Yan profil uzunluğu = clamping.Length (MM cinsinden)
+                decimal sideProfileLengthMM = clamping.Length;
+                decimal sideProfileLengthM = sideProfileLengthMM / 1000.0m; // MM'den metreye çevir
+                
+                // Her adet için 4 tane yan profil gerekiyor
+                int neededProfileCount = yapilanAdet * 4;
+
+                // Önce kalanlardan (remnants) kullan
+                var usableRemnants = _sideProfileRemnantRepository.GetAll(includeWaste: false)
+                    .Where(r => r.Length >= sideProfileLengthM && r.Quantity > 0)
+                    .OrderBy(r => r.Length)
+                    .ToList();
+
+                int remainingNeeded = neededProfileCount;
+
+                foreach (var remnant in usableRemnants)
+                {
+                    if (remainingNeeded <= 0)
+                        break;
+
+                    int useCount = Math.Min(remnant.Quantity, remainingNeeded);
+                    remnant.Quantity -= useCount;
+                    
+                    if (remnant.Quantity == 0)
+                    {
+                        // Eğer remnant tamamen kullanıldıysa sil (IsActive = false)
+                        _sideProfileRemnantRepository.Delete(remnant.Id);
+                    }
+                    else
+                    {
+                        _sideProfileRemnantRepository.Update(remnant);
+                    }
+
+                    remainingNeeded -= useCount;
+                }
+
+                // Hala ihtiyaç varsa 6 metrelik stoklardan kullan
+                if (remainingNeeded > 0)
+                {
+                    var sixMeterStock = _sideProfileStockRepository.GetByLength(6.0m);
+                    if (sixMeterStock != null && sixMeterStock.RemainingLength > 0)
+                    {
+                        // Her bir 6 metrelik profilden kaç tane yan profil çıkar
+                        int profilesPerSixMeter = (int)Math.Floor(6.0m / sideProfileLengthM);
+                        
+                        if (profilesPerSixMeter > 0)
+                        {
+                            // Kaç tane 6 metrelik profil gerekiyor
+                            int neededSixMeterProfiles = (int)Math.Ceiling((decimal)remainingNeeded / profilesPerSixMeter);
+                            
+                            // Mevcut 6 metrelik stoktan kaç tane kullanılabilir
+                            int availableSixMeterProfiles = (int)Math.Floor(sixMeterStock.RemainingLength / 6.0m);
+                            int useFromStock = Math.Min(neededSixMeterProfiles, availableSixMeterProfiles);
+
+                            if (useFromStock > 0)
+                            {
+                                decimal usedLengthM = useFromStock * 6.0m;
+                                sixMeterStock.UsedLength += usedLengthM;
+                                _sideProfileStockRepository.Update(sixMeterStock);
+
+                                // Kalan parçaları hesapla ve remnant'a ekle
+                                // Her 6 metrelik profilden kesilen parçadan kalan = 6m - (profilesPerSixMeter * sideProfileLengthM)
+                                decimal remnantLength = 6.0m - (profilesPerSixMeter * sideProfileLengthM);
+                                if (remnantLength > 0)
+                                {
+                                    var remnant = new SideProfileRemnant
+                                    {
+                                        Length = remnantLength,
+                                        Quantity = useFromStock,
+                                        IsWaste = false
+                                    };
+                                    _sideProfileRemnantRepository.InsertOrMerge(remnant);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Yan profil stoku tüketilirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private int GetKapakBoyuFromOrder(Order order)
@@ -3014,7 +3166,7 @@ namespace ERP.UI.Forms
                     OrderNo = order?.TrexOrderNo ?? "",
                     Hatve = GetHatveLetter(a.Hatve),
                     Size = a.Size.ToString("F2", CultureInfo.InvariantCulture),
-                    Length = (a.Length * 10.0m).ToString("F2", CultureInfo.InvariantCulture), // Length CM olarak saklanıyor (kapaksız), MM'ye çevir
+                    Length = a.Length.ToString("F2", CultureInfo.InvariantCulture), // Length MM cinsinden saklanıyor
                     AssemblyCount = a.AssemblyCount.ToString(),
                     Customer = order?.Company?.Name ?? "",
                     UsedClampCount = a.UsedClampCount.ToString(),
@@ -3034,7 +3186,7 @@ namespace ERP.UI.Forms
                         OrderNo = order?.TrexOrderNo ?? "",
                         Hatve = GetHatveLetter(r.Hatve),
                         Size = r.Size.ToString("F2", CultureInfo.InvariantCulture),
-                        Length = (r.Length * 10.0m).ToString("F2", CultureInfo.InvariantCulture), // Length CM olarak saklanıyor (kapaksız), MM'ye çevir
+                        Length = r.Length.ToString("F2", CultureInfo.InvariantCulture), // Length MM cinsinden saklanıyor
                         AssemblyCount = r.ResultedAssemblyCount?.ToString() ?? "-",
                         Customer = order?.Company?.Name ?? "",
                         UsedClampCount = r.ActualClampCount?.ToString() ?? "-",
@@ -3255,7 +3407,27 @@ namespace ERP.UI.Forms
                 };
                 _assemblyRepository.Insert(assembly);
 
-                MessageBox.Show("Montaj talebi onaylandı ve montaj kaydı oluşturuldu!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                // Stok tüketimleri
+                int yapilanAdet = selectedRequest.ResultedAssemblyCount.Value;
+                var order = selectedRequest.OrderId.HasValue ? _orderRepository.GetById(selectedRequest.OrderId.Value) : null;
+                
+                if (order != null)
+                {
+                    // 1. Kapak stokundan tüketim (her adet için 2 tane)
+                    ConsumeCoverStock(order, yapilanAdet);
+                    
+                    // 2. Yan profil stokundan tüketim (her adet için 4 tane)
+                    if (selectedRequest.ClampingId.HasValue)
+                    {
+                        var clamping = _clampingRepository.GetById(selectedRequest.ClampingId.Value);
+                        if (clamping != null)
+                        {
+                            ConsumeSideProfileStock(order, clamping, yapilanAdet);
+                        }
+                    }
+                }
+
+                MessageBox.Show("Montaj talebi onaylandı ve montaj kaydı oluşturuldu!\nStok tüketimleri yapıldı.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                 // Verileri yeniden yükle
                 LoadAssemblyData(dataGridView);
@@ -3416,7 +3588,7 @@ namespace ERP.UI.Forms
                     OrderNo = order?.TrexOrderNo ?? "",
                     Hatve = GetHatveLetter(p.Hatve),
                     Size = p.Size.ToString("F2", CultureInfo.InvariantCulture),
-                    Length = (p.Length * 10.0m + kapakBoyuMM).ToString("F2", CultureInfo.InvariantCulture), // Uzunluk + kapak boyu
+                    Length = (p.Length + kapakBoyuMM).ToString("F2", CultureInfo.InvariantCulture), // Uzunluk (MM) + kapak boyu (MM)
                     ProductType = productType,
                     Profil = profil,
                     PackagingCount = p.PackagingCount.ToString(),
@@ -3439,7 +3611,7 @@ namespace ERP.UI.Forms
                     OrderNo = order?.TrexOrderNo ?? "",
                     Hatve = GetHatveLetter(a.Hatve),
                     Size = a.Size.ToString("F2", CultureInfo.InvariantCulture),
-                    Length = (a.Length * 10.0m + kapakBoyuMM).ToString("F2", CultureInfo.InvariantCulture), // Uzunluk + kapak boyu
+                    Length = (a.Length + kapakBoyuMM).ToString("F2", CultureInfo.InvariantCulture), // Uzunluk (MM) + kapak boyu (MM)
                     ProductType = productType,
                     Profil = profil,
                     PackagingCount = "-",

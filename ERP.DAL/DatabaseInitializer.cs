@@ -38,6 +38,10 @@ namespace ERP.DAL
                     CreateAssemblyRequestsTable(connection);
                     CreateClamping2RequestsTable(connection);
                     CreatePackagingsTable(connection);
+                    CreateCoverStocksTable(connection);
+                    CreateSideProfileStocksTable(connection);
+                    CreateSideProfileRemnantsTable(connection);
+                    CreateIsolationStocksTable(connection);
                 }
             }
             catch (Exception ex)
@@ -750,6 +754,121 @@ namespace ERP.DAL
                         FOREIGN KEY ([SerialNoId]) REFERENCES [SerialNos]([Id]),
                         FOREIGN KEY ([MachineId]) REFERENCES [Machines]([Id]),
                         FOREIGN KEY ([EmployeeId]) REFERENCES [Employees]([Id])
+                    )
+                END";
+
+            using (var command = new SqlCommand(query, connection))
+            {
+                command.ExecuteNonQuery();
+            }
+        }
+
+        private static void CreateCoverStocksTable(SqlConnection connection)
+        {
+            var query = @"
+                IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[CoverStocks]') AND type in (N'U'))
+                BEGIN
+                    CREATE TABLE [dbo].[CoverStocks] (
+                        [Id] UNIQUEIDENTIFIER PRIMARY KEY,
+                        [ProfileType] NVARCHAR(50) NOT NULL,
+                        [Size] INT NOT NULL,
+                        [CoverLength] INT NOT NULL,
+                        [Quantity] INT NOT NULL,
+                        [EntryDate] DATETIME NOT NULL,
+                        [CreatedDate] DATETIME NOT NULL,
+                        [ModifiedDate] DATETIME NULL,
+                        [IsActive] BIT NOT NULL DEFAULT 1
+                    )
+                END";
+
+            using (var command = new SqlCommand(query, connection))
+            {
+                command.ExecuteNonQuery();
+            }
+
+            // Unique index'i ayrı bir sorgu ile oluştur (filtered index)
+            var indexQuery = @"
+                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_CoverStocks_ProfileType_Size_CoverLength' AND object_id = OBJECT_ID('CoverStocks'))
+                BEGIN
+                    CREATE UNIQUE INDEX IX_CoverStocks_ProfileType_Size_CoverLength 
+                    ON [dbo].[CoverStocks] ([ProfileType], [Size], [CoverLength])
+                    WHERE [IsActive] = 1
+                END";
+
+            using (var command = new SqlCommand(indexQuery, connection))
+            {
+                try
+                {
+                    command.ExecuteNonQuery();
+                }
+                catch
+                {
+                    // Index oluşturma hatası olursa devam et (zaten InsertOrUpdate metodunda kontrol var)
+                }
+            }
+        }
+
+        private static void CreateSideProfileStocksTable(SqlConnection connection)
+        {
+            var query = @"
+                IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[SideProfileStocks]') AND type in (N'U'))
+                BEGIN
+                    CREATE TABLE [dbo].[SideProfileStocks] (
+                        [Id] UNIQUEIDENTIFIER PRIMARY KEY,
+                        [Length] DECIMAL(10,2) NOT NULL,
+                        [InitialQuantity] INT NOT NULL,
+                        [UsedLength] DECIMAL(10,2) NOT NULL DEFAULT 0,
+                        [WastedLength] DECIMAL(10,2) NOT NULL DEFAULT 0,
+                        [RemainingLength] DECIMAL(10,2) NOT NULL,
+                        [EntryDate] DATETIME NOT NULL,
+                        [CreatedDate] DATETIME NOT NULL,
+                        [ModifiedDate] DATETIME NULL,
+                        [IsActive] BIT NOT NULL DEFAULT 1
+                    )
+                END";
+
+            using (var command = new SqlCommand(query, connection))
+            {
+                command.ExecuteNonQuery();
+            }
+        }
+
+        private static void CreateSideProfileRemnantsTable(SqlConnection connection)
+        {
+            var query = @"
+                IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[SideProfileRemnants]') AND type in (N'U'))
+                BEGIN
+                    CREATE TABLE [dbo].[SideProfileRemnants] (
+                        [Id] UNIQUEIDENTIFIER PRIMARY KEY,
+                        [Length] DECIMAL(10,2) NOT NULL,
+                        [Quantity] INT NOT NULL,
+                        [IsWaste] BIT NOT NULL DEFAULT 0,
+                        [CreatedDate] DATETIME NOT NULL,
+                        [WasteDate] DATETIME NULL,
+                        [ModifiedDate] DATETIME NULL,
+                        [IsActive] BIT NOT NULL DEFAULT 1
+                    )
+                END";
+
+            using (var command = new SqlCommand(query, connection))
+            {
+                command.ExecuteNonQuery();
+            }
+        }
+
+        private static void CreateIsolationStocksTable(SqlConnection connection)
+        {
+            var query = @"
+                IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[IsolationStocks]') AND type in (N'U'))
+                BEGIN
+                    CREATE TABLE [dbo].[IsolationStocks] (
+                        [Id] UNIQUEIDENTIFIER PRIMARY KEY,
+                        [LiquidType] NVARCHAR(50) NOT NULL,
+                        [Liter] DECIMAL(10,2) NOT NULL,
+                        [EntryDate] DATETIME NOT NULL,
+                        [CreatedDate] DATETIME NOT NULL,
+                        [ModifiedDate] DATETIME NULL,
+                        [IsActive] BIT NOT NULL DEFAULT 1
                     )
                 END";
 

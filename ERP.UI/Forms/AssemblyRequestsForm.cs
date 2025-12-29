@@ -109,8 +109,22 @@ namespace ERP.UI.Forms
             AddAssemblyRequestColumn("ProfilTipi", "Profil Tipi", 100);
             AddAssemblyRequestColumn("Customer", "Müşteri", 150);
             AddAssemblyRequestColumn("EmployeeName", "Operatör", 150);
-            AddAssemblyRequestColumn("MontajlanacakKenet", "Montajlanacak Kenet", 150);
-            AddAssemblyRequestColumn("OlusanMontaj", "Oluşan Montaj", 130);
+            AddAssemblyRequestColumn("MontajlanacakKenet", "İstenen", 100);
+            
+            // Yapılan kolonu - editable TextBox
+            var colYapilan = new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "Yapilan",
+                HeaderText = "Yapılan",
+                Name = "Yapilan",
+                Width = 100,
+                ReadOnly = false // Düzenlenebilir
+            };
+            colYapilan.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            _dataGridView.Columns.Add(colYapilan);
+            
+            // Kalan kolonu - readonly
+            AddAssemblyRequestColumn("Kalan", "Kalan", 100);
             
             // Montaj Tamamlandı checkbox kolonu
             var colMontajTamamlandi = new DataGridViewCheckBoxColumn
@@ -147,10 +161,10 @@ namespace ERP.UI.Forms
             _dataGridView.DefaultCellStyle.Font = new Font("Segoe UI", 9F);
             _dataGridView.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
 
-            // CellValueChanged event'i - checkbox değiştiğinde onaylama yap
+            // CellValueChanged event'i - checkbox ve Yapılan değiştiğinde işlem yap
             _dataGridView.CellValueChanged += DataGridView_CellValueChanged;
             
-            // CurrentCellDirtyStateChanged event'i - checkbox değişikliklerini hemen commit et
+            // CurrentCellDirtyStateChanged event'i - checkbox ve TextBox değişikliklerini hemen commit et
             _dataGridView.CurrentCellDirtyStateChanged += DataGridView_CurrentCellDirtyStateChanged;
 
             // Event handler
@@ -197,11 +211,14 @@ namespace ERP.UI.Forms
                 {
                     var order = r.OrderId.HasValue ? _orderRepository.GetById(r.OrderId.Value) : null;
                     
-                    // Montajlanacak kenet sayısı (RequestedAssemblyCount'tan gelecek)
-                    int montajlanacakKenet = r.RequestedAssemblyCount;
+                    // Montajlanacak kenet sayısı (İstenen - RequestedAssemblyCount)
+                    int istenen = r.RequestedAssemblyCount;
                     
-                    // Oluşan montaj sipariş adedinden gelecek
-                    int olusanMontaj = order?.Quantity ?? 0;
+                    // Yapılan (ResultedAssemblyCount - eğer null ise 0)
+                    int yapilan = r.ResultedAssemblyCount ?? 0;
+                    
+                    // Kalan
+                    int kalan = istenen - yapilan;
                     
                     // Kapak Tipi ve Profil Tipi parse et
                     string kapakTipi = "";
@@ -235,8 +252,8 @@ namespace ERP.UI.Forms
                         }
                     }
                     
-                    // Uzunluk CM olarak saklanıyor, MM olarak göstermek için 10 ile çarp
-                    decimal lengthMM = r.Length * 10.0m;
+                    // Uzunluk MM cinsinden saklanıyor (artık CM'ye çevirmeye gerek yok)
+                    decimal lengthMM = r.Length;
                     
                     return new
                     {
@@ -251,10 +268,11 @@ namespace ERP.UI.Forms
                         ProfilTipi = profilTipi,
                         Customer = order?.Company?.Name ?? "",
                         EmployeeName = r.Employee != null ? $"{r.Employee.FirstName} {r.Employee.LastName}" : "",
-                        MontajlanacakKenet = montajlanacakKenet.ToString(),
-                        OlusanMontaj = olusanMontaj.ToString(),
-                        MontajTamamlandi = r.Status == "Tamamlandı",
-                        Status = r.Status
+                        MontajlanacakKenet = istenen.ToString(),
+                        Yapilan = yapilan.ToString(),
+                        Kalan = kalan.ToString(),
+                        MontajTamamlandi = r.Status == "Tamamlandı" || kalan == 0,
+                        Status = kalan == 0 ? "Tamamlandı" : r.Status
                     };
                 }).ToList();
 
@@ -286,6 +304,15 @@ namespace ERP.UI.Forms
                 return;
 
             var columnName = _dataGridView.Columns[e.ColumnIndex].Name;
+            
+            // Yapılan kolonu değiştiğinde
+            if (columnName == "Yapilan")
+            {
+                UpdateYapilanValue(e.RowIndex);
+                return;
+            }
+            
+            // Checkbox değiştiğinde
             if (columnName != "MontajTamamlandi")
                 return;
 
@@ -327,6 +354,80 @@ namespace ERP.UI.Forms
             catch (Exception ex)
             {
                 MessageBox.Show("Montaj onaylanırken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                LoadData(); // Hata durumunda veriyi yeniden yükle
+            }
+        }
+
+        private void UpdateYapilanValue(int rowIndex)
+        {
+            try
+            {
+                var row = _dataGridView.Rows[rowIndex];
+                if (row.DataBoundItem == null)
+                    return;
+
+                // Id'yi al
+                Guid requestId = Guid.Empty;
+                var item = row.DataBoundItem;
+                var idProperty = item.GetType().GetProperty("Id");
+                if (idProperty != null)
+                {
+                    requestId = (Guid)idProperty.GetValue(item);
+                }
+
+                if (requestId == Guid.Empty)
+                    return;
+
+                var request = _assemblyRequestRepository.GetById(requestId);
+                if (request == null)
+                    return;
+
+                // Yapılan değerini al
+                string yapilanStr = row.Cells["Yapilan"].Value?.ToString() ?? "0";
+                if (!int.TryParse(yapilanStr, out int yapilan) || yapilan < 0)
+                {
+                    MessageBox.Show("Lütfen geçerli bir sayı giriniz (0 veya pozitif).", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    LoadData(); // Değeri geri almak için yeniden yükle
+                    return;
+                }
+
+                int istenen = request.RequestedAssemblyCount;
+                if (yapilan > istenen)
+                {
+                    MessageBox.Show($"Yapılan adet, istenen adetten ({istenen}) fazla olamaz!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    LoadData(); // Değeri geri almak için yeniden yükle
+                    return;
+                }
+
+                // ResultedAssemblyCount'u güncelle
+                request.ResultedAssemblyCount = yapilan;
+                
+                // Kalan 0 ise status'u Tamamlandı yap, değilse Montajda yap
+                int kalan = istenen - yapilan;
+                if (kalan == 0)
+                {
+                    request.Status = "Tamamlandı";
+                    request.CompletionDate = DateTime.Now;
+                }
+                else if (request.Status == "Tamamlandı")
+                {
+                    // Eğer daha önce tamamlanmışsa ama şimdi kalan varsa, durumu güncelle
+                    request.Status = "Montajda";
+                    request.CompletionDate = null;
+                }
+                else if (request.Status == "Beklemede")
+                {
+                    request.Status = "Montajda";
+                }
+                
+                _assemblyRequestRepository.Update(request);
+
+                // Verileri yeniden yükle (Kalan kolonu güncellenecek)
+                LoadData();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Yapılan adet güncellenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 LoadData(); // Hata durumunda veriyi yeniden yükle
             }
         }

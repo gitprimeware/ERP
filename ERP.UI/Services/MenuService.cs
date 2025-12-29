@@ -33,6 +33,10 @@ namespace ERP.UI.Services
 
             var consumptionItem = new MenuItem("⚡ Sarfiyat", "Consumption", "⚡", 6);
 
+            var consumptionMaterialStockItem = new MenuItem("📦 Sarfiyat Malzeme Stok", "ConsumptionMaterialStock", "📦", 7);
+            consumptionMaterialStockItem.AddSubMenuItem(new MenuItem("➕ Stok Gir", "ConsumptionMaterialStockEntry", "➕", 1));
+            consumptionMaterialStockItem.AddSubMenuItem(new MenuItem("📋 Stok Görüntüle", "ConsumptionMaterialStockView", "📋", 2));
+
             var stockItem = new MenuItem("📦 Stok Yönetimi", "Stock", "📦", 4);
             stockItem.AddSubMenuItem(new MenuItem("📥 Malzeme Giriş", "MaterialEntry", "📥", 1));
             stockItem.AddSubMenuItem(new MenuItem("📤 Malzeme Çıkış", "MaterialExit", "📤", 2));
@@ -58,6 +62,7 @@ namespace ERP.UI.Services
                 new MenuItem("📋 Kenetleme 2 Talepleri", "Clamping2Requests", "📋", 8),
                 new MenuItem("📋 Montaj Talepleri", "AssemblyRequests", "📋", 9),
                 consumptionItem,
+                consumptionMaterialStockItem,
                 reportsItem,
                 new MenuItem("⚙️ Ayarlar", "Settings", "⚙️", 11)
             };

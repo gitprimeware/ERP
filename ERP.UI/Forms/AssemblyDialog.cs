@@ -31,7 +31,18 @@ namespace ERP.UI.Forms
         private AssemblyRepository _assemblyRepository;
         private AssemblyRequestRepository _assemblyRequestRepository;
         private OrderRepository _orderRepository;
+        private CoverStockRepository _coverStockRepository;
+        private SideProfileStockRepository _sideProfileStockRepository;
+        private SideProfileRemnantRepository _sideProfileRemnantRepository;
         private Guid _orderId;
+        
+        // Yeni kontroller
+        private Label _lblSizeDisplay; // Ölçü (cm) gösterimi
+        private Label _lblLengthDisplay; // Uzunluk (mm) gösterimi
+        private Label _lblCoverInfo; // Kapak bilgisi
+        private Label _lblCoverCount; // Kapak adedi (her adet için 2 tane)
+        private Label _lblSideProfileInfo; // Yan profil bilgisi
+        private DataGridView _dgvSideProfiles; // Yan profil seçim listesi
 
         public AssemblyDialog(SerialNoRepository serialNoRepository, EmployeeRepository employeeRepository, 
             MachineRepository machineRepository, Guid orderId)
@@ -43,6 +54,9 @@ namespace ERP.UI.Forms
             _assemblyRepository = new AssemblyRepository();
             _assemblyRequestRepository = new AssemblyRequestRepository();
             _orderRepository = new OrderRepository();
+            _coverStockRepository = new CoverStockRepository();
+            _sideProfileStockRepository = new SideProfileStockRepository();
+            _sideProfileRemnantRepository = new SideProfileRemnantRepository();
             _orderId = orderId;
             InitializeComponent();
         }
@@ -50,8 +64,8 @@ namespace ERP.UI.Forms
         private void InitializeComponent()
         {
             this.Text = "Montaj Yap";
-            this.Width = 550;
-            this.Height = 650;
+            this.Width = 850; // Daha geniş yapıyoruz
+            this.Height = 800; // Daha yüksek yapıyoruz
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -151,10 +165,10 @@ namespace ERP.UI.Forms
             this.Controls.Add(_cmbSize);
             yPos += spacing;
 
-            // Uzunluk (Seçilebilir - sipariş uzunluğundan kapak boyu çıkarılmış)
+            // Uzunluk (Seçilebilir - sipariş uzunluğundan kapak boyu çıkarılmış, MM cinsinden)
             var lblLength = new Label
             {
-                Text = "Uzunluk:",
+                Text = "Uzunluk (mm):",
                 Location = new Point(20, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F)
@@ -167,6 +181,7 @@ namespace ERP.UI.Forms
                 DropDownStyle = ComboBoxStyle.DropDown,
                 Font = new Font("Segoe UI", 10F)
             };
+            _cmbLength.TextChanged += CmbLength_TextChanged; // Uzunluk değiştiğinde kenetlenmiş stokları yeniden yükle
             this.Controls.Add(lblLength);
             this.Controls.Add(_cmbLength);
             yPos += spacing;
@@ -227,6 +242,7 @@ namespace ERP.UI.Forms
                 Height = controlHeight,
                 Font = new Font("Segoe UI", 10F)
             };
+            _txtRequestedAssemblyCount.TextChanged += TxtRequestedAssemblyCount_TextChanged;
             this.Controls.Add(lblRequestedAssemblyCount);
             this.Controls.Add(_txtRequestedAssemblyCount);
             yPos += spacing;
@@ -272,12 +288,190 @@ namespace ERP.UI.Forms
             this.Controls.Add(employeePanel);
             yPos += spacing + 12;
 
+            // Bilgi paneli (Kenetlenmiş seçildiğinde gösterilecek)
+            var infoPanel = new Panel
+            {
+                Location = new Point(20, yPos),
+                Width = 500,
+                Height = 200,
+                BorderStyle = BorderStyle.FixedSingle,
+                BackColor = Color.WhiteSmoke
+            };
+
+            int infoYPos = 10;
+            
+            // Ölçü gösterimi (cm parantez içinde)
+            var lblSizeLabel = new Label
+            {
+                Text = "Ölçü:",
+                Location = new Point(10, infoYPos),
+                Width = 80,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold)
+            };
+            _lblSizeDisplay = new Label
+            {
+                Text = "-",
+                Location = new Point(90, infoYPos),
+                Width = 150,
+                Font = new Font("Segoe UI", 10F),
+                ForeColor = ThemeColors.TextPrimary
+            };
+            infoPanel.Controls.Add(lblSizeLabel);
+            infoPanel.Controls.Add(_lblSizeDisplay);
+            infoYPos += 25;
+
+            // Uzunluk gösterimi (mm parantez içinde)
+            var lblLengthLabel = new Label
+            {
+                Text = "Uzunluk:",
+                Location = new Point(10, infoYPos),
+                Width = 80,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold)
+            };
+            _lblLengthDisplay = new Label
+            {
+                Text = "-",
+                Location = new Point(90, infoYPos),
+                Width = 150,
+                Font = new Font("Segoe UI", 10F),
+                ForeColor = ThemeColors.TextPrimary
+            };
+            infoPanel.Controls.Add(lblLengthLabel);
+            infoPanel.Controls.Add(_lblLengthDisplay);
+            infoYPos += 25;
+
+            // Kapak bilgisi
+            var lblCoverLabel = new Label
+            {
+                Text = "Kullanılacak Kapak:",
+                Location = new Point(10, infoYPos),
+                Width = 150,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold)
+            };
+            _lblCoverInfo = new Label
+            {
+                Text = "-",
+                Location = new Point(160, infoYPos),
+                Width = 300,
+                Font = new Font("Segoe UI", 10F),
+                ForeColor = ThemeColors.TextPrimary
+            };
+            infoPanel.Controls.Add(lblCoverLabel);
+            infoPanel.Controls.Add(_lblCoverInfo);
+            infoYPos += 25;
+
+            // Kapak adedi (Her adet için 2 tane)
+            _lblCoverCount = new Label
+            {
+                Text = "Her adet için 2 tane kullanılacak",
+                Location = new Point(160, infoYPos),
+                Width = 300,
+                Font = new Font("Segoe UI", 9F, FontStyle.Italic),
+                ForeColor = ThemeColors.TextSecondary
+            };
+            infoPanel.Controls.Add(_lblCoverCount);
+            infoYPos += 25;
+
+            // Yan profil başlığı
+            var lblSideProfileLabel = new Label
+            {
+                Text = "Yan Profiller:",
+                Location = new Point(10, infoYPos),
+                Width = 150,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold)
+            };
+            _lblSideProfileInfo = new Label
+            {
+                Text = "-",
+                Location = new Point(160, infoYPos),
+                Width = 300,
+                Font = new Font("Segoe UI", 10F),
+                ForeColor = ThemeColors.TextPrimary
+            };
+            infoPanel.Controls.Add(lblSideProfileLabel);
+            infoPanel.Controls.Add(_lblSideProfileInfo);
+
+            this.Controls.Add(infoPanel);
+            yPos += 210;
+
+            // Yan profil seçim tablosu
+            var lblSideProfileGrid = new Label
+            {
+                Text = "Kullanılacak Yan Profiller:",
+                Location = new Point(20, yPos),
+                Width = 250,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold)
+            };
+            this.Controls.Add(lblSideProfileGrid);
+            yPos += 25;
+
+            _dgvSideProfiles = new DataGridView
+            {
+                Location = new Point(20, yPos),
+                Width = 500,
+                Height = 150,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                ReadOnly = true,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                MultiSelect = false,
+                BackgroundColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle,
+                AutoGenerateColumns = false
+            };
+
+            _dgvSideProfiles.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "Source",
+                HeaderText = "Kaynak",
+                Name = "Source",
+                Width = 100
+            });
+
+            _dgvSideProfiles.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "Length",
+                HeaderText = "Uzunluk (m)",
+                Name = "Length",
+                Width = 120
+            });
+
+            _dgvSideProfiles.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "Quantity",
+                HeaderText = "Adet",
+                Name = "Quantity",
+                Width = 80
+            });
+
+            _dgvSideProfiles.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "TotalLength",
+                HeaderText = "Toplam (m)",
+                Name = "TotalLength",
+                Width = 120
+            });
+
+            // Stil ayarları
+            _dgvSideProfiles.DefaultCellStyle.BackColor = Color.White;
+            _dgvSideProfiles.DefaultCellStyle.ForeColor = ThemeColors.TextPrimary;
+            _dgvSideProfiles.DefaultCellStyle.SelectionBackColor = ThemeColors.Primary;
+            _dgvSideProfiles.DefaultCellStyle.SelectionForeColor = Color.White;
+            _dgvSideProfiles.ColumnHeadersDefaultCellStyle.BackColor = ThemeColors.Primary;
+            _dgvSideProfiles.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            _dgvSideProfiles.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            _dgvSideProfiles.EnableHeadersVisualStyles = false;
+
+            this.Controls.Add(_dgvSideProfiles);
+            yPos += 160;
+
             // Butonlar
             _btnCancel = new Button
             {
                 Text = "İptal",
                 DialogResult = DialogResult.Cancel,
-                Location = new Point(370, yPos),
+                Location = new Point(720, yPos),
                 Width = 90,
                 Height = 32,
                 BackColor = ThemeColors.Secondary,
@@ -290,7 +484,7 @@ namespace ERP.UI.Forms
             _btnSave = new Button
             {
                 Text = "Kaydet",
-                Location = new Point(275, yPos),
+                Location = new Point(625, yPos),
                 Width = 90,
                 Height = 32,
                 BackColor = ThemeColors.Success,
@@ -450,9 +644,12 @@ namespace ERP.UI.Forms
                     int kapakBoyuMM = GetKapakBoyuFromOrder();
                     decimal kapaksizUzunlukMM = yukseklikComMM - kapakBoyuMM;
                     
-                    // ComboBox'a tüm mevcut uzunluk değerlerini ekle (CM'den MM'ye çevirerek)
+                    // ComboBox'a tüm mevcut uzunluk değerlerini ekle (MM cinsinden)
+                    // NOT: Clamping.Length veritabanında CM cinsinden saklanıyor, ama biz MM olarak gösteriyoruz
+                    // Eğer değerler yanlış geliyorsa (10 katı fazla), Length'in nasıl saklandığını kontrol et
                     var allLengths = _clampingRepository.GetAll()
-                        .Select(c => c.Length * 10.0m) // CM'yi MM'ye çevir
+                        .Where(c => c.ClampCount > 0 && c.IsActive)
+                        .Select(c => c.Length) // Direkt Length'i al - eğer MM cinsindense direkt kullan
                         .Distinct()
                         .OrderBy(l => l)
                         .ToList();
@@ -538,21 +735,22 @@ namespace ERP.UI.Forms
                     return;
                 }
 
-                // Uzunluk filtresi: ComboBox'tan seçilen uzunluk zaten sipariş uzunluğundan kapak boyu çıkarılmış (MM cinsinden)
-                // Kenet uzunluğu CM cinsinden saklandığı için MM'yi CM'ye çevir
-                decimal kapaksizUzunlukCM = lengthMM / 10.0m; // MM'yi CM'ye çevir
+                // Uzunluk filtresi: ComboBox'tan seçilen uzunluk MM cinsinden
+                // NOT: Eğer Length MM cinsinden saklanıyorsa direkt karşılaştır, CM ise /10 yap
+                // Şimdilik direkt karşılaştırıyoruz (Length'in MM cinsinden olduğunu varsayıyoruz)
+                decimal uzunlukDegeri = lengthMM; // MM cinsinden
 
                 // TÜM kenetlenmiş stokları yükle (sadece belirli bir siparişe ait değil, stoktan da kullanılabilir)
                 var allClampings = _clampingRepository.GetAll();
                 
-                // Filtreleme: Hatve, Ölçü, Plaka Kalınlığı, Uzunluk (kapaksız uzunluk CM cinsinden karşılaştırılacak)
+                // Filtreleme: Hatve, Ölçü, Plaka Kalınlığı, Uzunluk
                 var filteredClampings = allClampings.Where(c => 
                     c.ClampCount > 0 && 
                     c.IsActive &&
                     Math.Abs(c.Hatve - hatve) < 0.01m &&
                     Math.Abs(c.Size - size) < 0.1m &&
                     Math.Abs(c.PlateThickness - plateThickness) < 0.001m &&
-                    Math.Abs(c.Length - lengthMM) < 0.1m); // CM cinsinden tolerance (0.1cm = 1mm)
+                    Math.Abs(c.Length - uzunlukDegeri) < 0.1m); // Direkt karşılaştırma (tolerance: 0.1mm)
                 
                 var filteredList = filteredClampings.OrderByDescending(c => c.ClampingDate).ToList();
                 
@@ -689,11 +887,15 @@ namespace ERP.UI.Forms
         // Kenetlenmiş plaka seçimi artık sadece seçim yapıyor, değerleri değiştirmiyor
         private void CmbClamping_SelectedIndexChanged(object sender, EventArgs e)
         {
-            // Kenetlenmiş plaka seçildiğinde sadece Rulo Seri No'yu güncelle
-            // Diğer değerler (Hatve, Ölçü, Plaka Kalınlığı, Uzunluk) Order'dan geliyor
+            // Kenetlenmiş plaka seçildiğinde Rulo Seri No'yu güncelle ve bilgileri göster
             if (_cmbClamping.SelectedItem == null)
             {
                 _cmbSerialNo.SelectedItem = null;
+                _lblSizeDisplay.Text = "-";
+                _lblLengthDisplay.Text = "-";
+                _lblCoverInfo.Text = "-";
+                _lblSideProfileInfo.Text = "-";
+                _dgvSideProfiles.DataSource = null;
                 return;
             }
 
@@ -724,10 +926,210 @@ namespace ERP.UI.Forms
                 {
                     _cmbSerialNo.SelectedItem = null;
                 }
+
+                // Ölçü ve Uzunluk bilgilerini göster
+                _lblSizeDisplay.Text = $"{clamping.Size.ToString("F2", CultureInfo.InvariantCulture)} (cm)";
+                _lblLengthDisplay.Text = $"{clamping.Length.ToString("F2", CultureInfo.InvariantCulture)} (mm)";
+
+                // Sipariş bilgilerini al
+                var order = _orderRepository.GetById(_orderId);
+                if (order != null)
+                {
+                    // Kapak bilgisini göster
+                    LoadCoverInfo(order);
+                    
+                    // Yan profil bilgilerini hesapla ve göster
+                    LoadSideProfileInfo(order, clamping);
+                }
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Kenet bilgileri yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void LoadCoverInfo(Order order)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(order.ProductCode))
+                {
+                    _lblCoverInfo.Text = "-";
+                    return;
+                }
+
+                var parts = order.ProductCode.Split('-');
+                
+                // Profil tipi (2. parça, 2. karakter: S=Standart, G=Geniş)
+                string profileType = "";
+                if (parts.Length >= 3)
+                {
+                    string modelProfile = parts[2];
+                    if (modelProfile.Length >= 2)
+                    {
+                        char profileLetter = modelProfile[1];
+                        profileType = profileLetter == 'S' || profileLetter == 's' ? "Standart" : "Geniş";
+                    }
+                }
+
+                // Plaka ölçüsü
+                int plateSizeMM = 0;
+                if (parts.Length >= 4 && int.TryParse(parts[3], out int plakaOlcusuMM))
+                {
+                    plateSizeMM = plakaOlcusuMM <= 1150 ? plakaOlcusuMM : plakaOlcusuMM / 2;
+                }
+
+                // Kapak boyu
+                int coverLengthMM = GetKapakBoyuFromOrder();
+
+                if (!string.IsNullOrEmpty(profileType) && plateSizeMM > 0 && coverLengthMM > 0)
+                {
+                    // CoverStock'tan kontrol et
+                    var coverStock = _coverStockRepository.GetByProperties(profileType, plateSizeMM, coverLengthMM);
+                    string stockInfo = coverStock != null ? $" (Stok: {coverStock.Quantity} adet)" : " (Stokta yok)";
+                    _lblCoverInfo.Text = $"{profileType} - {plateSizeMM}mm - {coverLengthMM}mm{stockInfo}";
+                }
+                else
+                {
+                    _lblCoverInfo.Text = "-";
+                }
+            }
+            catch (Exception ex)
+            {
+                _lblCoverInfo.Text = "Hata: " + ex.Message;
+            }
+        }
+
+        private void LoadSideProfileInfo(Order order, Clamping clamping)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(_txtRequestedAssemblyCount.Text) || 
+                    !int.TryParse(_txtRequestedAssemblyCount.Text, out int assemblyCount) || 
+                    assemblyCount <= 0)
+                {
+                    _lblSideProfileInfo.Text = "Lütfen montajlanacak adet giriniz";
+                    _dgvSideProfiles.DataSource = null;
+                    return;
+                }
+
+                // Clamping.Length zaten kapaksız uzunluk (MM cinsinden), bu yan profil uzunluğu
+                decimal sideProfileLengthMM = clamping.Length; // MM cinsinden
+                decimal sideProfileLengthM = clamping.Length / 1000.0m; // MM'den metreye çevir (1000 ile böl)
+
+                // Her adet için 4 tane yan profil gerekiyor
+                int requiredSideProfileCount = assemblyCount * 4;
+                decimal requiredTotalLengthM = sideProfileLengthM * requiredSideProfileCount;
+
+                _lblSideProfileInfo.Text = $"Her adet için 4 tane - Toplam {requiredSideProfileCount} tane ({requiredTotalLengthM.ToString("F2", CultureInfo.InvariantCulture)} m) gerekiyor";
+
+                // Kullanılabilir yan profilleri hesapla ve göster
+                CalculateAndDisplaySideProfiles(sideProfileLengthM, requiredSideProfileCount, requiredTotalLengthM);
+            }
+            catch (Exception ex)
+            {
+                _lblSideProfileInfo.Text = "Hata: " + ex.Message;
+                _dgvSideProfiles.DataSource = null;
+            }
+        }
+
+        private void CmbLength_TextChanged(object sender, EventArgs e)
+        {
+            // Uzunluk değiştiğinde kenetlenmiş stokları yeniden yükle
+            LoadClampingsBasedOnOrder();
+        }
+
+        private void TxtRequestedAssemblyCount_TextChanged(object sender, EventArgs e)
+        {
+            // Montajlanacak adet değiştiğinde yan profil bilgilerini yeniden hesapla
+            if (_cmbClamping.SelectedItem != null)
+            {
+                var clampingProperty = _cmbClamping.SelectedItem.GetType().GetProperty("Clamping");
+                if (clampingProperty != null)
+                {
+                    var clamping = clampingProperty.GetValue(_cmbClamping.SelectedItem) as Clamping;
+                    if (clamping != null)
+                    {
+                        var order = _orderRepository.GetById(_orderId);
+                        if (order != null)
+                        {
+                            LoadSideProfileInfo(order, clamping);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void CalculateAndDisplaySideProfiles(decimal requiredLengthM, int requiredCount, decimal requiredTotalLengthM)
+        {
+            try
+            {
+                var profiles = new List<object>();
+                int remainingCount = requiredCount;
+
+                // Önce kalanlardan (remnants) kontrol et - eşit veya daha uzun olanları öncelikli kullan
+                var usableRemnants = _sideProfileRemnantRepository.GetAll(includeWaste: false)
+                    .Where(r => r.Length >= requiredLengthM && r.Quantity > 0)
+                    .OrderBy(r => r.Length) // En kısa olanlardan başla (öncelik)
+                    .ToList();
+
+                foreach (var remnant in usableRemnants)
+                {
+                    if (remainingCount <= 0)
+                        break;
+
+                    // Bu remnant'tan kaç tane kullanabiliriz
+                    int useCount = Math.Min(remnant.Quantity, remainingCount);
+                    
+                    profiles.Add(new
+                    {
+                        Source = "Kalan",
+                        Length = remnant.Length.ToString("F2", CultureInfo.InvariantCulture),
+                        Quantity = useCount.ToString(),
+                        TotalLength = (requiredLengthM * useCount).ToString("F2", CultureInfo.InvariantCulture)
+                    });
+
+                    remainingCount -= useCount;
+                }
+
+                // Hala ihtiyaç varsa 6 metrelik stoklardan kullan
+                if (remainingCount > 0)
+                {
+                    var sixMeterStock = _sideProfileStockRepository.GetByLength(6.0m);
+                    if (sixMeterStock != null && sixMeterStock.RemainingLength > 0)
+                    {
+                        // Her bir 6 metrelik profilden kaç tane yan profil çıkar (6m / requiredLengthM)
+                        decimal profilesPerSixMeter = 6.0m / requiredLengthM;
+                        int profilesPerSixMeterInt = (int)Math.Floor(profilesPerSixMeter);
+                        
+                        if (profilesPerSixMeterInt > 0)
+                        {
+                            // Kaç tane 6 metrelik profil gerekiyor
+                            int neededSixMeterProfiles = (int)Math.Ceiling((decimal)remainingCount / profilesPerSixMeterInt);
+                            
+                            // Mevcut 6 metrelik stoktan kaç tane kullanılabilir
+                            int availableSixMeterProfiles = (int)Math.Floor(sixMeterStock.RemainingLength / 6.0m);
+                            int useFromStock = Math.Min(neededSixMeterProfiles, availableSixMeterProfiles);
+
+                            if (useFromStock > 0)
+                            {
+                                profiles.Add(new
+                                {
+                                    Source = "Stok (6m)",
+                                    Length = "6.00",
+                                    Quantity = useFromStock.ToString(),
+                                    TotalLength = (useFromStock * 6.0m).ToString("F2", CultureInfo.InvariantCulture)
+                                });
+                            }
+                        }
+                    }
+                }
+
+                _dgvSideProfiles.DataSource = profiles;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Yan profil hesaplaması sırasında hata: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -865,8 +1267,8 @@ namespace ERP.UI.Forms
                     PlateThickness = decimal.Parse(_cmbPlateThickness.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
                     Hatve = decimal.Parse(_cmbHatve.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
                     Size = decimal.Parse(_cmbSize.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
-                    // Uzunluk MM olarak giriliyor, CM'ye çevirip kaydet (veritabanında CM olarak saklanıyor)
-                    Length = decimal.Parse(_cmbLength.Text, NumberStyles.Any, CultureInfo.InvariantCulture) / 10.0m,
+                    // Uzunluk MM olarak giriliyor, direkt kaydet (Length MM cinsinden saklanıyor)
+                    Length = decimal.Parse(_cmbLength.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
                     SerialNoId = clamping?.SerialNoId,
                     MachineId = _cmbMachine.SelectedItem != null ? GetSelectedId(_cmbMachine) : (Guid?)null,
                     RequestedAssemblyCount = int.Parse(_txtRequestedAssemblyCount.Text),

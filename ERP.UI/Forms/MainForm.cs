@@ -140,6 +140,10 @@ namespace ERP.UI.Forms
             {
                 _contentManager.ShowForm("Consumption");
             }
+            else if (formTag == "ConsumptionMaterialStockEntry" || formTag == "ConsumptionMaterialStockView")
+            {
+                _contentManager.ShowForm(formTag);
+            }
             else if (formTag == "MaterialEntry" || formTag == "MaterialExit" || formTag == "StockDetail")
             {
                 _contentManager.ShowForm(formTag);
