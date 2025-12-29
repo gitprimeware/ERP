@@ -3895,8 +3895,7 @@ namespace ERP.UI.Forms
             AddClamping2Column(dataGridView, "PlateThickness", "Lamel Kalınlığı", 110);
             AddClamping2Column(dataGridView, "ResultedSize", "Sonuç Ölçü", 85);
             AddClamping2Column(dataGridView, "ResultedLength", "Sonuç Uzunluk", 100);
-            AddClamping2Column(dataGridView, "FirstClampingInfo", "İlk Ürün", 140);
-            AddClamping2Column(dataGridView, "SecondClampingInfo", "İkinci Ürün", 140);
+            AddClamping2Column(dataGridView, "ClampingsList", "Kullanılacak Ürünler", 250);
             AddClamping2Column(dataGridView, "Count", "Adet", 70);
             AddClamping2Column(dataGridView, "EmployeeName", "Operatör", 120);
 
@@ -3962,11 +3961,37 @@ namespace ERP.UI.Forms
                 
                 var data = clamping2Requests.Select(cr2 =>
                 {
-                    var firstClamping = cr2.FirstClampingId.HasValue ? _clampingRepository.GetById(cr2.FirstClampingId.Value) : null;
-                    var secondClamping = cr2.SecondClampingId.HasValue ? _clampingRepository.GetById(cr2.SecondClampingId.Value) : null;
+                    // Items listesi varsa onu kullan, yoksa FirstClampingId/SecondClampingId kullan (geriye dönük uyumluluk)
+                    string clampingsList = "";
                     
-                    string firstInfo = firstClamping != null ? $"{firstClamping.Size:F2} x {firstClamping.Length:F2}" : "";
-                    string secondInfo = secondClamping != null ? $"{secondClamping.Size:F2} x {secondClamping.Length:F2}" : "";
+                    if (cr2.Items != null && cr2.Items.Count > 0)
+                    {
+                        var clampingInfos = cr2.Items
+                            .OrderBy(item => item.Sequence)
+                            .Select(item =>
+                            {
+                                var clamping = _clampingRepository.GetById(item.ClampingId);
+                                return clamping != null ? $"{clamping.Size:F2} x {clamping.Length:F2}" : "";
+                            })
+                            .Where(info => !string.IsNullOrEmpty(info))
+                            .ToList();
+                        
+                        clampingsList = string.Join(" + ", clampingInfos);
+                    }
+                    else
+                    {
+                        // Geriye dönük uyumluluk için FirstClampingId/SecondClampingId kullan
+                        var firstClamping = cr2.FirstClampingId.HasValue ? _clampingRepository.GetById(cr2.FirstClampingId.Value) : null;
+                        var secondClamping = cr2.SecondClampingId.HasValue ? _clampingRepository.GetById(cr2.SecondClampingId.Value) : null;
+                        
+                        var clampingInfos = new List<string>();
+                        if (firstClamping != null)
+                            clampingInfos.Add($"{firstClamping.Size:F2} x {firstClamping.Length:F2}");
+                        if (secondClamping != null)
+                            clampingInfos.Add($"{secondClamping.Size:F2} x {secondClamping.Length:F2}");
+                        
+                        clampingsList = string.Join(" + ", clampingInfos);
+                    }
                     
                     return new
                     {
@@ -3977,8 +4002,7 @@ namespace ERP.UI.Forms
                         PlateThickness = cr2.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
                         ResultedSize = cr2.ResultedSize.ToString("F2", CultureInfo.InvariantCulture),
                         ResultedLength = cr2.ResultedLength.ToString("F2", CultureInfo.InvariantCulture),
-                        FirstClampingInfo = firstInfo,
-                        SecondClampingInfo = secondInfo,
+                        ClampingsList = clampingsList,
                         Count = cr2.ResultedCount?.ToString() ?? cr2.ActualCount?.ToString() ?? cr2.RequestedCount.ToString(),
                         EmployeeName = cr2.Employee != null ? $"{cr2.Employee.FirstName} {cr2.Employee.LastName}" : ""
                     };
@@ -3996,8 +4020,7 @@ namespace ERP.UI.Forms
                     AddClamping2Column(dataGridView, "PlateThickness", "Lamel Kalınlığı", 110);
                     AddClamping2Column(dataGridView, "ResultedSize", "Sonuç Ölçü", 85);
                     AddClamping2Column(dataGridView, "ResultedLength", "Sonuç Uzunluk", 100);
-                    AddClamping2Column(dataGridView, "FirstClampingInfo", "İlk Ürün", 140);
-                    AddClamping2Column(dataGridView, "SecondClampingInfo", "İkinci Ürün", 140);
+                    AddClamping2Column(dataGridView, "ClampingsList", "Kullanılacak Ürünler", 250);
                     AddClamping2Column(dataGridView, "Count", "Adet", 70);
                     AddClamping2Column(dataGridView, "EmployeeName", "Operatör", 120);
                 }
@@ -4091,11 +4114,39 @@ namespace ERP.UI.Forms
 
                         foreach (var req in pendingRequests)
                         {
-                            var firstClampItem = req.FirstClampingId.HasValue ? _clampingRepository.GetById(req.FirstClampingId.Value) : null;
-                            var secondClampItem = req.SecondClampingId.HasValue ? _clampingRepository.GetById(req.SecondClampingId.Value) : null;
-                            string firstInfo = firstClampItem != null ? $"{firstClampItem.Size:F2} x {firstClampItem.Length:F2}" : "";
-                            string secondInfo = secondClampItem != null ? $"{secondClampItem.Size:F2} x {secondClampItem.Length:F2}" : "";
-                            listBox.Items.Add(new { Request = req, Display = $"Sonuç: {req.ResultedSize:F2} x {req.ResultedLength:F2} (İlk: {firstInfo}, İkinci: {secondInfo})" });
+                            string clampingsList = "";
+                            
+                            // Items listesi varsa onu kullan, yoksa FirstClampingId/SecondClampingId kullan (geriye dönük uyumluluk)
+                            if (req.Items != null && req.Items.Count > 0)
+                            {
+                                var clampingInfos = req.Items
+                                    .OrderBy(item => item.Sequence)
+                                    .Select(item =>
+                                    {
+                                        var clamping = _clampingRepository.GetById(item.ClampingId);
+                                        return clamping != null ? $"{clamping.Size:F2} x {clamping.Length:F2}" : "";
+                                    })
+                                    .Where(info => !string.IsNullOrEmpty(info))
+                                    .ToList();
+                                
+                                clampingsList = string.Join(" + ", clampingInfos);
+                            }
+                            else
+                            {
+                                // Geriye dönük uyumluluk için FirstClampingId/SecondClampingId kullan
+                                var firstClampItem = req.FirstClampingId.HasValue ? _clampingRepository.GetById(req.FirstClampingId.Value) : null;
+                                var secondClampItem = req.SecondClampingId.HasValue ? _clampingRepository.GetById(req.SecondClampingId.Value) : null;
+                                
+                                var clampingInfos = new List<string>();
+                                if (firstClampItem != null)
+                                    clampingInfos.Add($"{firstClampItem.Size:F2} x {firstClampItem.Length:F2}");
+                                if (secondClampItem != null)
+                                    clampingInfos.Add($"{secondClampItem.Size:F2} x {secondClampItem.Length:F2}");
+                                
+                                clampingsList = string.Join(" + ", clampingInfos);
+                            }
+                            
+                            listBox.Items.Add(new { Request = req, Display = $"Sonuç: {req.ResultedSize:F2} x {req.ResultedLength:F2} (Ürünler: {clampingsList})" });
                         }
                         listBox.DisplayMember = "Display";
                         listBox.ValueMember = "Request";
@@ -4224,7 +4275,7 @@ namespace ERP.UI.Forms
                         Size = selectedRequest.ResultedSize,
                         Length = selectedRequest.ResultedLength,
                         ClampCount = selectedRequest.ResultedCount.Value,
-                        UsedPlateCount = selectedRequest.ActualCount.Value * 2, // İki kenetlenmiş ürün kullanıldı
+                        UsedPlateCount = selectedRequest.ActualCount.Value * (selectedRequest.Items != null && selectedRequest.Items.Count > 0 ? selectedRequest.Items.Count : 2), // Kullanılan kenetlenmiş ürün sayısı
                         MachineId = selectedRequest.MachineId,
                         EmployeeId = selectedRequest.EmployeeId,
                         ClampingDate = DateTime.Now

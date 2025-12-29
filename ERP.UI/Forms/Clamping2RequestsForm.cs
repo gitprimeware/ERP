@@ -101,8 +101,7 @@ namespace ERP.UI.Forms
             AddClamping2RequestColumn("PlateThickness", "Lamel Kalınlığı", 120);
             AddClamping2RequestColumn("ResultedSize", "Sonuç Ölçü", 100);
             AddClamping2RequestColumn("ResultedLength", "Sonuç Uzunluk", 120);
-            AddClamping2RequestColumn("FirstClampingInfo", "İlk Ürün", 150);
-            AddClamping2RequestColumn("SecondClampingInfo", "İkinci Ürün", 150);
+            AddClamping2RequestColumn("ClampingsList", "Kullanılacak Ürünler", 250);
             AddClamping2RequestColumn("RequestedCount", "İstenen Adet", 120);
             
             // Kaç Tane Kullanıldı - buton kolonu
@@ -201,11 +200,37 @@ namespace ERP.UI.Forms
                 
                 var data = requests.Select(r =>
                 {
-                    var firstClamping = r.FirstClampingId.HasValue ? _clampingRepository.GetById(r.FirstClampingId.Value) : null;
-                    var secondClamping = r.SecondClampingId.HasValue ? _clampingRepository.GetById(r.SecondClampingId.Value) : null;
+                    string clampingsList = "";
                     
-                    string firstInfo = firstClamping != null ? $"{firstClamping.Size:F2} x {firstClamping.Length:F2}" : "";
-                    string secondInfo = secondClamping != null ? $"{secondClamping.Size:F2} x {secondClamping.Length:F2}" : "";
+                    // Items listesi varsa onu kullan, yoksa FirstClampingId/SecondClampingId kullan (geriye dönük uyumluluk)
+                    if (r.Items != null && r.Items.Count > 0)
+                    {
+                        var clampingInfos = r.Items
+                            .OrderBy(item => item.Sequence)
+                            .Select(item =>
+                            {
+                                var clamping = _clampingRepository.GetById(item.ClampingId);
+                                return clamping != null ? $"{clamping.Size:F2} x {clamping.Length:F2}" : "";
+                            })
+                            .Where(info => !string.IsNullOrEmpty(info))
+                            .ToList();
+                        
+                        clampingsList = string.Join(" + ", clampingInfos);
+                    }
+                    else
+                    {
+                        // Geriye dönük uyumluluk için FirstClampingId/SecondClampingId kullan
+                        var firstClamping = r.FirstClampingId.HasValue ? _clampingRepository.GetById(r.FirstClampingId.Value) : null;
+                        var secondClamping = r.SecondClampingId.HasValue ? _clampingRepository.GetById(r.SecondClampingId.Value) : null;
+                        
+                        var clampingInfos = new List<string>();
+                        if (firstClamping != null)
+                            clampingInfos.Add($"{firstClamping.Size:F2} x {firstClamping.Length:F2}");
+                        if (secondClamping != null)
+                            clampingInfos.Add($"{secondClamping.Size:F2} x {secondClamping.Length:F2}");
+                        
+                        clampingsList = string.Join(" + ", clampingInfos);
+                    }
                     
                     return new
                     {
@@ -214,8 +239,7 @@ namespace ERP.UI.Forms
                         PlateThickness = r.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
                         ResultedSize = r.ResultedSize.ToString("F2", CultureInfo.InvariantCulture),
                         ResultedLength = r.ResultedLength.ToString("F2", CultureInfo.InvariantCulture),
-                        FirstClampingInfo = firstInfo,
-                        SecondClampingInfo = secondInfo,
+                        ClampingsList = clampingsList,
                         RequestedCount = r.RequestedCount.ToString(),
                         ActualCount = r.ActualCount.HasValue ? r.ActualCount.Value.ToString() : "",
                         ResultedCount = r.ResultedCount.HasValue ? r.ResultedCount.Value.ToString() : "",

@@ -503,15 +503,31 @@ namespace ERP.UI.Forms
                     string orderInfo = order != null ? order.TrexOrderNo : "Stok";
                     
                     // Kalan adet hesapla
-                    var usedAsFirst = _clamping2RequestRepository.GetAll()
-                        .Where(cr2 => cr2.IsActive && cr2.FirstClampingId == c.Id)
-                        .Sum(cr2 => cr2.ActualCount ?? cr2.RequestedCount);
+                    var allRequests = _clamping2RequestRepository.GetAll().Where(cr2 => cr2.IsActive).ToList();
+                    var totalUsedCount = 0;
                     
-                    var usedAsSecond = _clamping2RequestRepository.GetAll()
-                        .Where(cr2 => cr2.IsActive && cr2.SecondClampingId == c.Id)
-                        .Sum(cr2 => cr2.ActualCount ?? cr2.RequestedCount);
+                    foreach (var cr2 in allRequests)
+                    {
+                        // Items listesi varsa onu kullan
+                        if (cr2.Items != null && cr2.Items.Count > 0)
+                        {
+                            // Bu ürün Items listesinde kaç kere geçiyor?
+                            var itemCount = cr2.Items.Count(item => item.ClampingId == c.Id);
+                            if (itemCount > 0)
+                            {
+                                totalUsedCount += (cr2.ActualCount ?? cr2.RequestedCount) * itemCount;
+                            }
+                        }
+                        // Geriye dönük uyumluluk için FirstClampingId/SecondClampingId kullan
+                        else
+                        {
+                            if (cr2.FirstClampingId == c.Id)
+                                totalUsedCount += cr2.ActualCount ?? cr2.RequestedCount;
+                            if (cr2.SecondClampingId == c.Id)
+                                totalUsedCount += cr2.ActualCount ?? cr2.RequestedCount;
+                        }
+                    }
                     
-                    var totalUsedCount = usedAsFirst + usedAsSecond;
                     var availableCount = c.ClampCount - totalUsedCount;
                     
                     return new
@@ -855,15 +871,33 @@ namespace ERP.UI.Forms
 
             if (clamping != null)
             {
-                var usedAsFirst = _clamping2RequestRepository.GetAll()
-                    .Where(cr2 => cr2.IsActive && cr2.FirstClampingId == clamping.Id)
-                    .Sum(cr2 => cr2.ActualCount ?? cr2.RequestedCount);
+                // Stok kontrolü: Items listesini de dikkate al
+                var allRequests = _clamping2RequestRepository.GetAll().Where(cr2 => cr2.IsActive).ToList();
+                var totalUsedCount = 0;
                 
-                var usedAsSecond = _clamping2RequestRepository.GetAll()
-                    .Where(cr2 => cr2.IsActive && cr2.SecondClampingId == clamping.Id)
-                    .Sum(cr2 => cr2.ActualCount ?? cr2.RequestedCount);
+                foreach (var cr2 in allRequests)
+                {
+                    // Items listesi varsa onu kullan
+                    if (cr2.Items != null && cr2.Items.Count > 0)
+                    {
+                        // Bu ürün Items listesinde kaç kere geçiyor?
+                        var itemCount = cr2.Items.Count(item => item.ClampingId == clamping.Id);
+                        if (itemCount > 0)
+                        {
+                            totalUsedCount += (cr2.ActualCount ?? cr2.RequestedCount) * itemCount;
+                        }
+                    }
+                    // Geriye dönük uyumluluk için FirstClampingId/SecondClampingId kullan
+                    else
+                    {
+                        if (cr2.FirstClampingId == clamping.Id)
+                            totalUsedCount += cr2.ActualCount ?? cr2.RequestedCount;
+                        if (cr2.SecondClampingId == clamping.Id)
+                            totalUsedCount += cr2.ActualCount ?? cr2.RequestedCount;
+                    }
+                }
                 
-                var availableCount = clamping.ClampCount - usedAsFirst - usedAsSecond;
+                var availableCount = clamping.ClampCount - totalUsedCount;
 
                 if (requestedCount > availableCount)
                 {

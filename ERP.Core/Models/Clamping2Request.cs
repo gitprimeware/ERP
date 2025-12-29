@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace ERP.Core.Models
 {
@@ -10,19 +11,23 @@ namespace ERP.Core.Models
         public decimal Hatve { get; set; } // Hatve (seçilecek)
         public decimal PlateThickness { get; set; } // Lamel Kalınlığı (seçilecek)
         
+        // Geriye dönük uyumluluk için tutuluyor, artık Items listesi kullanılıyor
         public Guid? FirstClampingId { get; set; } // İlk kenetlenmiş ürün
         public Clamping? FirstClamping { get; set; }
         
         public Guid? SecondClampingId { get; set; } // İkinci kenetlenmiş ürün
         public Clamping? SecondClamping { get; set; }
         
-        public decimal ResultedSize { get; set; } // Sonuç ölçü (iki ürünün ölçüsü aynı olmalı)
-        public decimal ResultedLength { get; set; } // Sonuç uzunluk (iki uzunluğun toplamı)
+        // Yeni liste mantığı
+        public List<Clamping2RequestItem> Items { get; set; } = new List<Clamping2RequestItem>();
+        
+        public decimal ResultedSize { get; set; } // Sonuç ölçü (tüm ürünlerin ölçüsü aynı olmalı)
+        public decimal ResultedLength { get; set; } // Sonuç uzunluk (tüm uzunlukların toplamı)
         
         public Guid? MachineId { get; set; } // Makina
         public Machine? Machine { get; set; }
         
-        public int RequestedCount { get; set; } // İstenen adet (ikisinden aynı miktar işleme sokulacak)
+        public int RequestedCount { get; set; } // İstenen adet (tüm ürünlerden aynı miktar işleme sokulacak)
         public int? ActualCount { get; set; } // Gerçekte kullanılan adet (işçi tarafından girilir)
         public int? ResultedCount { get; set; } // Oluşan kenetlenmiş adet (işçi tarafından girilir)
         

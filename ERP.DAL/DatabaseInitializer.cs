@@ -37,6 +37,7 @@ namespace ERP.DAL
                     CreateClampingRequestsTable(connection);
                     CreateAssemblyRequestsTable(connection);
                     CreateClamping2RequestsTable(connection);
+                    CreateClamping2RequestItemsTable(connection);
                     CreatePackagingsTable(connection);
                     CreateCoverStocksTable(connection);
                     CreateSideProfileStocksTable(connection);
@@ -1168,6 +1169,30 @@ namespace ERP.DAL
                         FOREIGN KEY ([SecondClampingId]) REFERENCES [Clampings]([Id]),
                         FOREIGN KEY ([MachineId]) REFERENCES [Machines]([Id]),
                         FOREIGN KEY ([EmployeeId]) REFERENCES [Employees]([Id])
+                    )
+                END";
+
+            using (var command = new SqlCommand(query, connection))
+            {
+                command.ExecuteNonQuery();
+            }
+        }
+
+        private static void CreateClamping2RequestItemsTable(SqlConnection connection)
+        {
+            var query = @"
+                IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Clamping2RequestItems]') AND type in (N'U'))
+                BEGIN
+                    CREATE TABLE [dbo].[Clamping2RequestItems] (
+                        [Id] UNIQUEIDENTIFIER PRIMARY KEY,
+                        [Clamping2RequestId] UNIQUEIDENTIFIER NOT NULL,
+                        [ClampingId] UNIQUEIDENTIFIER NOT NULL,
+                        [Sequence] INT NOT NULL,
+                        [CreatedDate] DATETIME NOT NULL,
+                        [ModifiedDate] DATETIME NULL,
+                        [IsActive] BIT NOT NULL DEFAULT 1,
+                        FOREIGN KEY ([Clamping2RequestId]) REFERENCES [Clamping2Requests]([Id]),
+                        FOREIGN KEY ([ClampingId]) REFERENCES [Clampings]([Id])
                     )
                 END";
 

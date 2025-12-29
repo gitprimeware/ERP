@@ -9,6 +9,13 @@ namespace ERP.DAL.Repositories
 {
     public class Clamping2RequestRepository
     {
+        private Clamping2RequestItemRepository _itemRepository;
+
+        public Clamping2RequestRepository()
+        {
+            _itemRepository = new Clamping2RequestItemRepository();
+        }
+
         public List<Clamping2Request> GetAll()
         {
             var requests = new List<Clamping2Request>();
@@ -38,7 +45,9 @@ namespace ERP.DAL.Repositories
                     {
                         while (reader.Read())
                         {
-                            requests.Add(MapToClamping2Request(reader));
+                            var request = MapToClamping2Request(reader);
+                            request.Items = _itemRepository.GetByClamping2RequestId(request.Id);
+                            requests.Add(request);
                         }
                     }
                 }
@@ -78,7 +87,9 @@ namespace ERP.DAL.Repositories
                     {
                         while (reader.Read())
                         {
-                            requests.Add(MapToClamping2Request(reader));
+                            var request = MapToClamping2Request(reader);
+                            request.Items = _itemRepository.GetByClamping2RequestId(request.Id);
+                            requests.Add(request);
                         }
                     }
                 }
@@ -116,7 +127,9 @@ namespace ERP.DAL.Repositories
                     {
                         while (reader.Read())
                         {
-                            requests.Add(MapToClamping2Request(reader));
+                            var request = MapToClamping2Request(reader);
+                            request.Items = _itemRepository.GetByClamping2RequestId(request.Id);
+                            requests.Add(request);
                         }
                     }
                 }
@@ -152,7 +165,9 @@ namespace ERP.DAL.Repositories
                     {
                         if (reader.Read())
                         {
-                            return MapToClamping2Request(reader);
+                            var request = MapToClamping2Request(reader);
+                            request.Items = _itemRepository.GetByClamping2RequestId(request.Id);
+                            return request;
                         }
                     }
                 }
@@ -169,6 +184,11 @@ namespace ERP.DAL.Repositories
             using (var connection = DatabaseHelper.GetConnection())
             {
                 connection.Open();
+                
+                // Geriye dönük uyumluluk: İlk iki item'ı FirstClampingId ve SecondClampingId olarak kaydet
+                var firstClampingId = request.Items != null && request.Items.Count > 0 ? (Guid?)request.Items[0].ClampingId : request.FirstClampingId;
+                var secondClampingId = request.Items != null && request.Items.Count > 1 ? (Guid?)request.Items[1].ClampingId : request.SecondClampingId;
+                
                 var query = @"INSERT INTO Clamping2Requests (Id, OrderId, Hatve, PlateThickness, FirstClampingId, SecondClampingId,
                              ResultedSize, ResultedLength, MachineId, RequestedCount, ActualCount, ResultedCount,
                              EmployeeId, Status, RequestDate, CompletionDate, CreatedDate, IsActive)
@@ -178,8 +198,24 @@ namespace ERP.DAL.Repositories
 
                 using (var command = new SqlCommand(query, connection))
                 {
-                    AddClamping2RequestParameters(command, request);
+                    AddClamping2RequestParameters(command, request, firstClampingId, secondClampingId);
                     command.ExecuteNonQuery();
+                }
+                
+                // Items'ı kaydet
+                if (request.Items != null && request.Items.Count > 0)
+                {
+                    // Önce eski item'ları sil
+                    _itemRepository.DeleteByClamping2RequestId(request.Id);
+                    
+                    // Yeni item'ları ekle
+                    for (int i = 0; i < request.Items.Count; i++)
+                    {
+                        var item = request.Items[i];
+                        item.Clamping2RequestId = request.Id;
+                        item.Sequence = i + 1;
+                        _itemRepository.Insert(item);
+                    }
                 }
             }
             return request.Id;
@@ -192,6 +228,11 @@ namespace ERP.DAL.Repositories
             using (var connection = DatabaseHelper.GetConnection())
             {
                 connection.Open();
+                
+                // Geriye dönük uyumluluk: İlk iki item'ı FirstClampingId ve SecondClampingId olarak kaydet
+                var firstClampingId = request.Items != null && request.Items.Count > 0 ? (Guid?)request.Items[0].ClampingId : request.FirstClampingId;
+                var secondClampingId = request.Items != null && request.Items.Count > 1 ? (Guid?)request.Items[1].ClampingId : request.SecondClampingId;
+                
                 var query = @"UPDATE Clamping2Requests SET
                              OrderId = @OrderId,
                              Hatve = @Hatve,
@@ -213,9 +254,25 @@ namespace ERP.DAL.Repositories
 
                 using (var command = new SqlCommand(query, connection))
                 {
-                    AddClamping2RequestParameters(command, request);
+                    AddClamping2RequestParameters(command, request, firstClampingId, secondClampingId);
                     command.Parameters.AddWithValue("@ModifiedDate", request.ModifiedDate);
                     command.ExecuteNonQuery();
+                }
+                
+                // Items'ı güncelle
+                if (request.Items != null)
+                {
+                    // Önce eski item'ları sil
+                    _itemRepository.DeleteByClamping2RequestId(request.Id);
+                    
+                    // Yeni item'ları ekle
+                    for (int i = 0; i < request.Items.Count; i++)
+                    {
+                        var item = request.Items[i];
+                        item.Clamping2RequestId = request.Id;
+                        item.Sequence = i + 1;
+                        _itemRepository.Insert(item);
+                    }
                 }
             }
         }
@@ -294,14 +351,14 @@ namespace ERP.DAL.Repositories
             return request;
         }
 
-        private void AddClamping2RequestParameters(SqlCommand command, Clamping2Request request)
+        private void AddClamping2RequestParameters(SqlCommand command, Clamping2Request request, Guid? firstClampingId = null, Guid? secondClampingId = null)
         {
             command.Parameters.AddWithValue("@Id", request.Id);
             command.Parameters.AddWithValue("@OrderId", request.OrderId.HasValue ? (object)request.OrderId.Value : DBNull.Value);
             command.Parameters.AddWithValue("@Hatve", request.Hatve);
             command.Parameters.AddWithValue("@PlateThickness", request.PlateThickness);
-            command.Parameters.AddWithValue("@FirstClampingId", request.FirstClampingId.HasValue ? (object)request.FirstClampingId.Value : DBNull.Value);
-            command.Parameters.AddWithValue("@SecondClampingId", request.SecondClampingId.HasValue ? (object)request.SecondClampingId.Value : DBNull.Value);
+            command.Parameters.AddWithValue("@FirstClampingId", (firstClampingId ?? request.FirstClampingId).HasValue ? (object)(firstClampingId ?? request.FirstClampingId).Value : DBNull.Value);
+            command.Parameters.AddWithValue("@SecondClampingId", (secondClampingId ?? request.SecondClampingId).HasValue ? (object)(secondClampingId ?? request.SecondClampingId).Value : DBNull.Value);
             command.Parameters.AddWithValue("@ResultedSize", request.ResultedSize);
             command.Parameters.AddWithValue("@ResultedLength", request.ResultedLength);
             command.Parameters.AddWithValue("@MachineId", request.MachineId.HasValue ? (object)request.MachineId.Value : DBNull.Value);

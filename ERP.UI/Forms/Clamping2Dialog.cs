@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.Linq;
@@ -16,10 +17,12 @@ namespace ERP.UI.Forms
         private ComboBox _cmbSize;
         private ComboBox _cmbLength;
         private DataGridView _dgvClampings;
-        private ComboBox _cmbFirstClamping;
-        private ComboBox _cmbSecondClamping;
+        private DataGridView _dgvSelectedClampings;
+        private Button _btnAddClamping;
+        private Button _btnRemoveClamping;
         private Label _lblResultedSize;
         private Label _lblResultedLength;
+        private List<Clamping> _selectedClampings;
         private TextBox _txtRequestedCount;
         private ComboBox _cmbMachine;
         private ComboBox _cmbEmployee;
@@ -43,14 +46,15 @@ namespace ERP.UI.Forms
             _clamping2RequestRepository = new Clamping2RequestRepository();
             _orderRepository = new OrderRepository();
             _orderId = orderId;
+            _selectedClampings = new List<Clamping>();
             InitializeComponent();
         }
 
         private void InitializeComponent()
         {
             this.Text = "Kenetleme 2 - Birleştirme";
-            this.Width = 550;
-            this.Height = 650;
+            this.Width = 650;
+            this.Height = 750;
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -168,7 +172,7 @@ namespace ERP.UI.Forms
             {
                 Location = new Point(20, yPos),
                 Width = 480,
-                Height = 180,
+                Height = 150,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 MultiSelect = false,
@@ -178,50 +182,69 @@ namespace ERP.UI.Forms
                 BorderStyle = BorderStyle.None
             };
             this.Controls.Add(_dgvClampings);
-            yPos += 190;
+            yPos += 160;
 
-            // İlk Kenetlenmiş Ürün
-            var lblFirstClamping = new Label
+            // Ürün Ekle Butonu
+            _btnAddClamping = new Button
             {
-                Text = "İlk Kenetlenmiş Ürün:",
-                Location = new Point(20, yPos),
-                Width = labelWidth,
-                Font = new Font("Segoe UI", 10F)
-            };
-            _cmbFirstClamping = new ComboBox
-            {
-                Location = new Point(150, yPos - 3),
-                Width = controlWidth,
+                Text = "Ürün Ekle",
+                Location = new Point(400, yPos - 10),
+                Width = 100,
                 Height = controlHeight,
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 10F),
+                BackColor = ThemeColors.Success,
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 9F),
+                Cursor = Cursors.Hand,
                 Enabled = false
             };
-            _cmbFirstClamping.SelectedIndexChanged += UpdateResultedValues;
-            this.Controls.Add(lblFirstClamping);
-            this.Controls.Add(_cmbFirstClamping);
+            UIHelper.ApplyRoundedButton(_btnAddClamping, 4);
+            _btnAddClamping.Click += BtnAddClamping_Click;
+            this.Controls.Add(_btnAddClamping);
             yPos += spacing;
 
-            // İkinci Kenetlenmiş Ürün
-            var lblSecondClamping = new Label
+            // Seçilen Ürünler Listesi
+            var lblSelectedClampings = new Label
             {
-                Text = "İkinci Kenetlenmiş Ürün:",
+                Text = "Seçilen Ürünler:",
                 Location = new Point(20, yPos),
                 Width = labelWidth,
-                Font = new Font("Segoe UI", 10F)
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold)
             };
-            _cmbSecondClamping = new ComboBox
+            this.Controls.Add(lblSelectedClampings);
+            yPos += 25;
+
+            _dgvSelectedClampings = new DataGridView
             {
-                Location = new Point(150, yPos - 3),
-                Width = controlWidth,
+                Location = new Point(20, yPos),
+                Width = 480,
+                Height = 120,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                MultiSelect = false,
+                ReadOnly = true,
+                AllowUserToAddRows = false,
+                BackgroundColor = Color.White,
+                BorderStyle = BorderStyle.None
+            };
+            this.Controls.Add(_dgvSelectedClampings);
+            yPos += 130;
+
+            // Ürün Çıkar Butonu
+            _btnRemoveClamping = new Button
+            {
+                Text = "Seçileni Çıkar",
+                Location = new Point(400, yPos - 10),
+                Width = 100,
                 Height = controlHeight,
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 10F),
+                BackColor = Color.FromArgb(220, 53, 69), // Red color
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 9F),
+                Cursor = Cursors.Hand,
                 Enabled = false
             };
-            _cmbSecondClamping.SelectedIndexChanged += UpdateResultedValues;
-            this.Controls.Add(lblSecondClamping);
-            this.Controls.Add(_cmbSecondClamping);
+            UIHelper.ApplyRoundedButton(_btnRemoveClamping, 4);
+            _btnRemoveClamping.Click += BtnRemoveClamping_Click;
+            this.Controls.Add(_btnRemoveClamping);
             yPos += spacing;
 
             // Sonuç Ölçü
@@ -480,10 +503,7 @@ namespace ERP.UI.Forms
                 if (_cmbPlateThickness.SelectedItem == null || _cmbHatve.SelectedItem == null)
                 {
                     _dgvClampings.DataSource = null;
-                    _cmbFirstClamping.Items.Clear();
-                    _cmbSecondClamping.Items.Clear();
-                    _cmbFirstClamping.Enabled = false;
-                    _cmbSecondClamping.Enabled = false;
+                    _btnAddClamping.Enabled = false;
                     return;
                 }
 
@@ -509,15 +529,31 @@ namespace ERP.UI.Forms
                     string orderInfo = order != null ? order.TrexOrderNo : "Stok";
                     
                     // Kalan adet hesapla: Clamping2Request'lerden kullanılan miktarları çıkar (bekleyen talepler de dahil)
-                    var usedAsFirst = _clamping2RequestRepository.GetAll()
-                        .Where(cr2 => cr2.IsActive && cr2.FirstClampingId == c.Id)
-                        .Sum(cr2 => cr2.ActualCount ?? cr2.RequestedCount);
+                    var allRequests = _clamping2RequestRepository.GetAll().Where(cr2 => cr2.IsActive).ToList();
+                    var totalUsedCount = 0;
                     
-                    var usedAsSecond = _clamping2RequestRepository.GetAll()
-                        .Where(cr2 => cr2.IsActive && cr2.SecondClampingId == c.Id)
-                        .Sum(cr2 => cr2.ActualCount ?? cr2.RequestedCount);
+                    foreach (var cr2 in allRequests)
+                    {
+                        // Items listesi varsa onu kullan
+                        if (cr2.Items != null && cr2.Items.Count > 0)
+                        {
+                            // Bu ürün Items listesinde kaç kere geçiyor?
+                            var itemCount = cr2.Items.Count(item => item.ClampingId == c.Id);
+                            if (itemCount > 0)
+                            {
+                                totalUsedCount += (cr2.ActualCount ?? cr2.RequestedCount) * itemCount;
+                            }
+                        }
+                        // Geriye dönük uyumluluk için FirstClampingId/SecondClampingId kullan
+                        else
+                        {
+                            if (cr2.FirstClampingId == c.Id)
+                                totalUsedCount += cr2.ActualCount ?? cr2.RequestedCount;
+                            if (cr2.SecondClampingId == c.Id)
+                                totalUsedCount += cr2.ActualCount ?? cr2.RequestedCount;
+                        }
+                    }
                     
-                    var totalUsedCount = usedAsFirst + usedAsSecond;
                     var availableCount = c.ClampCount - totalUsedCount;
                     
                     return new
@@ -555,34 +591,7 @@ namespace ERP.UI.Forms
                     _dgvClampings.Columns["AvailableCount"].Width = 100;
                 }
 
-                // ComboBox'ları doldur (TÜM ürünleri ekle)
-                _cmbFirstClamping.Items.Clear();
-                _cmbSecondClamping.Items.Clear();
-                
-                // Tüm ürünleri her iki ComboBox'a da ekle
-                foreach (var item in displayData)
-                {
-                    _cmbFirstClamping.Items.Add(new 
-                    { 
-                        Id = item.Id, 
-                        DisplayText = $"Ölçü: {item.Size}, Uzunluk: {item.Length}, Kalan: {item.AvailableCount}",
-                        Clamping = item.Clamping
-                    });
-                    _cmbSecondClamping.Items.Add(new 
-                    { 
-                        Id = item.Id, 
-                        DisplayText = $"Ölçü: {item.Size}, Uzunluk: {item.Length}, Kalan: {item.AvailableCount}",
-                        Clamping = item.Clamping
-                    });
-                }
-                
-                _cmbFirstClamping.DisplayMember = "DisplayText";
-                _cmbFirstClamping.ValueMember = "Id";
-                _cmbSecondClamping.DisplayMember = "DisplayText";
-                _cmbSecondClamping.ValueMember = "Id";
-                
-                _cmbFirstClamping.Enabled = _cmbFirstClamping.Items.Count > 0;
-                _cmbSecondClamping.Enabled = _cmbSecondClamping.Items.Count > 0;
+                _btnAddClamping.Enabled = displayData.Any();
             }
             catch (Exception ex)
             {
@@ -590,65 +599,125 @@ namespace ERP.UI.Forms
             }
         }
 
-        private void UpdateResultedValues(object sender, EventArgs e)
+        private void BtnAddClamping_Click(object sender, EventArgs e)
         {
             try
             {
-                if (_cmbFirstClamping.SelectedItem == null || _cmbSecondClamping.SelectedItem == null)
+                if (_dgvClampings.SelectedRows.Count == 0)
+                {
+                    MessageBox.Show("Lütfen eklemek için bir ürün seçin!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                var selectedRow = _dgvClampings.SelectedRows[0];
+                var clampingProperty = selectedRow.DataBoundItem.GetType().GetProperty("Clamping");
+                if (clampingProperty == null)
+                    return;
+
+                var clamping = clampingProperty.GetValue(selectedRow.DataBoundItem) as Clamping;
+                if (clamping == null)
+                    return;
+
+                // Aynı ölçü kontrolü: Eğer listede ürün varsa, aynı ölçüye sahip olmalı
+                if (_selectedClampings.Any())
+                {
+                    var firstSize = _selectedClampings[0].Size;
+                    if (Math.Abs(clamping.Size - firstSize) >= 0.01m)
+                    {
+                        MessageBox.Show("Tüm ürünler aynı ölçüye sahip olmalıdır!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                }
+
+                _selectedClampings.Add(clamping);
+                UpdateSelectedClampingsList();
+                UpdateResultedValues();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ürün eklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BtnRemoveClamping_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (_dgvSelectedClampings.SelectedRows.Count == 0)
+                {
+                    MessageBox.Show("Lütfen çıkarmak için bir ürün seçin!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                var selectedRow = _dgvSelectedClampings.SelectedRows[0];
+                var index = selectedRow.Index;
+                if (index >= 0 && index < _selectedClampings.Count)
+                {
+                    _selectedClampings.RemoveAt(index);
+                    UpdateSelectedClampingsList();
+                    UpdateResultedValues();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ürün çıkarılırken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void UpdateSelectedClampingsList()
+        {
+            try
+            {
+                var displayData = _selectedClampings.Select((c, index) => new
+                {
+                    Index = index + 1,
+                    Size = c.Size.ToString("F2", CultureInfo.InvariantCulture),
+                    Length = c.Length.ToString("F2", CultureInfo.InvariantCulture),
+                    Clamping = c
+                }).ToList();
+
+                _dgvSelectedClampings.DataSource = displayData;
+                _dgvSelectedClampings.Columns["Clamping"].Visible = false;
+                if (_dgvSelectedClampings.Columns["Index"] != null)
+                {
+                    _dgvSelectedClampings.Columns["Index"].HeaderText = "#";
+                    _dgvSelectedClampings.Columns["Index"].Width = 40;
+                }
+                if (_dgvSelectedClampings.Columns["Size"] != null)
+                {
+                    _dgvSelectedClampings.Columns["Size"].HeaderText = "Ölçü";
+                    _dgvSelectedClampings.Columns["Size"].Width = 100;
+                }
+                if (_dgvSelectedClampings.Columns["Length"] != null)
+                {
+                    _dgvSelectedClampings.Columns["Length"].HeaderText = "Uzunluk";
+                    _dgvSelectedClampings.Columns["Length"].Width = 100;
+                }
+
+                _btnRemoveClamping.Enabled = _selectedClampings.Any();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Seçilen ürünler listesi güncellenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void UpdateResultedValues()
+        {
+            try
+            {
+                if (_selectedClampings.Count == 0)
                 {
                     _lblResultedSize.Text = "";
                     _lblResultedLength.Text = "";
                     return;
                 }
 
-                var firstIdProperty = _cmbFirstClamping.SelectedItem.GetType().GetProperty("Id");
-                var firstClampingProperty = _cmbFirstClamping.SelectedItem.GetType().GetProperty("Clamping");
-                var secondIdProperty = _cmbSecondClamping.SelectedItem.GetType().GetProperty("Id");
-                var secondClampingProperty = _cmbSecondClamping.SelectedItem.GetType().GetProperty("Clamping");
+                // Sonuç ölçü: Tüm ürünlerin ölçüsü aynı olmalı (zaten kontrol edildi)
+                _lblResultedSize.Text = _selectedClampings[0].Size.ToString("F2", CultureInfo.InvariantCulture);
                 
-                if (firstIdProperty == null || firstClampingProperty == null || secondIdProperty == null || secondClampingProperty == null)
-                    return;
-
-                var firstId = (Guid)firstIdProperty.GetValue(_cmbFirstClamping.SelectedItem);
-                var secondId = (Guid)secondIdProperty.GetValue(_cmbSecondClamping.SelectedItem);
-
-                // Aynı ürün seçilemez kontrolü
-                if (firstId == secondId)
-                {
-                    MessageBox.Show("Birinci ve ikinci ürün olarak aynı ürün seçilemez!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    if (sender == _cmbFirstClamping)
-                        _cmbFirstClamping.SelectedItem = null;
-                    else
-                        _cmbSecondClamping.SelectedItem = null;
-                    _lblResultedSize.Text = "";
-                    _lblResultedLength.Text = "";
-                    return;
-                }
-
-                var firstClamping = firstClampingProperty.GetValue(_cmbFirstClamping.SelectedItem) as Clamping;
-                var secondClamping = secondClampingProperty.GetValue(_cmbSecondClamping.SelectedItem) as Clamping;
-
-                if (firstClamping == null || secondClamping == null)
-                    return;
-
-                // Aynı ölçüye sahip olmalı (farklı uzunlukta olabilir)
-                if (Math.Abs(firstClamping.Size - secondClamping.Size) >= 0.01m)
-                {
-                    MessageBox.Show("Aynı ölçüye sahip ürünler seçilmelidir!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    if (sender == _cmbFirstClamping)
-                        _cmbFirstClamping.SelectedItem = null;
-                    else
-                        _cmbSecondClamping.SelectedItem = null;
-                    _lblResultedSize.Text = "";
-                    _lblResultedLength.Text = "";
-                    return;
-                }
-
-                // Sonuç ölçü: İki ürünün ölçüsü aynı olmalı
-                _lblResultedSize.Text = firstClamping.Size.ToString("F2", CultureInfo.InvariantCulture);
-                
-                // Sonuç uzunluk: İki uzunluğun toplamı
-                var resultedLength = firstClamping.Length + secondClamping.Length;
+                // Sonuç uzunluk: Tüm uzunlukların toplamı
+                var resultedLength = _selectedClampings.Sum(c => c.Length);
                 _lblResultedLength.Text = resultedLength.ToString("F2", CultureInfo.InvariantCulture);
             }
             catch (Exception ex)
@@ -777,51 +846,48 @@ namespace ERP.UI.Forms
 
             try
             {
-                var firstClampingId = GetSelectedId(_cmbFirstClamping);
-                var firstClamping = _clampingRepository.GetById(firstClampingId);
-
-                if (firstClamping == null)
+                if (_selectedClampings.Count < 2)
                 {
-                    MessageBox.Show("Seçilen kenetlenmiş ürün bulunamadı!", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
-
-                var secondClampingId = GetSelectedId(_cmbSecondClamping);
-                var secondClamping = _clampingRepository.GetById(secondClampingId);
-
-                if (secondClamping == null)
-                {
-                    MessageBox.Show("Seçilen ikinci kenetlenmiş ürün bulunamadı!", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
-
-                // Aynı ölçüye sahip olmalı (farklı uzunlukta olabilir)
-                if (Math.Abs(firstClamping.Size - secondClamping.Size) >= 0.01m)
-                {
-                    MessageBox.Show("Aynı ölçüye sahip ürünler seçilmelidir!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("En az 2 ürün seçilmelidir!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
                 // OrderId: Dialog hangi sipariş için açıldıysa o siparişe ait olmalı
                 var orderId = _orderId != Guid.Empty ? _orderId : (Guid?)null;
+                var hatve = decimal.Parse(_cmbHatve.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture);
+                var plateThickness = decimal.Parse(_cmbPlateThickness.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture);
+                var requestedCount = int.Parse(_txtRequestedCount.Text);
+                var machineId = _cmbMachine.SelectedItem != null ? GetSelectedId(_cmbMachine) : (Guid?)null;
+                var employeeId = _cmbEmployee.SelectedItem != null ? GetSelectedId(_cmbEmployee) : (Guid?)null;
 
+                // Tüm seçilen ürünleri Items listesine ekle
                 var clamping2Request = new Clamping2Request
                 {
                     OrderId = orderId,
-                    Hatve = decimal.Parse(_cmbHatve.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture),
-                    PlateThickness = decimal.Parse(_cmbPlateThickness.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture),
-                    FirstClampingId = firstClampingId,
-                    SecondClampingId = secondClampingId,
-                    ResultedSize = firstClamping.Size,
-                    ResultedLength = firstClamping.Length + secondClamping.Length,
-                    MachineId = _cmbMachine.SelectedItem != null ? GetSelectedId(_cmbMachine) : (Guid?)null,
-                    RequestedCount = int.Parse(_txtRequestedCount.Text),
-                    EmployeeId = _cmbEmployee.SelectedItem != null ? GetSelectedId(_cmbEmployee) : (Guid?)null,
+                    Hatve = hatve,
+                    PlateThickness = plateThickness,
+                    ResultedSize = _selectedClampings[0].Size, // Tüm ürünler aynı ölçüye sahip olmalı
+                    ResultedLength = _selectedClampings.Sum(c => c.Length), // Tüm uzunlukların toplamı
+                    MachineId = machineId,
+                    RequestedCount = requestedCount,
+                    EmployeeId = employeeId,
                     Status = "Beklemede",
-                    RequestDate = DateTime.Now
+                    RequestDate = DateTime.Now,
+                    Items = new List<ERP.Core.Models.Clamping2RequestItem>()
                 };
                 
+                // Items listesini oluştur
+                for (int i = 0; i < _selectedClampings.Count; i++)
+                {
+                    clamping2Request.Items.Add(new ERP.Core.Models.Clamping2RequestItem
+                    {
+                        ClampingId = _selectedClampings[i].Id,
+                        Sequence = i + 1
+                    });
+                }
+                
                 _clamping2RequestRepository.Insert(clamping2Request);
+                
                 MessageBox.Show("Kenetleme 2 talebi başarıyla oluşturuldu!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 this.DialogResult = DialogResult.OK;
                 this.Close();
@@ -846,15 +912,9 @@ namespace ERP.UI.Forms
                 return false;
             }
 
-            if (_cmbFirstClamping.SelectedItem == null)
+            if (_selectedClampings.Count < 2)
             {
-                MessageBox.Show("Lütfen ilk kenetlenmiş ürünü seçin!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return false;
-            }
-
-            if (_cmbSecondClamping.SelectedItem == null)
-            {
-                MessageBox.Show("Lütfen ikinci kenetlenmiş ürünü seçin!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("En az 2 ürün seçilmelidir!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
 
@@ -865,53 +925,51 @@ namespace ERP.UI.Forms
             }
 
             // Adet kontrolü: Seçilen ürünlerin kalan adetlerini kontrol et
-            if (_cmbFirstClamping.SelectedItem != null)
+            // Aynı ürün birden fazla kez seçilebilir, bu durumu dikkate almalıyız
+            var clampingCounts = _selectedClampings.GroupBy(c => c.Id).Select(g => new { ClampingId = g.Key, Count = g.Count(), Clamping = g.First() }).ToList();
+            
+            foreach (var clampingGroup in clampingCounts)
             {
-                var firstClampingId = GetSelectedId(_cmbFirstClamping);
-                var firstClamping = _clampingRepository.GetById(firstClampingId);
-
-                if (firstClamping != null)
+                var clamping = clampingGroup.Clamping;
+                var selectedCount = clampingGroup.Count; // Bu ürün kaç kere seçilmiş
+                
+                // Mevcut kullanımları hesapla
+                var allRequests = _clamping2RequestRepository.GetAll().Where(cr2 => cr2.IsActive).ToList();
+                var totalUsedCount = 0;
+                
+                foreach (var cr2 in allRequests)
                 {
-                    // İlk ürünün kalan adetini hesapla (tamamlanmış ve bekleyen taleplerin hepsi hesaba katılmalı)
-                    var usedAsFirstFirst = _clamping2RequestRepository.GetAll()
-                        .Where(cr2 => cr2.IsActive && cr2.FirstClampingId == firstClamping.Id)
-                        .Sum(cr2 => cr2.ActualCount ?? cr2.RequestedCount);
-                    
-                    var usedAsFirstSecond = _clamping2RequestRepository.GetAll()
-                        .Where(cr2 => cr2.IsActive && cr2.SecondClampingId == firstClamping.Id)
-                        .Sum(cr2 => cr2.ActualCount ?? cr2.RequestedCount);
-                    
-                    var firstAvailableCount = firstClamping.ClampCount - usedAsFirstFirst - usedAsFirstSecond;
-
-                    // İstenen adet ilk ürünün kalan adetinden fazla olamaz
-                    if (requestedCount > firstAvailableCount)
+                    // Items listesi varsa onu kullan
+                    if (cr2.Items != null && cr2.Items.Count > 0)
                     {
-                        MessageBox.Show($"İstenen adet, ürünün kalan adedinden fazla olamaz! (Kalan: {firstAvailableCount}, İstenen: {requestedCount})", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        return false;
-                    }
-
-                    // İkinci ürünün kalan adedini de kontrol et
-                    var secondClampingId = GetSelectedId(_cmbSecondClamping);
-                    var secondClamping = _clampingRepository.GetById(secondClampingId);
-
-                    if (secondClamping != null)
-                    {
-                        var usedAsSecondFirst = _clamping2RequestRepository.GetAll()
-                            .Where(cr2 => cr2.IsActive && cr2.FirstClampingId == secondClamping.Id)
-                            .Sum(cr2 => cr2.ActualCount ?? cr2.RequestedCount);
-                        
-                        var usedAsSecondSecond = _clamping2RequestRepository.GetAll()
-                            .Where(cr2 => cr2.IsActive && cr2.SecondClampingId == secondClamping.Id)
-                            .Sum(cr2 => cr2.ActualCount ?? cr2.RequestedCount);
-                        
-                        var secondAvailableCount = secondClamping.ClampCount - usedAsSecondFirst - usedAsSecondSecond;
-
-                        if (requestedCount > secondAvailableCount)
+                        // Bu ürün Items listesinde kaç kere geçiyor?
+                        var itemCount = cr2.Items.Count(item => item.ClampingId == clamping.Id);
+                        if (itemCount > 0)
                         {
-                            MessageBox.Show($"İstenen adet, ikinci ürünün kalan adedinden fazla olamaz! (Kalan: {secondAvailableCount}, İstenen: {requestedCount})", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                            return false;
+                            totalUsedCount += (cr2.ActualCount ?? cr2.RequestedCount) * itemCount;
                         }
                     }
+                    // Geriye dönük uyumluluk için FirstClampingId/SecondClampingId kullan
+                    else
+                    {
+                        if (cr2.FirstClampingId == clamping.Id)
+                            totalUsedCount += cr2.ActualCount ?? cr2.RequestedCount;
+                        if (cr2.SecondClampingId == clamping.Id)
+                            totalUsedCount += cr2.ActualCount ?? cr2.RequestedCount;
+                    }
+                }
+                
+                var availableCount = clamping.ClampCount - totalUsedCount;
+                
+                // İstenen adet * seçim sayısı ürünün kalan adedinden fazla olamaz
+                // Örnek: Aynı ürün 2 kere seçildiyse ve requestedCount=1 ise, toplam 2 adet kullanılacak
+                var totalNeeded = requestedCount * selectedCount;
+                
+                if (totalNeeded > availableCount)
+                {
+                    var countInfo = selectedCount > 1 ? $" ({selectedCount} kere seçildi, toplam {totalNeeded} adet gerekli)" : "";
+                    MessageBox.Show($"İstenen adet, ürünün kalan adedinden fazla olamaz! (Ölçü: {clamping.Size}, Uzunluk: {clamping.Length}, Kalan: {availableCount}, Gerekli: {totalNeeded}{countInfo})", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return false;
                 }
             }
 
@@ -924,6 +982,8 @@ namespace ERP.UI.Forms
                 return Guid.Empty;
 
             var idProperty = comboBox.SelectedItem.GetType().GetProperty("Id");
+            if (idProperty == null)
+                return Guid.Empty;
             return (Guid)idProperty.GetValue(comboBox.SelectedItem);
         }
     }

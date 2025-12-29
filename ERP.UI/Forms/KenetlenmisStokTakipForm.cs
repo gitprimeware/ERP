@@ -428,17 +428,46 @@ namespace ERP.UI.Forms
                     .GroupBy(ar => ar.ClampingId.Value)
                     .ToDictionary(g => g.Key, g => g.Sum(ar => ar.ActualClampCount ?? ar.RequestedAssemblyCount));
 
-                // Kenetleme 2 işlemlerinden kullanılan kenet adedini hesapla (hem FirstClampingId hem SecondClampingId'den)
-                var allClamping2Requests = _clamping2RequestRepository.GetAll();
-                var usedClampCountFromClamping2AsFirst = allClamping2Requests
-                    .Where(cr2 => cr2.IsActive && cr2.FirstClampingId.HasValue)
-                    .GroupBy(cr2 => cr2.FirstClampingId.Value)
-                    .ToDictionary(g => g.Key, g => g.Sum(cr2 => cr2.ActualCount ?? cr2.RequestedCount));
+                // Kenetleme 2 işlemlerinden kullanılan kenet adedini hesapla
+                // Items listesi varsa onu kullan, yoksa FirstClampingId/SecondClampingId kullan (geriye dönük uyumluluk)
+                var allClamping2Requests = _clamping2RequestRepository.GetAll().Where(cr2 => cr2.IsActive).ToList();
+                var usedClampCountFromClamping2 = new Dictionary<Guid, int>();
                 
-                var usedClampCountFromClamping2AsSecond = allClamping2Requests
-                    .Where(cr2 => cr2.IsActive && cr2.SecondClampingId.HasValue)
-                    .GroupBy(cr2 => cr2.SecondClampingId.Value)
-                    .ToDictionary(g => g.Key, g => g.Sum(cr2 => cr2.ActualCount ?? cr2.RequestedCount));
+                foreach (var cr2 in allClamping2Requests)
+                {
+                    var requestCount = cr2.ActualCount ?? cr2.RequestedCount;
+                    
+                    if (cr2.Items != null && cr2.Items.Count > 0)
+                    {
+                        // Items listesinden her bir clamping için kullanım sayısını hesapla
+                        foreach (var item in cr2.Items)
+                        {
+                            if (!usedClampCountFromClamping2.ContainsKey(item.ClampingId))
+                                usedClampCountFromClamping2[item.ClampingId] = 0;
+                            usedClampCountFromClamping2[item.ClampingId] += requestCount;
+                        }
+                    }
+                    else
+                    {
+                        // Geriye dönük uyumluluk için FirstClampingId/SecondClampingId kullan
+                        if (cr2.FirstClampingId.HasValue)
+                        {
+                            if (!usedClampCountFromClamping2.ContainsKey(cr2.FirstClampingId.Value))
+                                usedClampCountFromClamping2[cr2.FirstClampingId.Value] = 0;
+                            usedClampCountFromClamping2[cr2.FirstClampingId.Value] += requestCount;
+                        }
+                        if (cr2.SecondClampingId.HasValue)
+                        {
+                            if (!usedClampCountFromClamping2.ContainsKey(cr2.SecondClampingId.Value))
+                                usedClampCountFromClamping2[cr2.SecondClampingId.Value] = 0;
+                            usedClampCountFromClamping2[cr2.SecondClampingId.Value] += requestCount;
+                        }
+                    }
+                }
+                
+                // Geriye dönük uyumluluk için eski kodları da tutuyoruz (kod okunabilirliği için)
+                var usedClampCountFromClamping2AsFirst = new Dictionary<Guid, int>();
+                var usedClampCountFromClamping2AsSecond = new Dictionary<Guid, int>();
 
                 var data = clampings.Select(c =>
                 {
@@ -457,13 +486,9 @@ namespace ERP.UI.Forms
                     
                     // Bu kenet için kenetleme 2 işlemlerinde kullanılan adeti hesapla
                     int usedInClamping2 = 0;
-                    if (usedClampCountFromClamping2AsFirst.ContainsKey(c.Id))
+                    if (usedClampCountFromClamping2.ContainsKey(c.Id))
                     {
-                        usedInClamping2 += usedClampCountFromClamping2AsFirst[c.Id];
-                    }
-                    if (usedClampCountFromClamping2AsSecond.ContainsKey(c.Id))
-                    {
-                        usedInClamping2 += usedClampCountFromClamping2AsSecond[c.Id];
+                        usedInClamping2 = usedClampCountFromClamping2[c.Id];
                     }
                     
                     // Kalan adet = Toplam kenet adedi - Montajda kullanılan adet - Kenetleme 2'de kullanılan adet
