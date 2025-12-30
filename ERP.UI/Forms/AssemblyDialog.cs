@@ -601,10 +601,12 @@ namespace ERP.UI.Forms
                         _cmbHatve.Items.Clear();
                         foreach (var h in allHatves)
                         {
-                            _cmbHatve.Items.Add(h.ToString("F2", CultureInfo.InvariantCulture));
+                            // Hatve değerini "6.5(M)" formatında göster
+                            string hatveDisplay = GetHatveLetter(h);
+                            _cmbHatve.Items.Add(hatveDisplay);
                         }
                         
-                        var hatveText = hatve.ToString("F2", CultureInfo.InvariantCulture);
+                        var hatveText = GetHatveLetter(hatve);
                         if (_cmbHatve.Items.Contains(hatveText))
                             _cmbHatve.SelectedItem = hatveText;
                         else
@@ -817,7 +819,8 @@ namespace ERP.UI.Forms
                     return;
                 }
 
-                if (!decimal.TryParse(_cmbHatve.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out decimal hatve) ||
+                decimal hatve = ParseHatveValue(_cmbHatve.SelectedItem.ToString());
+                if (hatve == 0 ||
                     !decimal.TryParse(_cmbSize.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out decimal size) ||
                     !decimal.TryParse(_cmbPlateThickness.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out decimal plateThickness))
                 {
@@ -1265,7 +1268,7 @@ namespace ERP.UI.Forms
                     OrderId = orderId, // Dialog hangi sipariş için açıldıysa o siparişe ait
                     ClampingId = clampingId,
                     PlateThickness = decimal.Parse(_cmbPlateThickness.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
-                    Hatve = decimal.Parse(_cmbHatve.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
+                    Hatve = ParseHatveValue(_cmbHatve.Text),
                     Size = decimal.Parse(_cmbSize.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
                     // Uzunluk MM olarak giriliyor, direkt kaydet (Length MM cinsinden saklanıyor)
                     Length = decimal.Parse(_cmbLength.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
@@ -1382,6 +1385,49 @@ namespace ERP.UI.Forms
 
             var idProperty = comboBox.SelectedItem.GetType().GetProperty("Id");
             return (Guid)idProperty.GetValue(comboBox.SelectedItem);
+        }
+
+        private string GetHatveLetter(decimal hatveValue)
+        {
+            // Hatve değerini "6.5(M)" formatında göster: sayısal değer + harf
+            const decimal tolerance = 0.1m;
+            string letter = "";
+            
+            if (Math.Abs(hatveValue - 3.25m) < tolerance || Math.Abs(hatveValue - 3.10m) < tolerance)
+                letter = "H";
+            else if (Math.Abs(hatveValue - 4.5m) < tolerance || Math.Abs(hatveValue - 4.3m) < tolerance)
+                letter = "D";
+            else if (Math.Abs(hatveValue - 6.5m) < tolerance || Math.Abs(hatveValue - 6.3m) < tolerance || Math.Abs(hatveValue - 6.4m) < tolerance)
+                letter = "M";
+            else if (Math.Abs(hatveValue - 9m) < tolerance || Math.Abs(hatveValue - 8.7m) < tolerance || Math.Abs(hatveValue - 8.65m) < tolerance)
+                letter = "L";
+            
+            // Format: 6.5(M) veya sadece sayısal değer (harf bulunamazsa)
+            if (!string.IsNullOrEmpty(letter))
+                return $"{hatveValue.ToString("F2", CultureInfo.InvariantCulture)}({letter})";
+            else
+                return hatveValue.ToString("F2", CultureInfo.InvariantCulture); // Eğer tanınmazsa sadece sayısal göster
+        }
+
+        private decimal ParseHatveValue(string hatveText)
+        {
+            // "6.5(M)" formatından sayısal değeri çıkar
+            if (string.IsNullOrWhiteSpace(hatveText))
+                return 0;
+
+            // Parantez varsa parantez öncesini al
+            if (hatveText.Contains("("))
+            {
+                string hatveNumberPart = hatveText.Split('(')[0].Trim();
+                if (decimal.TryParse(hatveNumberPart, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal hatveValue))
+                    return hatveValue;
+            }
+
+            // Direkt parse et
+            if (decimal.TryParse(hatveText, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal hatve))
+                return hatve;
+
+            return 0;
         }
     }
 }

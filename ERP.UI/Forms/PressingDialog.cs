@@ -132,7 +132,7 @@ namespace ERP.UI.Forms
             // Kesilmiş Stoklar (Multi-select CheckedListBox)
             var lblKesilmisStoklar = new Label
             {
-                Text = "Kesilmiş Stoklardan Seçiniz:",
+                Text = "Kesilmişler:",
                 Location = new Point(20, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold)
@@ -332,7 +332,7 @@ namespace ERP.UI.Forms
                     return;
                 }
 
-                    var parts = order.ProductCode.Split('-');
+                var parts = order.ProductCode.Split('-');
                 if (parts.Length < 6)
                 {
                     _txtGerekenPresAdedi.Text = "0";
@@ -341,15 +341,46 @@ namespace ERP.UI.Forms
 
                 // Model harfi
                 char modelLetter = 'H';
-                    if (parts.Length >= 3)
-                    {
-                        string modelProfile = parts[2];
-                        if (modelProfile.Length > 0)
+                if (parts.Length >= 3)
+                {
+                    string modelProfile = parts[2];
+                    if (modelProfile.Length > 0)
                         modelLetter = modelProfile[0];
                 }
 
-                // 10cm Plaka Adedi
-                int plakaAdedi10cm = GetPlakaAdedi10cm(modelLetter);
+                // Ölçüyü al (CM cinsinden) - plakaOlcusuCM hesaplama için
+                decimal plakaOlcusuCM = 0;
+                int plakaOlcusuMMValue = 0;
+                if (parts.Length >= 4 && int.TryParse(parts[3], out plakaOlcusuMMValue))
+                {
+                    int plakaOlcusuComMM = plakaOlcusuMMValue <= 1150 ? plakaOlcusuMMValue : plakaOlcusuMMValue / 2;
+                    plakaOlcusuCM = plakaOlcusuComMM / 10.0m;
+                }
+
+                // Hatve ölçümünü hesapla (yeni formata göre)
+                decimal? hatveOlcumu = GetHatveOlcumu(modelLetter, plakaOlcusuCM);
+                decimal hatve = 0;
+                if (hatveOlcumu.HasValue)
+                {
+                    hatve = hatveOlcumu.Value;
+                }
+                else
+                {
+                    hatve = GetHtave(modelLetter);
+                }
+
+                // 10cm Plaka Adedi: 100 / hatve (tam bölünmüyorsa 1 ekle)
+                int plakaAdedi10cm = 0;
+                if (hatve > 0)
+                {
+                    decimal plakaAdedi10cmDecimal = 100m / hatve;
+                    int tamKisim = (int)Math.Floor(plakaAdedi10cmDecimal);
+                    // Eğer tam bölünmüyorsa (ondalık kısmı varsa) 1 ekle
+                    if (plakaAdedi10cmDecimal % 1 != 0)
+                        plakaAdedi10cm = tamKisim + 1;
+                    else
+                        plakaAdedi10cm = tamKisim;
+                }
 
                 // Yükseklik (mm)
                 int yukseklikMM = 0;
@@ -377,8 +408,9 @@ namespace ERP.UI.Forms
                 // Toplam Sipariş Adedi
                 int boyAdet = yukseklikMM <= 1800 ? 1 : 2;
                 int plakaAdet = 1;
-                if (parts.Length >= 4 && int.TryParse(parts[3], out int plakaOlcusuMM))
-                    plakaAdet = plakaOlcusuMM <= 1150 ? 1 : 4;
+                // plakaOlcusuMMValue zaten yukarıda tanımlanmış, onu kullan
+                if (plakaOlcusuMMValue > 0)
+                    plakaAdet = plakaOlcusuMMValue <= 1150 ? 1 : 4;
                 int toplamSiparisAdedi = order.Quantity * boyAdet * plakaAdet;
 
                 // Formül: plaka adedi = (Kapaksız Yükseklik (mm) / 100) * 10cm Plaka Adedi * Toplam Sipariş Adedi
@@ -426,15 +458,28 @@ namespace ERP.UI.Forms
                 if (modelProfile.Length == 0)
                     return;
 
-                            char modelLetter = modelProfile[0];
-                            decimal hatve = GetHtave(modelLetter);
+                char modelLetter = modelProfile[0];
                 
-                // Ölçü bilgisini al
+                // Ölçü bilgisini al (CM cinsinden)
                 decimal size = 0;
+                decimal plakaOlcusuCM = 0;
                 if (parts.Length >= 4 && int.TryParse(parts[3], out int plakaOlcusuMM))
                 {
-                    size = plakaOlcusuMM <= 1150 ? plakaOlcusuMM : plakaOlcusuMM / 2;
-                    size = size / 10; // cm'ye çevir
+                    int plakaOlcusuComMM = plakaOlcusuMM <= 1150 ? plakaOlcusuMM : plakaOlcusuMM / 2;
+                    size = plakaOlcusuComMM / 10.0m; // cm'ye çevir
+                    plakaOlcusuCM = size;
+                }
+
+                // Hatve ölçümünü hesapla (yeni formata göre)
+                decimal? hatveOlcumu = GetHatveOlcumu(modelLetter, plakaOlcusuCM);
+                decimal hatve = 0;
+                if (hatveOlcumu.HasValue)
+                {
+                    hatve = hatveOlcumu.Value;
+                }
+                else
+                {
+                    hatve = GetHtave(modelLetter);
                 }
 
                 // Tüm kesilmiş stokları yükle (aynı hatve ve ölçü için)

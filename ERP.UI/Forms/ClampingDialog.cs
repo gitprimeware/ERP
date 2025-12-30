@@ -809,19 +809,24 @@ namespace ERP.UI.Forms
 
         private string GetHatveLetter(decimal hatveValue)
         {
-            // Hatve değerlerini harfe çevir: 3.25=H, 4.5=D, 6.5=M, 9=L
+            // Hatve değerini "6.5(M)" formatında göster: sayısal değer + harf
             const decimal tolerance = 0.1m;
+            string letter = "";
             
             if (Math.Abs(hatveValue - 3.25m) < tolerance || Math.Abs(hatveValue - 3.10m) < tolerance)
-                return "H";
+                letter = "H";
             else if (Math.Abs(hatveValue - 4.5m) < tolerance || Math.Abs(hatveValue - 4.3m) < tolerance)
-                return "D";
+                letter = "D";
             else if (Math.Abs(hatveValue - 6.5m) < tolerance || Math.Abs(hatveValue - 6.3m) < tolerance || Math.Abs(hatveValue - 6.4m) < tolerance)
-                return "M";
+                letter = "M";
             else if (Math.Abs(hatveValue - 9m) < tolerance || Math.Abs(hatveValue - 8.7m) < tolerance || Math.Abs(hatveValue - 8.65m) < tolerance)
-                return "L";
+                letter = "L";
+            
+            // Format: 6.5(M) veya sadece sayısal değer (harf bulunamazsa)
+            if (!string.IsNullOrEmpty(letter))
+                return $"{hatveValue.ToString("F2", CultureInfo.InvariantCulture)}({letter})";
             else
-                return hatveValue.ToString("F2", CultureInfo.InvariantCulture); // Eğer tanınmazsa sayısal göster
+                return hatveValue.ToString("F2", CultureInfo.InvariantCulture); // Eğer tanınmazsa sadece sayısal göster
         }
 
         private decimal GetHatveValue(ComboBox cmbHatve)

@@ -559,10 +559,10 @@ namespace ERP.UI.Forms
                                 case 'L': hatveTipiHarf = "L"; break;
                             }
                             
-                            // Format: 3.10(H) gibi göster
+                            // Format: 3.10(H) gibi göster (InvariantCulture kullanarak nokta/virgül sorununu önle)
                             if (hatveOlcumu.HasValue && !string.IsNullOrEmpty(hatveTipiHarf))
                             {
-                                _txtHatve.Text = $"{hatveOlcumu.Value:F2}({hatveTipiHarf})";
+                                _txtHatve.Text = $"{hatveOlcumu.Value.ToString("F2", CultureInfo.InvariantCulture)}({hatveTipiHarf})";
                             }
                             else if (!string.IsNullOrEmpty(hatveTipiHarf))
                             {
@@ -1424,59 +1424,36 @@ namespace ERP.UI.Forms
                 if (hatveText.Contains("("))
                 {
                     string hatveNumberPart = hatveText.Split('(')[0].Trim();
-                    // Nokta kontrolü - eğer nokta yoksa ve sayı 100'den büyükse, 100'e böl (640 -> 6.40)
-                    if (hatveNumberPart.Contains("."))
+                    // Nokta/virgül sorununu çözmek için önce InvariantCulture ile dene, sonra CurrentCulture ile dene
+                    if (!decimal.TryParse(hatveNumberPart, NumberStyles.Any, CultureInfo.InvariantCulture, out hatveValue))
                     {
-                        if (!decimal.TryParse(hatveNumberPart, NumberStyles.Any, CultureInfo.InvariantCulture, out hatveValue))
+                        // Türkçe locale için virgül desteği
+                        if (!decimal.TryParse(hatveNumberPart, NumberStyles.Any, CultureInfo.CurrentCulture, out hatveValue))
                         {
-                            MessageBox.Show("Hatve değeri parse edilemedi!", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                            return;
-                        }
-                    }
-                    else
-                    {
-                        // Nokta yoksa ve sayı 100'den büyükse, muhtemelen nokta kaybolmuş (640 -> 6.40)
-                        if (int.TryParse(hatveNumberPart, out int hatveInt) && hatveInt > 100)
-                        {
-                            hatveValue = hatveInt / 100.0m;
-                        }
-                        else if (decimal.TryParse(hatveNumberPart, NumberStyles.Any, CultureInfo.InvariantCulture, out hatveValue))
-                        {
-                            // Normal parse
-                        }
-                        else
-                        {
-                            MessageBox.Show("Hatve değeri parse edilemedi!", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                            return;
+                            // Son çare: virgülü noktaya çevir ve tekrar dene
+                            hatveNumberPart = hatveNumberPart.Replace(',', '.');
+                            if (!decimal.TryParse(hatveNumberPart, NumberStyles.Any, CultureInfo.InvariantCulture, out hatveValue))
+                            {
+                                MessageBox.Show("Hatve değeri parse edilemedi!", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                return;
+                            }
                         }
                     }
                 }
                 else
                 {
-                    // Nokta kontrolü - eğer nokta yoksa ve sayı 100'den büyükse, 100'e böl (640 -> 6.40)
-                    if (hatveText.Contains("."))
+                    if (!decimal.TryParse(hatveText, NumberStyles.Any, CultureInfo.InvariantCulture, out hatveValue))
                     {
-                        if (!decimal.TryParse(hatveText, NumberStyles.Any, CultureInfo.InvariantCulture, out hatveValue))
+                        // Türkçe locale için virgül desteği
+                        if (!decimal.TryParse(hatveText, NumberStyles.Any, CultureInfo.CurrentCulture, out hatveValue))
                         {
-                            MessageBox.Show("Hatve değeri parse edilemedi!", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                            return;
-                        }
-                    }
-                    else
-                    {
-                        // Nokta yoksa ve sayı 100'den büyükse, muhtemelen nokta kaybolmuş (640 -> 6.40)
-                        if (int.TryParse(hatveText, out int hatveInt) && hatveInt > 100)
-                        {
-                            hatveValue = hatveInt / 100.0m;
-                        }
-                        else if (decimal.TryParse(hatveText, NumberStyles.Any, CultureInfo.InvariantCulture, out hatveValue))
-                        {
-                            // Normal parse
-                        }
-                        else
-                        {
-                            MessageBox.Show("Hatve değeri parse edilemedi!", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                            return;
+                            // Son çare: virgülü noktaya çevir ve tekrar dene
+                            string hatveTextFixed = hatveText.Replace(',', '.');
+                            if (!decimal.TryParse(hatveTextFixed, NumberStyles.Any, CultureInfo.InvariantCulture, out hatveValue))
+                            {
+                                MessageBox.Show("Hatve değeri parse edilemedi!", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                return;
+                            }
                         }
                     }
                 }
@@ -1516,7 +1493,22 @@ namespace ERP.UI.Forms
             if (hatveText.Contains("("))
             {
                 string hatveNumberPart = hatveText.Split('(')[0].Trim();
-                if (!decimal.TryParse(hatveNumberPart, NumberStyles.Any, CultureInfo.InvariantCulture, out hatve) || hatve <= 0)
+                // Nokta/virgül sorununu çözmek için önce InvariantCulture ile dene, sonra CurrentCulture ile dene
+                if (!decimal.TryParse(hatveNumberPart, NumberStyles.Any, CultureInfo.InvariantCulture, out hatve))
+                {
+                    // Türkçe locale için virgül desteği
+                    if (!decimal.TryParse(hatveNumberPart, NumberStyles.Any, CultureInfo.CurrentCulture, out hatve))
+                    {
+                        // Son çare: virgülü noktaya çevir ve tekrar dene
+                        hatveNumberPart = hatveNumberPart.Replace(',', '.');
+                        if (!decimal.TryParse(hatveNumberPart, NumberStyles.Any, CultureInfo.InvariantCulture, out hatve) || hatve <= 0)
+                        {
+                            MessageBox.Show("Lütfen geçerli bir hatve giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return false;
+                        }
+                    }
+                }
+                if (hatve <= 0)
                 {
                     MessageBox.Show("Lütfen geçerli bir hatve giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return false;
@@ -1524,7 +1516,21 @@ namespace ERP.UI.Forms
             }
             else
             {
-                if (!decimal.TryParse(hatveText, NumberStyles.Any, CultureInfo.InvariantCulture, out hatve) || hatve <= 0)
+                if (!decimal.TryParse(hatveText, NumberStyles.Any, CultureInfo.InvariantCulture, out hatve))
+                {
+                    // Türkçe locale için virgül desteği
+                    if (!decimal.TryParse(hatveText, NumberStyles.Any, CultureInfo.CurrentCulture, out hatve))
+                    {
+                        // Son çare: virgülü noktaya çevir ve tekrar dene
+                        string hatveTextFixed = hatveText.Replace(',', '.');
+                        if (!decimal.TryParse(hatveTextFixed, NumberStyles.Any, CultureInfo.InvariantCulture, out hatve) || hatve <= 0)
+                        {
+                            MessageBox.Show("Lütfen geçerli bir hatve giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return false;
+                        }
+                    }
+                }
+                if (hatve <= 0)
                 {
                     MessageBox.Show("Lütfen geçerli bir hatve giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return false;

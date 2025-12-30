@@ -461,7 +461,9 @@ namespace ERP.UI.Forms
                 _cmbHatve.Items.Clear();
                 foreach (var h in hatves)
                 {
-                    _cmbHatve.Items.Add(h.ToString("F2", CultureInfo.InvariantCulture));
+                    // Hatve değerini "6.5(M)" formatında göster
+                    string hatveDisplay = GetHatveLetter(h);
+                    _cmbHatve.Items.Add(hatveDisplay);
                 }
 
                 // Ölçü değerlerini al (distinct)
@@ -508,7 +510,7 @@ namespace ERP.UI.Forms
                 }
 
                 var selectedPlateThickness = decimal.Parse(_cmbPlateThickness.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture);
-                var selectedHatve = decimal.Parse(_cmbHatve.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture);
+                var selectedHatve = ParseHatveValue(_cmbHatve.SelectedItem.ToString());
 
                 // Tüm kenetlenmiş ürünleri getir
                 var allClampings = _clampingRepository.GetAll();
@@ -854,7 +856,7 @@ namespace ERP.UI.Forms
 
                 // OrderId: Dialog hangi sipariş için açıldıysa o siparişe ait olmalı
                 var orderId = _orderId != Guid.Empty ? _orderId : (Guid?)null;
-                var hatve = decimal.Parse(_cmbHatve.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture);
+                var hatve = ParseHatveValue(_cmbHatve.SelectedItem.ToString());
                 var plateThickness = decimal.Parse(_cmbPlateThickness.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture);
                 var requestedCount = int.Parse(_txtRequestedCount.Text);
                 var machineId = _cmbMachine.SelectedItem != null ? GetSelectedId(_cmbMachine) : (Guid?)null;
@@ -985,6 +987,49 @@ namespace ERP.UI.Forms
             if (idProperty == null)
                 return Guid.Empty;
             return (Guid)idProperty.GetValue(comboBox.SelectedItem);
+        }
+
+        private string GetHatveLetter(decimal hatveValue)
+        {
+            // Hatve değerini "6.5(M)" formatında göster: sayısal değer + harf
+            const decimal tolerance = 0.1m;
+            string letter = "";
+            
+            if (Math.Abs(hatveValue - 3.25m) < tolerance || Math.Abs(hatveValue - 3.10m) < tolerance)
+                letter = "H";
+            else if (Math.Abs(hatveValue - 4.5m) < tolerance || Math.Abs(hatveValue - 4.3m) < tolerance)
+                letter = "D";
+            else if (Math.Abs(hatveValue - 6.5m) < tolerance || Math.Abs(hatveValue - 6.3m) < tolerance || Math.Abs(hatveValue - 6.4m) < tolerance)
+                letter = "M";
+            else if (Math.Abs(hatveValue - 9m) < tolerance || Math.Abs(hatveValue - 8.7m) < tolerance || Math.Abs(hatveValue - 8.65m) < tolerance)
+                letter = "L";
+            
+            // Format: 6.5(M) veya sadece sayısal değer (harf bulunamazsa)
+            if (!string.IsNullOrEmpty(letter))
+                return $"{hatveValue.ToString("F2", CultureInfo.InvariantCulture)}({letter})";
+            else
+                return hatveValue.ToString("F2", CultureInfo.InvariantCulture); // Eğer tanınmazsa sadece sayısal göster
+        }
+
+        private decimal ParseHatveValue(string hatveText)
+        {
+            // "6.5(M)" formatından sayısal değeri çıkar
+            if (string.IsNullOrWhiteSpace(hatveText))
+                return 0;
+
+            // Parantez varsa parantez öncesini al
+            if (hatveText.Contains("("))
+            {
+                string hatveNumberPart = hatveText.Split('(')[0].Trim();
+                if (decimal.TryParse(hatveNumberPart, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal hatveValue))
+                    return hatveValue;
+            }
+
+            // Direkt parse et
+            if (decimal.TryParse(hatveText, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal hatve))
+                return hatve;
+
+            return 0;
         }
     }
 }

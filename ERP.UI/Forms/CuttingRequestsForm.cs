@@ -569,13 +569,7 @@ namespace ERP.UI.Forms
 
         private string GetHatveLetter(decimal hatveValue)
         {
-            // Eğer hatve değeri 100'den büyükse, muhtemelen nokta kaybolmuş (640 -> 6.40)
-            if (hatveValue > 100)
-            {
-                hatveValue = hatveValue / 100.0m;
-            }
-            
-            // Hatve değerlerini harfe çevir: H=3.25/3.10, D=4.5/4.3, M=6.5/6.3/6.4, L=9.0
+            // Hatve değerlerini harfe çevir (yeni format): 3.10, 3.25=H | 4.3, 4.5=D | 6.3, 6.4, 6.5=M | 9.0=L
             const decimal tolerance = 0.1m;
             
             if (Math.Abs(hatveValue - 3.25m) < tolerance || Math.Abs(hatveValue - 3.10m) < tolerance)

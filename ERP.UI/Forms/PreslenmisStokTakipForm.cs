@@ -239,15 +239,16 @@ namespace ERP.UI.Forms
         private string GetModelFromPressing(Pressing pressing)
         {
             // Hatve ve Size'a göre model kodu belirle
-            // H: 3.25, D: 4.5, M: 6.5, L: 9
+            // H: 3.10, 3.25 | D: 4.3, 4.5 | M: 6.3, 6.4, 6.5 | L: 8.65, 8.7, 9.0
             decimal hatve = pressing.Hatve;
             decimal size = pressing.Size;
 
             string modelLetter = "";
-            if (Math.Abs(hatve - 3.25m) < 0.1m) modelLetter = "H";
-            else if (Math.Abs(hatve - 4.5m) < 0.1m) modelLetter = "D";
-            else if (Math.Abs(hatve - 6.5m) < 0.1m) modelLetter = "M";
-            else if (Math.Abs(hatve - 9m) < 0.1m) modelLetter = "L";
+            const decimal tolerance = 0.1m;
+            if (Math.Abs(hatve - 3.25m) < tolerance || Math.Abs(hatve - 3.10m) < tolerance) modelLetter = "H";
+            else if (Math.Abs(hatve - 4.5m) < tolerance || Math.Abs(hatve - 4.3m) < tolerance) modelLetter = "D";
+            else if (Math.Abs(hatve - 6.5m) < tolerance || Math.Abs(hatve - 6.3m) < tolerance || Math.Abs(hatve - 6.4m) < tolerance) modelLetter = "M";
+            else if (Math.Abs(hatve - 9m) < tolerance || Math.Abs(hatve - 8.7m) < tolerance || Math.Abs(hatve - 8.65m) < tolerance) modelLetter = "L";
 
             // Size'a göre sayıyı belirle (örn: 20, 30, 40, 50, 60, 70, 80, 100)
             int sizeNumber = (int)Math.Round(size / 10) * 10;
