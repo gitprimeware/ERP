@@ -76,7 +76,7 @@ namespace ERP.UI.Forms
             // Hatve
             var lblHatve = new Label
             {
-                Text = "Hatve:",
+                Text = "Hatve (mm):",
                 Location = new Point(20, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F)
@@ -97,7 +97,7 @@ namespace ERP.UI.Forms
             // Ölçü
             var lblSize = new Label
             {
-                Text = "Ölçü:",
+                Text = "Ölçü (cm):",
                 Location = new Point(20, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F)
@@ -118,7 +118,7 @@ namespace ERP.UI.Forms
             // Plaka Kalınlığı
             var lblPlateThickness = new Label
             {
-                Text = "Plaka Kalınlığı:",
+                Text = "Plaka Kalınlığı (mm):",
                 Location = new Point(20, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F)
@@ -460,12 +460,48 @@ namespace ERP.UI.Forms
                 _cmbMachine.DisplayMember = "Name";
                 _cmbMachine.ValueMember = "Id";
 
-                // Seri No'ları yükle
+                // Seri No'ları yükle - ölçü ve plaka kalınlığına göre filtrele (MaterialEntry'lerden)
                 _cmbSerialNo.Items.Clear();
-                var serialNos = _serialNoRepository.GetAll();
-                foreach (var serialNo in serialNos)
+                var orderForSerialNo = _orderRepository.GetById(_orderId);
+                if (orderForSerialNo != null)
                 {
-                    _cmbSerialNo.Items.Add(new { Id = serialNo.Id, SerialNumber = serialNo.SerialNumber });
+                    // Ölçüyü hesapla (CM cinsinden, sonra Size'a çevir)
+                    int targetSize = 0;
+                    decimal plakaKalinligi = 0;
+                    
+                    if (!string.IsNullOrEmpty(orderForSerialNo.ProductCode))
+                    {
+                        var parts = orderForSerialNo.ProductCode.Split('-');
+                        if (parts.Length >= 4 && int.TryParse(parts[3], out int plakaOlcusuMMValue))
+                        {
+                            int plakaOlcusuComMM = plakaOlcusuMMValue <= 1150 ? plakaOlcusuMMValue : plakaOlcusuMMValue / 2;
+                            decimal plakaOlcusuCM = plakaOlcusuComMM / 10.0m;
+                            // CM'yi Size'a çevir (50 cm -> 50, 60 cm -> 60, vb.)
+                            targetSize = (int)Math.Round(plakaOlcusuCM, MidpointRounding.AwayFromZero);
+                        }
+                    }
+                    
+                    if (orderForSerialNo.LamelThickness.HasValue)
+                    {
+                        plakaKalinligi = orderForSerialNo.LamelThickness.Value;
+                    }
+                    
+                    // MaterialEntry'lerden Size ve Thickness'e göre SerialNo'ları filtrele
+                    var filteredSerialNos = FilterSerialNosBySizeAndThickness(targetSize, plakaKalinligi);
+                    
+                    foreach (var serialNo in filteredSerialNos)
+                    {
+                        _cmbSerialNo.Items.Add(new { Id = serialNo.Id, SerialNumber = serialNo.SerialNumber });
+                    }
+                }
+                else
+                {
+                    // Sipariş yoksa tüm seri no'ları göster
+                    var serialNos = _serialNoRepository.GetAll();
+                    foreach (var serialNo in serialNos)
+                    {
+                        _cmbSerialNo.Items.Add(new { Id = serialNo.Id, SerialNumber = serialNo.SerialNumber });
+                    }
                 }
                 _cmbSerialNo.DisplayMember = "SerialNumber";
                 _cmbSerialNo.ValueMember = "Id";
@@ -501,11 +537,47 @@ namespace ERP.UI.Forms
                         if (modelProfile.Length > 0)
                         {
                             char modelLetter = modelProfile[0];
-                            decimal hatve = GetHtave(modelLetter);
-                            _txtHatve.Text = hatve.ToString("F2", CultureInfo.InvariantCulture);
+                            
+                            // Ölçüyü al (CM cinsinden) - zaten yukarıda hesaplandı
+                            decimal plakaOlcusuCM = 0;
+                            if (parts.Length >= 4 && int.TryParse(parts[3], out int plakaOlcusuMMValue))
+                            {
+                                int plakaOlcusuComMM = plakaOlcusuMMValue <= 1150 ? plakaOlcusuMMValue : plakaOlcusuMMValue / 2;
+                                plakaOlcusuCM = plakaOlcusuComMM / 10.0m;
+                            }
+                            
+                            // Hatve ölçümünü hesapla (yeni formata göre)
+                            decimal? hatveOlcumu = GetHatveOlcumu(modelLetter, plakaOlcusuCM);
+                            
+                            // Hatve tipi harfini belirle
+                            string hatveTipiHarf = "";
+                            switch (char.ToUpper(modelLetter))
+                            {
+                                case 'H': hatveTipiHarf = "H"; break;
+                                case 'D': hatveTipiHarf = "D"; break;
+                                case 'M': hatveTipiHarf = "M"; break;
+                                case 'L': hatveTipiHarf = "L"; break;
+                            }
+                            
+                            // Format: 3.10(H) gibi göster
+                            if (hatveOlcumu.HasValue && !string.IsNullOrEmpty(hatveTipiHarf))
+                            {
+                                _txtHatve.Text = $"{hatveOlcumu.Value:F2}({hatveTipiHarf})";
+                            }
+                            else if (!string.IsNullOrEmpty(hatveTipiHarf))
+                            {
+                                // Hatve ölçümü bulunamadıysa sadece hatve tipi göster
+                                _txtHatve.Text = $"({hatveTipiHarf})";
+                            }
+                            else
+                            {
+                                // Eski yöntemle fallback
+                                decimal hatve = GetHtave(modelLetter);
+                                _txtHatve.Text = hatve.ToString("F2", CultureInfo.InvariantCulture);
+                            }
 
                             // Gereken plaka adedini hesapla (formül sayfasından)
-                            CalculateGerekenPlakaAdedi(order, modelLetter, parts);
+                            CalculateGerekenPlakaAdedi(order, modelLetter, parts, hatveOlcumu);
                         }
                     }
                     
@@ -820,7 +892,82 @@ namespace ERP.UI.Forms
             return Math.Abs(actual - expected) < 0.001m;
         }
 
-        private void CalculateGerekenPlakaAdedi(Order order, char modelLetter, string[] productCodeParts)
+        private decimal? GetHatveOlcumu(char hatveTipi, decimal plakaOlcusuCM)
+        {
+            // Plaka ölçüsünü cm cinsinden al (20, 30, 40, 50, 60, 70, 80, 100 gibi)
+            // En yakın 10'a yuvarla (örn: 21-29 -> 20, 31-39 -> 30)
+            int plakaOlcusuYuvarla = (int)Math.Round(plakaOlcusuCM / 10.0m, MidpointRounding.AwayFromZero) * 10;
+            
+            char hatveTipiUpper = char.ToUpper(hatveTipi);
+            
+            // Hatve tipi ve plaka ölçüsüne göre hatve değerini döndür
+            switch (hatveTipiUpper)
+            {
+                case 'H':
+                    // H20, H30, H40, H50: 3.10
+                    if (plakaOlcusuYuvarla == 20 || plakaOlcusuYuvarla == 30 || plakaOlcusuYuvarla == 40 || plakaOlcusuYuvarla == 50)
+                        return 3.10m;
+                    break;
+                case 'M':
+                    // M30: 6.4, M40: 6.3, M50: 6.4, M60: 6.3, M70: 6.5, M80: 6.5, M100: 6.5
+                    if (plakaOlcusuYuvarla == 30 || plakaOlcusuYuvarla == 50) return 6.4m;
+                    if (plakaOlcusuYuvarla == 40 || plakaOlcusuYuvarla == 60) return 6.3m;
+                    if (plakaOlcusuYuvarla == 70 || plakaOlcusuYuvarla == 80 || plakaOlcusuYuvarla == 100) return 6.5m;
+                    break;
+                case 'D':
+                    // D30: 4.5, D40: 4.5, D50: 4.5, D60: 4.3
+                    if (plakaOlcusuYuvarla == 30 || plakaOlcusuYuvarla == 40 || plakaOlcusuYuvarla == 50) return 4.5m;
+                    if (plakaOlcusuYuvarla == 60) return 4.3m;
+                    break;
+                case 'L':
+                    // L30: 9.0, L40: 9.0, L50: 9.0, L60: 9.0, L70: 9.0, L80: 9.0, L100: 9.0
+                    if (plakaOlcusuYuvarla >= 30 && plakaOlcusuYuvarla <= 100)
+                        return 9.0m;
+                    break;
+            }
+            
+            return null;
+        }
+
+        private List<SerialNo> FilterSerialNosBySizeAndThickness(int targetSize, decimal plakaKalinligi)
+        {
+            var filteredSerialNos = new List<SerialNo>();
+            
+            // MaterialEntry'lerden Size ve Thickness'e göre eşleşen SerialNo'ları bul
+            var materialEntries = _materialEntryRepository.GetAll()
+                .Where(me => me.IsActive && me.SerialNoId.HasValue)
+                .ToList();
+            
+            // Size aralığını hesapla (50 ölçü için 500-509, 60 ölçü için 600-609, vb.)
+            int sizeBaslangic = targetSize * 10; // 50 -> 500
+            int sizeBitis = sizeBaslangic + 99;   // 500 -> 599
+            
+            // Size ve Thickness'e göre filtrele
+            var matchingEntries = materialEntries
+                .Where(me => me.Size >= sizeBaslangic && me.Size <= sizeBitis && Math.Abs(me.Thickness - plakaKalinligi) < 0.001m)
+                .ToList();
+            
+            // Eşleşen SerialNo'ları topla (tekrarları önlemek için Distinct)
+            var serialNoIds = matchingEntries
+                .Where(me => me.SerialNoId.HasValue)
+                .Select(me => me.SerialNoId.Value)
+                .Distinct()
+                .ToList();
+            
+            // SerialNo'ları getir
+            foreach (var serialNoId in serialNoIds)
+            {
+                var serialNo = _serialNoRepository.GetById(serialNoId);
+                if (serialNo != null)
+                {
+                    filteredSerialNos.Add(serialNo);
+                }
+            }
+            
+            return filteredSerialNos;
+        }
+
+        private void CalculateGerekenPlakaAdedi(Order order, char modelLetter, string[] productCodeParts, decimal? hatveOlcumu)
         {
             try
             {
@@ -830,8 +977,29 @@ namespace ERP.UI.Forms
                     return;
                 }
 
-                // 10cm Plaka Adedi
-                int plakaAdedi10cm = GetPlakaAdedi10cm(modelLetter);
+                // Hatve değerini al (hatveOlcumu varsa onu kullan, yoksa eski yöntemle)
+                decimal hatve = 0;
+                if (hatveOlcumu.HasValue)
+                {
+                    hatve = hatveOlcumu.Value;
+                }
+                else
+                {
+                    hatve = GetHtave(modelLetter);
+                }
+
+                // 10cm Plaka Adedi: 100 / hatve (tam bölünmüyorsa 1 ekle)
+                int plakaAdedi10cm = 0;
+                if (hatve > 0)
+                {
+                    decimal plakaAdedi10cmDecimal = 100m / hatve;
+                    int tamKisim = (int)Math.Floor(plakaAdedi10cmDecimal);
+                    // Eğer tam bölünmüyorsa (ondalık kısmı varsa) 1 ekle
+                    if (plakaAdedi10cmDecimal % 1 != 0)
+                        plakaAdedi10cm = tamKisim + 1;
+                    else
+                        plakaAdedi10cm = tamKisim;
+                }
 
                 // Yükseklik (mm)
                 int yukseklikMM = 0;
@@ -1250,10 +1418,73 @@ namespace ERP.UI.Forms
                     return;
                 }
 
+                // Hatve değerini parse et (parantez içindeki harfi çıkar)
+                string hatveText = _txtHatve.Text;
+                decimal hatveValue = 0;
+                if (hatveText.Contains("("))
+                {
+                    string hatveNumberPart = hatveText.Split('(')[0].Trim();
+                    // Nokta kontrolü - eğer nokta yoksa ve sayı 100'den büyükse, 100'e böl (640 -> 6.40)
+                    if (hatveNumberPart.Contains("."))
+                    {
+                        if (!decimal.TryParse(hatveNumberPart, NumberStyles.Any, CultureInfo.InvariantCulture, out hatveValue))
+                        {
+                            MessageBox.Show("Hatve değeri parse edilemedi!", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        // Nokta yoksa ve sayı 100'den büyükse, muhtemelen nokta kaybolmuş (640 -> 6.40)
+                        if (int.TryParse(hatveNumberPart, out int hatveInt) && hatveInt > 100)
+                        {
+                            hatveValue = hatveInt / 100.0m;
+                        }
+                        else if (decimal.TryParse(hatveNumberPart, NumberStyles.Any, CultureInfo.InvariantCulture, out hatveValue))
+                        {
+                            // Normal parse
+                        }
+                        else
+                        {
+                            MessageBox.Show("Hatve değeri parse edilemedi!", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            return;
+                        }
+                    }
+                }
+                else
+                {
+                    // Nokta kontrolü - eğer nokta yoksa ve sayı 100'den büyükse, 100'e böl (640 -> 6.40)
+                    if (hatveText.Contains("."))
+                    {
+                        if (!decimal.TryParse(hatveText, NumberStyles.Any, CultureInfo.InvariantCulture, out hatveValue))
+                        {
+                            MessageBox.Show("Hatve değeri parse edilemedi!", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        // Nokta yoksa ve sayı 100'den büyükse, muhtemelen nokta kaybolmuş (640 -> 6.40)
+                        if (int.TryParse(hatveText, out int hatveInt) && hatveInt > 100)
+                        {
+                            hatveValue = hatveInt / 100.0m;
+                        }
+                        else if (decimal.TryParse(hatveText, NumberStyles.Any, CultureInfo.InvariantCulture, out hatveValue))
+                        {
+                            // Normal parse
+                        }
+                        else
+                        {
+                            MessageBox.Show("Hatve değeri parse edilemedi!", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            return;
+                        }
+                    }
+                }
+
                 var cuttingRequest = new CuttingRequest
                 {
                     OrderId = _orderId,
-                    Hatve = decimal.Parse(_txtHatve.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
+                    Hatve = hatveValue,
                     Size = decimal.Parse(_txtSize.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
                     PlateThickness = order.LamelThickness ?? 0m,
                     MachineId = _cmbMachine.SelectedItem != null ? GetSelectedId(_cmbMachine) : (Guid?)null,
@@ -1279,10 +1510,25 @@ namespace ERP.UI.Forms
 
         private bool ValidateForm()
         {
-            if (string.IsNullOrWhiteSpace(_txtHatve.Text) || !decimal.TryParse(_txtHatve.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal hatve) || hatve <= 0)
+            // Hatve değerini parse et (parantez içindeki harfi çıkar)
+            string hatveText = _txtHatve.Text;
+            decimal hatve = 0;
+            if (hatveText.Contains("("))
             {
-                MessageBox.Show("Lütfen geçerli bir hatve giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return false;
+                string hatveNumberPart = hatveText.Split('(')[0].Trim();
+                if (!decimal.TryParse(hatveNumberPart, NumberStyles.Any, CultureInfo.InvariantCulture, out hatve) || hatve <= 0)
+                {
+                    MessageBox.Show("Lütfen geçerli bir hatve giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return false;
+                }
+            }
+            else
+            {
+                if (!decimal.TryParse(hatveText, NumberStyles.Any, CultureInfo.InvariantCulture, out hatve) || hatve <= 0)
+                {
+                    MessageBox.Show("Lütfen geçerli bir hatve giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return false;
+                }
             }
 
             if (string.IsNullOrWhiteSpace(_txtSize.Text) || !decimal.TryParse(_txtSize.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal size) || size <= 0)

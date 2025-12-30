@@ -3269,10 +3269,10 @@ namespace ERP.UI.Forms
         {
             try
             {
-                // Bu siparişe ait bekleyen montaj taleplerini getir
-                // Sadece bu sipariş için oluşturulmuş talepleri göster (nerede oluşturulduysa orada göster)
+                // Bu siparişe ait bekleyen ve tamamlanan montaj taleplerini getir
+                // "Tamamlandı" statusündeki talepler de gösterilecek (stok tüketimi için onay bekliyor)
                 var pendingRequests = _assemblyRequestRepository.GetAll()
-                    .Where(r => r.OrderId == _orderId && (r.Status == "Montajda" || r.Status == "Beklemede")).ToList();
+                    .Where(r => r.OrderId == _orderId && (r.Status == "Montajda" || r.Status == "Beklemede" || r.Status == "Tamamlandı")).ToList();
 
                 if (pendingRequests.Count == 0)
                 {

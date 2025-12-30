@@ -569,16 +569,22 @@ namespace ERP.UI.Forms
 
         private string GetHatveLetter(decimal hatveValue)
         {
-            // Hatve değerlerini harfe çevir: 3.25=H, 4.5=D, 6.5=M, 9=L
+            // Eğer hatve değeri 100'den büyükse, muhtemelen nokta kaybolmuş (640 -> 6.40)
+            if (hatveValue > 100)
+            {
+                hatveValue = hatveValue / 100.0m;
+            }
+            
+            // Hatve değerlerini harfe çevir: H=3.25/3.10, D=4.5/4.3, M=6.5/6.3/6.4, L=9.0
             const decimal tolerance = 0.1m;
             
-            if (Math.Abs(hatveValue - 3.25m) < tolerance)
+            if (Math.Abs(hatveValue - 3.25m) < tolerance || Math.Abs(hatveValue - 3.10m) < tolerance)
                 return "H";
-            else if (Math.Abs(hatveValue - 4.5m) < tolerance)
+            else if (Math.Abs(hatveValue - 4.5m) < tolerance || Math.Abs(hatveValue - 4.3m) < tolerance)
                 return "D";
-            else if (Math.Abs(hatveValue - 6.5m) < tolerance)
+            else if (Math.Abs(hatveValue - 6.5m) < tolerance || Math.Abs(hatveValue - 6.3m) < tolerance || Math.Abs(hatveValue - 6.4m) < tolerance)
                 return "M";
-            else if (Math.Abs(hatveValue - 9m) < tolerance)
+            else if (Math.Abs(hatveValue - 9m) < tolerance || Math.Abs(hatveValue - 8.7m) < tolerance || Math.Abs(hatveValue - 8.65m) < tolerance)
                 return "L";
             else
                 return hatveValue.ToString("F2", CultureInfo.InvariantCulture); // Eğer tanınmazsa sayısal göster

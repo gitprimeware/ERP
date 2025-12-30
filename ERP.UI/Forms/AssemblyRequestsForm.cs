@@ -111,14 +111,14 @@ namespace ERP.UI.Forms
             AddAssemblyRequestColumn("EmployeeName", "Operatör", 150);
             AddAssemblyRequestColumn("MontajlanacakKenet", "İstenen", 100);
             
-            // Yapılan kolonu - editable TextBox
-            var colYapilan = new DataGridViewTextBoxColumn
+            // Yapılan kolonu - buton kolonu
+            var colYapilan = new DataGridViewButtonColumn
             {
-                DataPropertyName = "Yapilan",
                 HeaderText = "Yapılan",
                 Name = "Yapilan",
-                Width = 100,
-                ReadOnly = false // Düzenlenebilir
+                Width = 120,
+                Text = "Gir",
+                UseColumnTextForButtonValue = false // Dinamik buton metni için false
             };
             colYapilan.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             _dataGridView.Columns.Add(colYapilan);
@@ -161,11 +161,17 @@ namespace ERP.UI.Forms
             _dataGridView.DefaultCellStyle.Font = new Font("Segoe UI", 9F);
             _dataGridView.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
 
-            // CellValueChanged event'i - checkbox ve Yapılan değiştiğinde işlem yap
+            // CellValueChanged event'i - checkbox değiştiğinde işlem yap
             _dataGridView.CellValueChanged += DataGridView_CellValueChanged;
             
-            // CurrentCellDirtyStateChanged event'i - checkbox ve TextBox değişikliklerini hemen commit et
+            // CurrentCellDirtyStateChanged event'i - checkbox değişikliklerini hemen commit et
             _dataGridView.CurrentCellDirtyStateChanged += DataGridView_CurrentCellDirtyStateChanged;
+            
+            // CellClick event'i - buton kolonuna tıklandığında dialog aç
+            _dataGridView.CellClick += DataGridView_CellClick;
+            
+            // CellFormatting event'i - buton metnini dinamik olarak ayarla
+            _dataGridView.CellFormatting += DataGridView_CellFormatting;
 
             // Event handler
             btnYenile.Click += (s, e) => LoadData();
@@ -271,8 +277,8 @@ namespace ERP.UI.Forms
                         MontajlanacakKenet = istenen.ToString(),
                         Yapilan = yapilan.ToString(),
                         Kalan = kalan.ToString(),
-                        MontajTamamlandi = r.Status == "Tamamlandı" || kalan == 0,
-                        Status = kalan == 0 ? "Tamamlandı" : r.Status
+                        MontajTamamlandi = r.Status == "Tamamlandı",
+                        Status = r.Status
                     };
                 }).ToList();
 
@@ -298,19 +304,61 @@ namespace ERP.UI.Forms
             }
         }
 
-        private void DataGridView_CellValueChanged(object sender, DataGridViewCellEventArgs e)
+        private void DataGridView_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (e.RowIndex >= 0)
+            {
+                var columnName = _dataGridView.Columns[e.ColumnIndex].Name;
+                
+                // Yapılan buton kolonu için
+                if (columnName == "Yapilan")
+                {
+                    var row = _dataGridView.Rows[e.RowIndex];
+                    if (row.DataBoundItem != null)
+                    {
+                        var item = row.DataBoundItem;
+                        var yapilanProperty = item.GetType().GetProperty("Yapilan");
+                        if (yapilanProperty != null)
+                        {
+                            var yapilanValue = yapilanProperty.GetValue(item)?.ToString();
+                            
+                            if (!string.IsNullOrWhiteSpace(yapilanValue) && yapilanValue != "0")
+                            {
+                                e.Value = $"Girildi ({yapilanValue})";
+                                e.FormattingApplied = true;
+                            }
+                            else
+                            {
+                                e.Value = "Gir";
+                                e.FormattingApplied = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private void DataGridView_CellClick(object sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0 || e.ColumnIndex < 0)
                 return;
 
             var columnName = _dataGridView.Columns[e.ColumnIndex].Name;
             
-            // Yapılan kolonu değiştiğinde
+            // Yapılan buton kolonuna tıklandığında
             if (columnName == "Yapilan")
             {
                 UpdateYapilanValue(e.RowIndex);
                 return;
             }
+        }
+
+        private void DataGridView_CellValueChanged(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0)
+                return;
+
+            var columnName = _dataGridView.Columns[e.ColumnIndex].Name;
             
             // Checkbox değiştiğinde
             if (columnName != "MontajTamamlandi")
@@ -382,42 +430,33 @@ namespace ERP.UI.Forms
                 if (request == null)
                     return;
 
-                // Yapılan değerini al
-                string yapilanStr = row.Cells["Yapilan"].Value?.ToString() ?? "0";
-                if (!int.TryParse(yapilanStr, out int yapilan) || yapilan < 0)
-                {
-                    MessageBox.Show("Lütfen geçerli bir sayı giriniz (0 veya pozitif).", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    LoadData(); // Değeri geri almak için yeniden yükle
-                    return;
-                }
-
                 int istenen = request.RequestedAssemblyCount;
-                if (yapilan > istenen)
+                int mevcutYapilan = request.ResultedAssemblyCount ?? 0;
+
+                // Dialog göster
+                int? yapilan = ShowYapilanDialog(istenen, mevcutYapilan);
+                if (!yapilan.HasValue)
+                    return;
+
+                if (yapilan.Value > istenen)
                 {
                     MessageBox.Show($"Yapılan adet, istenen adetten ({istenen}) fazla olamaz!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    LoadData(); // Değeri geri almak için yeniden yükle
                     return;
                 }
 
                 // ResultedAssemblyCount'u güncelle
-                request.ResultedAssemblyCount = yapilan;
+                request.ResultedAssemblyCount = yapilan.Value;
                 
-                // Kalan 0 ise status'u Tamamlandı yap, değilse Montajda yap
-                int kalan = istenen - yapilan;
-                if (kalan == 0)
+                // Status güncellemesi - otomatik tamamlandı yapmıyoruz
+                if (request.Status == "Beklemede")
                 {
-                    request.Status = "Tamamlandı";
-                    request.CompletionDate = DateTime.Now;
+                    request.Status = "Montajda";
                 }
-                else if (request.Status == "Tamamlandı")
+                // Eğer daha önce tamamlanmışsa ve şimdi değiştirildiyse, durumu Montajda yap
+                else if (request.Status == "Tamamlandı" && istenen != yapilan.Value)
                 {
-                    // Eğer daha önce tamamlanmışsa ama şimdi kalan varsa, durumu güncelle
                     request.Status = "Montajda";
                     request.CompletionDate = null;
-                }
-                else if (request.Status == "Beklemede")
-                {
-                    request.Status = "Montajda";
                 }
                 
                 _assemblyRequestRepository.Update(request);
@@ -432,33 +471,93 @@ namespace ERP.UI.Forms
             }
         }
 
+        private int? ShowYapilanDialog(int istenen, int mevcutYapilan)
+        {
+            using (var dialog = new Form
+            {
+                Text = "Yapılan Adet",
+                Width = 350,
+                Height = 200,
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false
+            })
+            {
+                var lblInfo = new Label
+                {
+                    Text = $"İstenen Adet: {istenen}",
+                    Location = new Point(20, 20),
+                    AutoSize = true,
+                    Font = new Font("Segoe UI", 10F)
+                };
+
+                var lblCount = new Label
+                {
+                    Text = "Yapılan Adet:",
+                    Location = new Point(20, 60),
+                    AutoSize = true,
+                    Font = new Font("Segoe UI", 10F)
+                };
+
+                var txtCount = new NumericUpDown
+                {
+                    Location = new Point(150, 57),
+                    Width = 150,
+                    Minimum = 0,
+                    Maximum = 999999,
+                    Value = mevcutYapilan
+                };
+
+                var btnOk = new Button
+                {
+                    Text = "Kaydet",
+                    DialogResult = DialogResult.OK,
+                    Location = new Point(150, 110),
+                    Width = 80
+                };
+
+                var btnCancel = new Button
+                {
+                    Text = "İptal",
+                    DialogResult = DialogResult.Cancel,
+                    Location = new Point(240, 110),
+                    Width = 80
+                };
+
+                dialog.Controls.AddRange(new Control[] { lblInfo, lblCount, txtCount, btnOk, btnCancel });
+                dialog.AcceptButton = btnOk;
+                dialog.CancelButton = btnCancel;
+
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    return (int)txtCount.Value;
+                }
+            }
+            return null;
+        }
+
         private void OnaylaMontajTalebi(AssemblyRequest request)
         {
             try
             {
-                // Montajlanacak kenet sayısı (RequestedAssemblyCount'tan gelecek)
-                int montajlanacakKenet = request.RequestedAssemblyCount;
+                int istenen = request.RequestedAssemblyCount;
+                int yapilan = request.ResultedAssemblyCount ?? 0;
 
-                // Oluşan montaj sipariş adedinden gelecek
-                var order = request.OrderId.HasValue ? _orderRepository.GetById(request.OrderId.Value) : null;
-                int olusanMontaj = order?.Quantity ?? 0;
-
-                if (olusanMontaj == 0)
+                // İstenen != Yapılan ise uyarı ver
+                if (istenen != yapilan)
                 {
-                    MessageBox.Show("Sipariş adedi bulunamadı. Montaj talebi onaylanamaz!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show($"İstenen adet ({istenen}) ile yapılan adet ({yapilan}) eşleşmiyor! Montaj tamamlandı olarak işaretlenemez.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     LoadData(); // Checkbox'ı geri al
                     return;
                 }
 
-                // ActualClampCount ve ResultedAssemblyCount değerlerini set et (sadece bilgi giriliyor, onay ProductionDetailForm'da yapılacak)
-                request.ActualClampCount = montajlanacakKenet;
-                request.ResultedAssemblyCount = olusanMontaj;
-                
-                // Durum değişmeyecek, "Beklemede" kalacak
-                // Assembly kaydı oluşturulmayacak (ProductionDetailForm'da onaylandığında oluşturulacak)
+                // Status'u Tamamlandı yap (stok tüketimi ProductionDetailForm'da yapılacak)
+                request.Status = "Tamamlandı";
+                request.CompletionDate = DateTime.Now;
                 _assemblyRequestRepository.Update(request);
 
-                MessageBox.Show($"Bilgiler kaydedildi. Onay için Üretim Ayrıntı sayfasındaki Montaj tab'ından 'Montaj Onayla' butonunu kullanın.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Montaj talebi tamamlandı olarak işaretlendi. Stok tüketimi için Üretim Ayrıntı sayfasındaki Montaj tab'ından 'Montaj Onayla' butonunu kullanın.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                 // Verileri yeniden yükle
                 LoadData();
