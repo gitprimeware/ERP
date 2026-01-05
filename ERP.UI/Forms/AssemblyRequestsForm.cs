@@ -211,6 +211,7 @@ namespace ERP.UI.Forms
         {
             try
             {
+                // Sadece bekleyen ve montajda olan talepleri göster - "Tamamlandı" ve "İptal" durumundaki talepler listede görünmemeli
                 var requests = _assemblyRequestRepository.GetPendingRequests();
                 
                 var data = requests.Select(r =>
@@ -431,10 +432,11 @@ namespace ERP.UI.Forms
                     return;
 
                 int istenen = request.RequestedAssemblyCount;
-                int mevcutYapilan = request.ResultedAssemblyCount ?? 0;
+                // Mevcut montajlanan kenet sayısını al (ActualClampCount varsa onu kullan, yoksa ResultedAssemblyCount'u kullan)
+                int mevcutMontajlananKenet = request.ActualClampCount ?? request.ResultedAssemblyCount ?? 0;
 
                 // Dialog göster
-                int? yapilan = ShowYapilanDialog(istenen, mevcutYapilan);
+                int? yapilan = ShowYapilanDialog(istenen, mevcutMontajlananKenet);
                 if (!yapilan.HasValue)
                     return;
 
@@ -444,8 +446,10 @@ namespace ERP.UI.Forms
                     return;
                 }
 
-                // ResultedAssemblyCount'u güncelle
-                request.ResultedAssemblyCount = yapilan.Value;
+                // Montajlanan kenet sayısı = Oluşan montaj sayısı (1:1 oran)
+                // Girilen değer hem ActualClampCount hem de ResultedAssemblyCount'a atanır
+                request.ActualClampCount = yapilan.Value; // Montajlanan kenet sayısı
+                request.ResultedAssemblyCount = yapilan.Value; // Oluşan montaj sayısı (aynı değer)
                 
                 // Status güncellemesi - otomatik tamamlandı yapmıyoruz
                 if (request.Status == "Beklemede")
@@ -471,12 +475,12 @@ namespace ERP.UI.Forms
             }
         }
 
-        private int? ShowYapilanDialog(int istenen, int mevcutYapilan)
+        private int? ShowYapilanDialog(int istenen, int mevcutMontajlananKenet)
         {
             using (var dialog = new Form
             {
-                Text = "Yapılan Adet",
-                Width = 350,
+                Text = "Montajlanan Kenet Sayısı",
+                Width = 380,
                 Height = 200,
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
@@ -494,7 +498,7 @@ namespace ERP.UI.Forms
 
                 var lblCount = new Label
                 {
-                    Text = "Yapılan Adet:",
+                    Text = "Montajlanan Kenet Sayısı:",
                     Location = new Point(20, 60),
                     AutoSize = true,
                     Font = new Font("Segoe UI", 10F)
@@ -502,11 +506,11 @@ namespace ERP.UI.Forms
 
                 var txtCount = new NumericUpDown
                 {
-                    Location = new Point(150, 57),
+                    Location = new Point(200, 57),
                     Width = 150,
                     Minimum = 0,
                     Maximum = 999999,
-                    Value = mevcutYapilan
+                    Value = mevcutMontajlananKenet
                 };
 
                 var btnOk = new Button
@@ -542,12 +546,29 @@ namespace ERP.UI.Forms
             try
             {
                 int istenen = request.RequestedAssemblyCount;
-                int yapilan = request.ResultedAssemblyCount ?? 0;
-
-                // İstenen != Yapılan ise uyarı ver
-                if (istenen != yapilan)
+                
+                // Montajlanan kenet sayısı = Oluşan montaj sayısı (1:1 oran)
+                // ActualClampCount (kullanılan/montajlanan kenet) girilmiş olmalı
+                if (!request.ActualClampCount.HasValue)
                 {
-                    MessageBox.Show($"İstenen adet ({istenen}) ile yapılan adet ({yapilan}) eşleşmiyor! Montaj tamamlandı olarak işaretlenemez.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("Lütfen önce kaç tane kenet montajlandığını giriniz (Yapılan butonuna tıklayarak).", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    LoadData(); // Checkbox'ı geri al
+                    return;
+                }
+
+                int montajlananKenetSayisi = request.ActualClampCount.Value;
+                
+                // Montajlanan kenet sayısı = Oluşan montaj sayısı (1:1 oran)
+                // Eğer ResultedAssemblyCount farklı bir değerse, ActualClampCount'a eşitle
+                if (!request.ResultedAssemblyCount.HasValue || request.ResultedAssemblyCount.Value != montajlananKenetSayisi)
+                {
+                    request.ResultedAssemblyCount = montajlananKenetSayisi;
+                }
+
+                // İstenen ile kontrol
+                if (istenen != montajlananKenetSayisi)
+                {
+                    MessageBox.Show($"İstenen adet ({istenen}) ile montajlanan kenet sayısı ({montajlananKenetSayisi}) eşleşmiyor! Montaj tamamlandı olarak işaretlenemez.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     LoadData(); // Checkbox'ı geri al
                     return;
                 }
@@ -569,19 +590,27 @@ namespace ERP.UI.Forms
             }
         }
 
+
         private string GetHatveLetter(decimal hatveValue)
         {
-            decimal tolerance = 0.1m;
-            if (Math.Abs(hatveValue - 3.25m) < tolerance)
-                return "H";
-            else if (Math.Abs(hatveValue - 4.5m) < tolerance)
-                return "D";
-            else if (Math.Abs(hatveValue - 6.5m) < tolerance)
-                return "M";
-            else if (Math.Abs(hatveValue - 9m) < tolerance)
-                return "L";
+            // Hatve değerini "6.5(M)" formatında göster: sayısal değer + harf
+            const decimal tolerance = 0.1m;
+            string letter = "";
+            
+            if (Math.Abs(hatveValue - 3.25m) < tolerance || Math.Abs(hatveValue - 3.10m) < tolerance)
+                letter = "H";
+            else if (Math.Abs(hatveValue - 4.5m) < tolerance || Math.Abs(hatveValue - 4.3m) < tolerance)
+                letter = "D";
+            else if (Math.Abs(hatveValue - 6.5m) < tolerance || Math.Abs(hatveValue - 6.3m) < tolerance || Math.Abs(hatveValue - 6.4m) < tolerance)
+                letter = "M";
+            else if (Math.Abs(hatveValue - 9m) < tolerance || Math.Abs(hatveValue - 8.7m) < tolerance || Math.Abs(hatveValue - 8.65m) < tolerance)
+                letter = "L";
+            
+            // Format: 6.5(M) veya sadece sayısal değer (harf bulunamazsa)
+            if (!string.IsNullOrEmpty(letter))
+                return $"{hatveValue.ToString("F2", CultureInfo.InvariantCulture)}({letter})";
             else
-                return hatveValue.ToString("F2", CultureInfo.InvariantCulture);
+                return hatveValue.ToString("F2", CultureInfo.InvariantCulture); // Eğer tanınmazsa sadece sayısal göster
         }
     }
 }

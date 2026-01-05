@@ -16,7 +16,7 @@ namespace ERP.DAL.Repositories
             using (var connection = DatabaseHelper.GetConnection())
             {
                 connection.Open();
-                var query = @"SELECT p.Id, p.OrderId, p.AssemblyId, p.PlateThickness, p.Hatve, p.Size, p.Length,
+                var query = @"SELECT p.Id, p.OrderId, p.AssemblyId, p.IsolationId, p.PlateThickness, p.Hatve, p.Size, p.Length,
                              p.SerialNoId, p.MachineId, p.PackagingCount, p.UsedAssemblyCount, p.EmployeeId, p.PackagingDate,
                              p.CreatedDate, p.ModifiedDate, p.IsActive,
                              sn.SerialNumber as SerialNumber,
@@ -51,7 +51,7 @@ namespace ERP.DAL.Repositories
             using (var connection = DatabaseHelper.GetConnection())
             {
                 connection.Open();
-                var query = @"SELECT p.Id, p.OrderId, p.AssemblyId, p.PlateThickness, p.Hatve, p.Size, p.Length,
+                var query = @"SELECT p.Id, p.OrderId, p.AssemblyId, p.IsolationId, p.PlateThickness, p.Hatve, p.Size, p.Length,
                              p.SerialNoId, p.MachineId, p.PackagingCount, p.UsedAssemblyCount, p.EmployeeId, p.PackagingDate,
                              p.CreatedDate, p.ModifiedDate, p.IsActive,
                              sn.SerialNumber as SerialNumber,
@@ -124,9 +124,9 @@ namespace ERP.DAL.Repositories
             using (var connection = DatabaseHelper.GetConnection())
             {
                 connection.Open();
-                var query = @"INSERT INTO Packagings (Id, OrderId, AssemblyId, PlateThickness, Hatve, Size, Length,
+                var query = @"INSERT INTO Packagings (Id, OrderId, AssemblyId, IsolationId, PlateThickness, Hatve, Size, Length,
                              SerialNoId, MachineId, PackagingCount, UsedAssemblyCount, EmployeeId, PackagingDate, CreatedDate, IsActive) 
-                             VALUES (@Id, @OrderId, @AssemblyId, @PlateThickness, @Hatve, @Size, @Length,
+                             VALUES (@Id, @OrderId, @AssemblyId, @IsolationId, @PlateThickness, @Hatve, @Size, @Length,
                              @SerialNoId, @MachineId, @PackagingCount, @UsedAssemblyCount, @EmployeeId, @PackagingDate, @CreatedDate, @IsActive)";
                 
                 using (var command = new SqlCommand(query, connection))
@@ -149,6 +149,7 @@ namespace ERP.DAL.Repositories
                 var query = @"UPDATE Packagings SET 
                              OrderId = @OrderId,
                              AssemblyId = @AssemblyId,
+                             IsolationId = @IsolationId,
                              PlateThickness = @PlateThickness,
                              Hatve = @Hatve,
                              Size = @Size,
@@ -214,6 +215,11 @@ namespace ERP.DAL.Repositories
                 packaging.AssemblyId = reader.GetGuid("AssemblyId");
             }
 
+            if (!reader.IsDBNull("IsolationId"))
+            {
+                packaging.IsolationId = reader.GetGuid("IsolationId");
+            }
+
             if (!reader.IsDBNull("SerialNoId"))
             {
                 packaging.SerialNoId = reader.GetGuid("SerialNoId");
@@ -262,6 +268,7 @@ namespace ERP.DAL.Repositories
             command.Parameters.AddWithValue("@Id", packaging.Id);
             command.Parameters.AddWithValue("@OrderId", packaging.OrderId.HasValue ? (object)packaging.OrderId.Value : DBNull.Value);
             command.Parameters.AddWithValue("@AssemblyId", packaging.AssemblyId.HasValue ? (object)packaging.AssemblyId.Value : DBNull.Value);
+            command.Parameters.AddWithValue("@IsolationId", packaging.IsolationId.HasValue ? (object)packaging.IsolationId.Value : DBNull.Value);
             command.Parameters.AddWithValue("@PlateThickness", packaging.PlateThickness);
             command.Parameters.AddWithValue("@Hatve", packaging.Hatve);
             command.Parameters.AddWithValue("@Size", packaging.Size);

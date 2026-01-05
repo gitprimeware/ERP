@@ -235,6 +235,14 @@ namespace ERP.UI.Forms
             // Kolonlar
             _dgvYanProfilStock.Columns.Add(new DataGridViewTextBoxColumn
             {
+                DataPropertyName = "ProfileType",
+                HeaderText = "Profil Tipi",
+                Name = "ProfileType",
+                Width = 120
+            });
+
+            _dgvYanProfilStock.Columns.Add(new DataGridViewTextBoxColumn
+            {
                 DataPropertyName = "Length",
                 HeaderText = "Uzunluk (m)",
                 Name = "Length",
@@ -323,6 +331,14 @@ namespace ERP.UI.Forms
             // Kolonlar
             _dgvYanProfilDetail.Columns.Add(new DataGridViewTextBoxColumn
             {
+                DataPropertyName = "ProfileType",
+                HeaderText = "Profil Tipi",
+                Name = "ProfileType",
+                Width = 120
+            });
+
+            _dgvYanProfilDetail.Columns.Add(new DataGridViewTextBoxColumn
+            {
                 DataPropertyName = "Length",
                 HeaderText = "Uzunluk (m)",
                 Name = "Length",
@@ -361,6 +377,7 @@ namespace ERP.UI.Forms
                 
                 var data = stocks.Select(s => new
                 {
+                    ProfileType = s.ProfileType,
                     Length = $"{s.Length.ToString("F2", CultureInfo.InvariantCulture)} m",
                     InitialQuantity = s.InitialQuantity.ToString(),
                     UsedLength = $"{s.UsedLength.ToString("F2", CultureInfo.InvariantCulture)} m",
@@ -384,6 +401,7 @@ namespace ERP.UI.Forms
                 
                 var data = remnants.Select(r => new
                 {
+                    ProfileType = r.ProfileType,
                     Length = $"{r.Length.ToString("F2", CultureInfo.InvariantCulture)} m",
                     Quantity = r.Quantity.ToString()
                 }).ToList();
@@ -398,7 +416,7 @@ namespace ERP.UI.Forms
 
         private void CreateIzolasyonViewTabContent(TabPage tab)
         {
-            var panel = new Panel
+            var mainPanel = new Panel
             {
                 Dock = DockStyle.Fill,
                 BackColor = Color.White,
@@ -414,14 +432,49 @@ namespace ERP.UI.Forms
                 AutoSize = true,
                 Location = new Point(30, 30)
             };
-            panel.Controls.Add(titleLabel);
+            mainPanel.Controls.Add(titleLabel);
+
+            // Toplam Stok Özeti Paneli
+            var summaryPanel = new Panel
+            {
+                Location = new Point(30, 80),
+                Width = mainPanel.Width - 60,
+                Height = 100,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                BackColor = Color.FromArgb(245, 245, 245),
+                Padding = new Padding(20)
+            };
+
+            var summaryTitleLabel = new Label
+            {
+                Text = "📊 Toplam Stok Özeti",
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                ForeColor = ThemeColors.Primary,
+                AutoSize = true,
+                Location = new Point(20, 15)
+            };
+            summaryPanel.Controls.Add(summaryTitleLabel);
+
+            // Toplam stok bilgileri için label'lar (dinamik olarak yüklenecek)
+            var summaryInfoLabel = new Label
+            {
+                Text = "Yükleniyor...",
+                Font = new Font("Segoe UI", 10F),
+                ForeColor = ThemeColors.TextPrimary,
+                AutoSize = true,
+                Location = new Point(20, 45),
+                Name = "SummaryInfoLabel"
+            };
+            summaryPanel.Controls.Add(summaryInfoLabel);
+
+            mainPanel.Controls.Add(summaryPanel);
 
             // DataGridView
             _dgvIzolasyon = new DataGridView
             {
-                Location = new Point(30, 80),
-                Width = panel.Width - 60,
-                Height = panel.Height - 120,
+                Location = new Point(30, 190),
+                Width = mainPanel.Width - 60,
+                Height = mainPanel.Height - 230,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
                 AllowUserToAddRows = false,
@@ -437,42 +490,26 @@ namespace ERP.UI.Forms
             // Kolonlar
             _dgvIzolasyon.Columns.Add(new DataGridViewTextBoxColumn
             {
-                DataPropertyName = "LiquidType",
-                HeaderText = "Eklenen Madde",
-                Name = "LiquidType",
-                Width = 200
+                DataPropertyName = "EntryDate",
+                HeaderText = "Tarih",
+                Name = "EntryDate",
+                Width = 120
             });
 
             _dgvIzolasyon.Columns.Add(new DataGridViewTextBoxColumn
             {
-                DataPropertyName = "Liter",
-                HeaderText = "Litresi",
-                Name = "Liter",
+                DataPropertyName = "LiquidType",
+                HeaderText = "Ürün Türü",
+                Name = "LiquidType",
                 Width = 150
             });
 
             _dgvIzolasyon.Columns.Add(new DataGridViewTextBoxColumn
             {
-                DataPropertyName = "IsosiyanatPercentage",
-                HeaderText = "İzosiyanat Miktarı (%)",
-                Name = "IsosiyanatPercentage",
-                Width = 180
-            });
-
-            _dgvIzolasyon.Columns.Add(new DataGridViewTextBoxColumn
-            {
-                DataPropertyName = "PoliolPercentage",
-                HeaderText = "Poliol Miktarı (%)",
-                Name = "PoliolPercentage",
-                Width = 180
-            });
-
-            _dgvIzolasyon.Columns.Add(new DataGridViewTextBoxColumn
-            {
-                DataPropertyName = "TotalLiter",
-                HeaderText = "Toplam Sıvı (Litre)",
-                Name = "TotalLiter",
-                Width = 180
+                DataPropertyName = "Kilogram",
+                HeaderText = "Kilogram (kg)",
+                Name = "Kilogram",
+                Width = 150
             });
 
             // Stil ayarları
@@ -485,10 +522,13 @@ namespace ERP.UI.Forms
             _dgvIzolasyon.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             _dgvIzolasyon.EnableHeadersVisualStyles = false;
 
-            panel.Controls.Add(_dgvIzolasyon);
+            mainPanel.Controls.Add(_dgvIzolasyon);
+
+            tab.Controls.Add(mainPanel);
 
             // Verileri yükle
             LoadIzolasyonData();
+            LoadIzolasyonSummary(summaryInfoLabel);
         }
 
         private void LoadIzolasyonData()
@@ -500,45 +540,15 @@ namespace ERP.UI.Forms
                 // Tarih sırasına göre sırala (en eski önce)
                 var sortedStocks = stocks.OrderBy(s => s.EntryDate).ToList();
 
-                decimal cumulativeIsosiyanat = 0;
-                decimal cumulativePoliol = 0;
-                decimal cumulativeTotal = 0;
-
                 var data = new List<object>();
 
                 foreach (var stock in sortedStocks)
                 {
-                    // Bu girişten sonraki toplamları hesapla
-                    if (stock.LiquidType == "İzosiyanat")
-                    {
-                        cumulativeIsosiyanat += stock.Liter;
-                        cumulativeTotal += stock.Liter;
-                    }
-                    else if (stock.LiquidType == "Poliol")
-                    {
-                        cumulativePoliol += stock.Liter;
-                        cumulativeTotal += stock.Liter;
-                    }
-                    else if (stock.LiquidType == "İzolasyon")
-                    {
-                        // İzolasyon karışımı 1:1 oranında (50% İzosiyanat, 50% Poliol)
-                        decimal halfLiter = stock.Liter / 2.0m;
-                        cumulativeIsosiyanat += halfLiter;
-                        cumulativePoliol += halfLiter;
-                        cumulativeTotal += stock.Liter;
-                    }
-
-                    // Yüzde hesaplamaları
-                    decimal isosiyanatPercentage = cumulativeTotal > 0 ? (cumulativeIsosiyanat / cumulativeTotal) * 100 : 0;
-                    decimal poliolPercentage = cumulativeTotal > 0 ? (cumulativePoliol / cumulativeTotal) * 100 : 0;
-
                     data.Add(new
                     {
+                        EntryDate = stock.EntryDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
                         LiquidType = stock.LiquidType,
-                        Liter = $"{stock.Liter.ToString("F2", CultureInfo.InvariantCulture)} L",
-                        IsosiyanatPercentage = $"{isosiyanatPercentage.ToString("F2", CultureInfo.InvariantCulture)}%",
-                        PoliolPercentage = $"{poliolPercentage.ToString("F2", CultureInfo.InvariantCulture)}%",
-                        TotalLiter = $"({cumulativeTotal.ToString("F2", CultureInfo.InvariantCulture)} L)"
+                        Kilogram = stock.Kilogram.ToString("F3", CultureInfo.InvariantCulture)
                     });
                 }
 
@@ -547,6 +557,39 @@ namespace ERP.UI.Forms
             catch (Exception ex)
             {
                 MessageBox.Show("İzolasyon sıvısı stok verileri yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void LoadIzolasyonSummary(Label summaryLabel)
+        {
+            try
+            {
+                var stocks = _isolationStockRepository.GetAll();
+                
+                // Ürün türüne göre grupla ve topla
+                var summary = stocks
+                    .GroupBy(s => s.LiquidType)
+                    .Select(g => new
+                    {
+                        LiquidType = g.Key,
+                        TotalKilogram = g.Sum(s => s.Kilogram)
+                    })
+                    .ToList();
+
+                if (summary.Count == 0)
+                {
+                    summaryLabel.Text = "Stok bulunmamaktadır.";
+                    return;
+                }
+
+                var summaryText = string.Join(" | ", summary.Select(s => 
+                    $"{s.LiquidType}: {s.TotalKilogram.ToString("F3", CultureInfo.InvariantCulture)} kg"));
+
+                summaryLabel.Text = summaryText;
+            }
+            catch (Exception ex)
+            {
+                summaryLabel.Text = "Toplam stok bilgisi yüklenirken hata oluştu: " + ex.Message;
             }
         }
 

@@ -4,6 +4,7 @@ namespace ERP.Core.Models
 {
     public class SideProfileRemnant : BaseModel
     {
+        public string ProfileType { get; set; } // "Standart" veya "Geniş"
         public decimal Length { get; set; } // Metre cinsinden kalan parça uzunluğu (örn: 1, 5)
         public int Quantity { get; set; } // Bu uzunluktan kaç adet var (örn: 2 tane 1 metrelik)
         public bool IsWaste { get; set; } // Hurda olarak işaretlendi mi?

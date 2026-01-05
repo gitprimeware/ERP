@@ -16,7 +16,7 @@ namespace ERP.DAL.Repositories
             using (var connection = DatabaseHelper.GetConnection())
             {
                 connection.Open();
-                var query = @"SELECT Id, Length, InitialQuantity, UsedLength, WastedLength, RemainingLength, EntryDate, 
+                var query = @"SELECT Id, ProfileType, Length, InitialQuantity, UsedLength, WastedLength, RemainingLength, EntryDate, 
                              CreatedDate, ModifiedDate, IsActive
                              FROM SideProfileStocks
                              WHERE IsActive = 1
@@ -42,7 +42,7 @@ namespace ERP.DAL.Repositories
             using (var connection = DatabaseHelper.GetConnection())
             {
                 connection.Open();
-                var query = @"SELECT Id, Length, InitialQuantity, UsedLength, WastedLength, RemainingLength, EntryDate, 
+                var query = @"SELECT Id, ProfileType, Length, InitialQuantity, UsedLength, WastedLength, RemainingLength, EntryDate, 
                              CreatedDate, ModifiedDate, IsActive
                              FROM SideProfileStocks
                              WHERE Id = @Id AND IsActive = 1";
@@ -64,15 +64,45 @@ namespace ERP.DAL.Repositories
             return null;
         }
 
-        public SideProfileStock GetByLength(decimal length)
+        public SideProfileStock GetByLengthAndProfileType(decimal length, string profileType)
         {
             using (var connection = DatabaseHelper.GetConnection())
             {
                 connection.Open();
-                var query = @"SELECT Id, Length, InitialQuantity, UsedLength, WastedLength, RemainingLength, EntryDate, 
+                var query = @"SELECT Id, ProfileType, Length, InitialQuantity, UsedLength, WastedLength, RemainingLength, EntryDate, 
                              CreatedDate, ModifiedDate, IsActive
                              FROM SideProfileStocks
-                             WHERE Length = @Length AND IsActive = 1";
+                             WHERE Length = @Length AND ProfileType = @ProfileType AND IsActive = 1";
+                
+                using (var command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@Length", length);
+                    command.Parameters.AddWithValue("@ProfileType", profileType);
+                    
+                    using (var reader = command.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            return MapToSideProfileStock(reader);
+                        }
+                    }
+                }
+            }
+            
+            return null;
+        }
+
+        public SideProfileStock GetByLength(decimal length)
+        {
+            // Backward compatibility - returns first match (deprecated, use GetByLengthAndProfileType instead)
+            using (var connection = DatabaseHelper.GetConnection())
+            {
+                connection.Open();
+                var query = @"SELECT TOP 1 Id, ProfileType, Length, InitialQuantity, UsedLength, WastedLength, RemainingLength, EntryDate, 
+                             CreatedDate, ModifiedDate, IsActive
+                             FROM SideProfileStocks
+                             WHERE Length = @Length AND IsActive = 1
+                             ORDER BY EntryDate DESC";
                 
                 using (var command = new SqlCommand(query, connection))
                 {
@@ -93,8 +123,8 @@ namespace ERP.DAL.Repositories
 
         public Guid InsertOrUpdate(SideProfileStock stock)
         {
-            // Önce mevcut kaydı kontrol et
-            var existing = GetByLength(stock.Length);
+            // Önce mevcut kaydı kontrol et (ProfileType ve Length'e göre)
+            var existing = GetByLengthAndProfileType(stock.Length, stock.ProfileType);
             
             if (existing != null)
             {
@@ -124,8 +154,8 @@ namespace ERP.DAL.Repositories
             using (var connection = DatabaseHelper.GetConnection())
             {
                 connection.Open();
-                var query = @"INSERT INTO SideProfileStocks (Id, Length, InitialQuantity, UsedLength, WastedLength, RemainingLength, EntryDate, CreatedDate, IsActive) 
-                             VALUES (@Id, @Length, @InitialQuantity, @UsedLength, @WastedLength, @RemainingLength, @EntryDate, @CreatedDate, @IsActive)";
+                var query = @"INSERT INTO SideProfileStocks (Id, ProfileType, Length, InitialQuantity, UsedLength, WastedLength, RemainingLength, EntryDate, CreatedDate, IsActive) 
+                             VALUES (@Id, @ProfileType, @Length, @InitialQuantity, @UsedLength, @WastedLength, @RemainingLength, @EntryDate, @CreatedDate, @IsActive)";
                 
                 using (var command = new SqlCommand(query, connection))
                 {
@@ -146,6 +176,7 @@ namespace ERP.DAL.Repositories
             {
                 connection.Open();
                 var query = @"UPDATE SideProfileStocks SET 
+                             ProfileType = @ProfileType,
                              InitialQuantity = @InitialQuantity,
                              UsedLength = @UsedLength,
                              WastedLength = @WastedLength,
@@ -157,6 +188,7 @@ namespace ERP.DAL.Repositories
                 using (var command = new SqlCommand(query, connection))
                 {
                     command.Parameters.AddWithValue("@Id", stock.Id);
+                    command.Parameters.AddWithValue("@ProfileType", stock.ProfileType);
                     command.Parameters.AddWithValue("@InitialQuantity", stock.InitialQuantity);
                     command.Parameters.AddWithValue("@UsedLength", stock.UsedLength);
                     command.Parameters.AddWithValue("@WastedLength", stock.WastedLength);
@@ -188,6 +220,7 @@ namespace ERP.DAL.Repositories
         private void AddSideProfileStockParameters(SqlCommand command, SideProfileStock stock)
         {
             command.Parameters.AddWithValue("@Id", stock.Id);
+            command.Parameters.AddWithValue("@ProfileType", stock.ProfileType);
             command.Parameters.AddWithValue("@Length", stock.Length);
             command.Parameters.AddWithValue("@InitialQuantity", stock.InitialQuantity);
             command.Parameters.AddWithValue("@UsedLength", stock.UsedLength);
@@ -203,6 +236,7 @@ namespace ERP.DAL.Repositories
             return new SideProfileStock
             {
                 Id = reader.GetGuid("Id"),
+                ProfileType = reader.IsDBNull("ProfileType") ? "Standart" : reader.GetString("ProfileType"),
                 Length = reader.GetDecimal("Length"),
                 InitialQuantity = reader.GetInt32("InitialQuantity"),
                 UsedLength = reader.GetDecimal("UsedLength"),

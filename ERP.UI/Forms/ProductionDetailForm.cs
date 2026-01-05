@@ -80,6 +80,7 @@ namespace ERP.UI.Forms
         private PressingRepository _pressingRepository;
         private ClampingRepository _clampingRepository;
         private AssemblyRepository _assemblyRepository;
+        private IsolationRepository _isolationRepository;
         private PackagingRepository _packagingRepository;
         private MachineRepository _machineRepository;
         private SerialNoRepository _serialNoRepository;
@@ -87,6 +88,7 @@ namespace ERP.UI.Forms
         private CoverStockRepository _coverStockRepository;
         private SideProfileStockRepository _sideProfileStockRepository;
         private SideProfileRemnantRepository _sideProfileRemnantRepository;
+        private IsolationStockRepository _isolationStockRepository;
         private Order _order;
 
         public event EventHandler BackRequested;
@@ -108,6 +110,7 @@ namespace ERP.UI.Forms
             _pressingRepository = new PressingRepository();
             _clampingRepository = new ClampingRepository();
             _assemblyRepository = new AssemblyRepository();
+            _isolationRepository = new IsolationRepository();
             _packagingRepository = new PackagingRepository();
             _machineRepository = new MachineRepository();
             _serialNoRepository = new SerialNoRepository();
@@ -115,6 +118,7 @@ namespace ERP.UI.Forms
             _coverStockRepository = new CoverStockRepository();
             _sideProfileStockRepository = new SideProfileStockRepository();
             _sideProfileRemnantRepository = new SideProfileRemnantRepository();
+            _isolationStockRepository = new IsolationStockRepository();
             InitializeCustomComponents();
         }
 
@@ -1217,10 +1221,153 @@ namespace ERP.UI.Forms
             }
         }
 
+        private void ConsumeIsolationStock(string isolationMethod, decimal isolationLiquidAmount, int izosiyanatRatio = 1, int poliolRatio = 1)
+        {
+            try
+            {
+                if (isolationMethod == "MS Silikon")
+                {
+                    // MS Silikon tüketimi (kg cinsinden)
+                    // isolationLiquidAmount zaten kg cinsinden geliyor (IsolationDialog'dan)
+                    // MS Silikon için 1 metre = 2 kg izolasyon sıvısı = 0.95 kg MS Silikon tüketimi
+                    decimal msSilikonNeededKg = isolationLiquidAmount * 0.95m / 2m; // Toplam kg'dan MS Silikon kg'ına çevir
+
+                    var msSilikonStocks = _isolationStockRepository.GetAll()
+                        .Where(s => s.LiquidType == "MS Silikon" && s.Kilogram > 0)
+                        .OrderBy(s => s.EntryDate)
+                        .ToList();
+
+                    decimal remainingNeeded = msSilikonNeededKg;
+                    foreach (var stock in msSilikonStocks)
+                    {
+                        if (remainingNeeded <= 0)
+                            break;
+
+                        decimal useKilogram = Math.Min(stock.Kilogram, remainingNeeded);
+                        stock.Kilogram -= useKilogram;
+
+                        if (stock.Kilogram <= 0)
+                        {
+                            _isolationStockRepository.Delete(stock.Id);
+                        }
+                        else
+                        {
+                            _isolationStockRepository.Update(stock);
+                        }
+
+                        remainingNeeded -= useKilogram;
+                    }
+
+                    if (remainingNeeded > 0)
+                    {
+                        MessageBox.Show($"Yetersiz MS Silikon stoku!\nGereken: {msSilikonNeededKg:F3} kg\nEksik: {remainingNeeded:F3} kg", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                }
+                else // İzosiyanat+Poliol
+                {
+                    // İzolasyon sıvısı miktarı kg cinsinden
+                    // İzosiyanat ve Poliol'ü belirlenen oranlara göre kullan
+                    int totalRatio = izosiyanatRatio + poliolRatio;
+                    decimal izosiyanatKg = (isolationLiquidAmount * izosiyanatRatio) / totalRatio;
+                    decimal poliolKg = (isolationLiquidAmount * poliolRatio) / totalRatio;
+                    
+                    // İzosiyanat stoklarından kullan
+                    var isosiyanatStocks = _isolationStockRepository.GetAll()
+                        .Where(s => s.LiquidType == "İzosiyanat" && s.Kilogram > 0)
+                        .OrderBy(s => s.EntryDate)
+                        .ToList();
+                    
+                    decimal remainingIsosiyanat = izosiyanatKg;
+                    foreach (var stock in isosiyanatStocks)
+                    {
+                        if (remainingIsosiyanat <= 0)
+                            break;
+                        
+                        decimal useKilogram = Math.Min(stock.Kilogram, remainingIsosiyanat);
+                        stock.Kilogram -= useKilogram;
+                        
+                        if (stock.Kilogram <= 0)
+                        {
+                            _isolationStockRepository.Delete(stock.Id);
+                        }
+                        else
+                        {
+                            _isolationStockRepository.Update(stock);
+                        }
+                        
+                        remainingIsosiyanat -= useKilogram;
+                    }
+                    
+                    // Poliol stoklarından kullan
+                    var poliolStocks = _isolationStockRepository.GetAll()
+                        .Where(s => s.LiquidType == "Poliol" && s.Kilogram > 0)
+                        .OrderBy(s => s.EntryDate)
+                        .ToList();
+                    
+                    decimal remainingPoliol = poliolKg;
+                    foreach (var stock in poliolStocks)
+                    {
+                        if (remainingPoliol <= 0)
+                            break;
+                        
+                        decimal useKilogram = Math.Min(stock.Kilogram, remainingPoliol);
+                        stock.Kilogram -= useKilogram;
+                        
+                        if (stock.Kilogram <= 0)
+                        {
+                            _isolationStockRepository.Delete(stock.Id);
+                        }
+                        else
+                        {
+                            _isolationStockRepository.Update(stock);
+                        }
+                        
+                        remainingPoliol -= useKilogram;
+                    }
+                    
+                    // Eğer yeterli stok yoksa uyarı ver
+                    if (remainingIsosiyanat > 0 || remainingPoliol > 0)
+                    {
+                        MessageBox.Show(
+                            $"Yetersiz izolasyon sıvısı stoku!\nGereken: {isolationLiquidAmount:F2} kg\n" +
+                            $"Eksik İzosiyanat: {Math.Max(0, remainingIsosiyanat):F3} kg\n" +
+                            $"Eksik Poliol: {Math.Max(0, remainingPoliol):F3} kg",
+                            "Uyarı",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("İzolasyon sıvısı stoku tüketilirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private string GetProfileTypeFromOrder(Order order)
+        {
+            if (order == null || string.IsNullOrEmpty(order.ProductCode))
+                return "Standart";
+            
+            // Ürün kodundan profil tipini çıkar (örnek: TREX-CR-LG-500-730-002)
+            // parts[2] = "LG" -> ikinci karakter 'G' = Geniş, 'S' = Standart
+            var productCodeParts = order.ProductCode.Split('-');
+            if (productCodeParts.Length >= 3 && productCodeParts[2].Length >= 2)
+            {
+                char profileLetter = productCodeParts[2][1];
+                return profileLetter == 'S' || profileLetter == 's' ? "Standart" : "Geniş";
+            }
+            
+            return "Standart";
+        }
+
         private void ConsumeSideProfileStock(Order order, Clamping clamping, int yapilanAdet)
         {
             try
             {
+                // Profil tipini Order'dan al (ürün kodundan)
+                string profileType = GetProfileTypeFromOrder(order);
+                
                 // Yan profil uzunluğu = clamping.Length (MM cinsinden)
                 decimal sideProfileLengthMM = clamping.Length;
                 decimal sideProfileLengthM = sideProfileLengthMM / 1000.0m; // MM'den metreye çevir
@@ -1228,9 +1375,9 @@ namespace ERP.UI.Forms
                 // Her adet için 4 tane yan profil gerekiyor
                 int neededProfileCount = yapilanAdet * 4;
 
-                // Önce kalanlardan (remnants) kullan
+                // Önce kalanlardan (remnants) kullan - aynı profil tipindekilerden
                 var usableRemnants = _sideProfileRemnantRepository.GetAll(includeWaste: false)
-                    .Where(r => r.Length >= sideProfileLengthM && r.Quantity > 0)
+                    .Where(r => r.ProfileType == profileType && r.Length >= sideProfileLengthM && r.Quantity > 0)
                     .OrderBy(r => r.Length)
                     .ToList();
 
@@ -1257,10 +1404,10 @@ namespace ERP.UI.Forms
                     remainingNeeded -= useCount;
                 }
 
-                // Hala ihtiyaç varsa 6 metrelik stoklardan kullan
+                // Hala ihtiyaç varsa 6 metrelik stoklardan kullan - aynı profil tipindekilerden
                 if (remainingNeeded > 0)
                 {
-                    var sixMeterStock = _sideProfileStockRepository.GetByLength(6.0m);
+                    var sixMeterStock = _sideProfileStockRepository.GetByLengthAndProfileType(6.0m, profileType);
                     if (sixMeterStock != null && sixMeterStock.RemainingLength > 0)
                     {
                         // Her bir 6 metrelik profilden kaç tane yan profil çıkar
@@ -1288,6 +1435,7 @@ namespace ERP.UI.Forms
                                 {
                                     var remnant = new SideProfileRemnant
                                     {
+                                        ProfileType = profileType,
                                         Length = remnantLength,
                                         Quantity = useFromStock,
                                         IsWaste = false
@@ -1546,6 +1694,13 @@ namespace ERP.UI.Forms
             tabMontaj.UseVisualStyleBackColor = false;
             CreateAssemblyTab(tabMontaj);
             cuttingTabControl.TabPages.Add(tabMontaj);
+
+            var tabIzolasyon = new TabPage("🛡️ İzolasyon");
+            tabIzolasyon.Padding = new Padding(20);
+            tabIzolasyon.BackColor = Color.White;
+            tabIzolasyon.UseVisualStyleBackColor = false;
+            CreateIsolationTab(tabIzolasyon);
+            cuttingTabControl.TabPages.Add(tabIzolasyon);
 
             var tabPaketleme = new TabPage("📦 Paketleme");
             tabPaketleme.Padding = new Padding(20);
@@ -3269,10 +3424,45 @@ namespace ERP.UI.Forms
         {
             try
             {
-                // Bu siparişe ait bekleyen ve tamamlanan montaj taleplerini getir
-                // "Tamamlandı" statusündeki talepler de gösterilecek (stok tüketimi için onay bekliyor)
-                var pendingRequests = _assemblyRequestRepository.GetAll()
-                    .Where(r => r.OrderId == _orderId && (r.Status == "Montajda" || r.Status == "Beklemede" || r.Status == "Tamamlandı")).ToList();
+                // Bu siparişe ait bekleyen ve montajda olan montaj taleplerini getir
+                // "Tamamlandı" statusündeki talepler için daha önce bir Assembly kaydı oluşturulmuş mu kontrol et
+                // Eğer oluşturulmuşsa, bu talep artık gösterilmemeli (zaten onaylanmış)
+                var allRequests = _assemblyRequestRepository.GetAll()
+                    .Where(r => r.OrderId == _orderId && r.Status != "İptal" && r.IsActive).ToList();
+                
+                // Bu siparişe ait tüm Assembly kayıtlarını al (bir kere al, tekrar tekrar sorgu atmamak için)
+                var allAssemblies = _assemblyRepository.GetByOrderId(_orderId);
+                
+                // Bekleyen talepleri filtrele
+                var pendingRequests = new List<AssemblyRequest>();
+                foreach (var request in allRequests)
+                {
+                    if (request.Status == "Montajda" || request.Status == "Beklemede")
+                    {
+                        // Bekleyen ve montajda olan talepler her zaman gösterilmeli
+                        pendingRequests.Add(request);
+                    }
+                    else if (request.Status == "Tamamlandı")
+                    {
+                        // "Tamamlandı" statusündeki talepler için Assembly kaydı var mı kontrol et
+                        // Eğer varsa, bu talep zaten onaylanmış demektir ve tekrar gösterilmemeli
+                        bool hasAssemblyRecord = allAssemblies.Any(a => 
+                            a.ClampingId == request.ClampingId && 
+                            a.OrderId == request.OrderId &&
+                            Math.Abs(a.Hatve - request.Hatve) < 0.01m &&
+                            Math.Abs(a.Size - request.Size) < 0.1m &&
+                            Math.Abs(a.PlateThickness - request.PlateThickness) < 0.001m &&
+                            Math.Abs(a.Length - request.Length) < 0.1m &&
+                            a.AssemblyCount == request.ResultedAssemblyCount &&
+                            a.UsedClampCount == request.ActualClampCount);
+                        
+                        // Eğer Assembly kaydı yoksa, bu talep henüz onaylanmamış demektir (stok tüketimi için bekliyor)
+                        if (!hasAssemblyRecord)
+                        {
+                            pendingRequests.Add(request);
+                        }
+                    }
+                }
 
                 if (pendingRequests.Count == 0)
                 {
@@ -3356,26 +3546,40 @@ namespace ERP.UI.Forms
                 if (selectedRequest == null)
                     return;
 
-                // Kenet adedi girilmiş mi kontrol et
+                // Montajlanan kenet adedi girilmiş mi kontrol et
+                // Montajlanan kenet sayısı = Oluşan montaj sayısı (1:1 oran)
                 if (!selectedRequest.ActualClampCount.HasValue)
                 {
-                    MessageBox.Show("Lütfen önce kaç tane kenet kullanıldığını giriniz (Montaj Talepleri sayfasından).", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("Lütfen önce kaç tane kenet montajlandığını giriniz (Montaj Talepleri sayfasından).", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
-                // Oluşan montaj adedi girilmiş mi kontrol et
-                if (!selectedRequest.ResultedAssemblyCount.HasValue)
+                // Montajlanan kenet sayısı = Oluşan montaj sayısı (otomatik eşitle)
+                int montajlananKenetSayisi = selectedRequest.ActualClampCount.Value;
+                int olusanMontajSayisi = montajlananKenetSayisi; // 1:1 oran
+
+                // Eğer ResultedAssemblyCount girilmişse ve farklıysa uyarı ver
+                if (selectedRequest.ResultedAssemblyCount.HasValue && selectedRequest.ResultedAssemblyCount.Value != montajlananKenetSayisi)
                 {
-                    MessageBox.Show("Lütfen önce kaç tane montaj oluştuğunu giriniz (Montaj Talepleri sayfasından).", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
+                    MessageBox.Show(
+                        $"Uyarı: Montajlanan kenet sayısı ({montajlananKenetSayisi}) ile oluşan montaj sayısı ({selectedRequest.ResultedAssemblyCount.Value}) eşleşmiyor!\n\n" +
+                        $"Montajlanan kenet sayısı = Oluşan montaj sayısı olmalıdır (1:1 oran).\n" +
+                        $"Oluşan montaj sayısı {montajlananKenetSayisi} olarak ayarlanacak.",
+                        "Uyarı",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
                 }
+
+                // ResultedAssemblyCount'u montajlanan kenet sayısına eşitle
+                selectedRequest.ResultedAssemblyCount = montajlananKenetSayisi;
+                _assemblyRequestRepository.Update(selectedRequest);
 
                 // Onaylama işlemi
                 var result = MessageBox.Show(
                     $"Montaj talebi onaylanacak:\n\n" +
                     $"İstenen: {selectedRequest.RequestedAssemblyCount} adet\n" +
-                    $"Kullanılan Kenet (kenetlenmiş stoktan): {selectedRequest.ActualClampCount.Value} adet\n" +
-                    $"Oluşan Montaj (montajlanmış stoğa): {selectedRequest.ResultedAssemblyCount.Value} adet\n\n" +
+                    $"Montajlanan Kenet (kenetlenmiş stoktan): {montajlananKenetSayisi} adet\n" +
+                    $"Oluşan Montaj (montajlanmış stoğa): {olusanMontajSayisi} adet\n\n" +
                     $"Onaylamak istediğinize emin misiniz?",
                     "Montaj Talebi Onayla",
                     MessageBoxButtons.YesNo,
@@ -3389,7 +3593,7 @@ namespace ERP.UI.Forms
                 selectedRequest.CompletionDate = DateTime.Now;
                 _assemblyRequestRepository.Update(selectedRequest);
 
-                // Montaj kaydı oluştur (Assembly) - ResultedAssemblyCount montajlanmış stoğa eklenecek
+                // Montaj kaydı oluştur (Assembly) - montajlanan kenet sayısı = oluşan montaj sayısı
                 var assembly = new Assembly
                 {
                     OrderId = selectedRequest.OrderId,
@@ -3400,15 +3604,15 @@ namespace ERP.UI.Forms
                     Length = selectedRequest.Length,
                     SerialNoId = selectedRequest.SerialNoId,
                     MachineId = selectedRequest.MachineId,
-                    AssemblyCount = selectedRequest.ResultedAssemblyCount.Value, // Oluşan montaj adedi
-                    UsedClampCount = selectedRequest.ActualClampCount.Value, // Kullanılan kenet adedi
+                    AssemblyCount = olusanMontajSayisi, // Oluşan montaj adedi = Montajlanan kenet adedi
+                    UsedClampCount = montajlananKenetSayisi, // Montajlanan kenet adedi
                     EmployeeId = selectedRequest.EmployeeId,
                     AssemblyDate = DateTime.Now
                 };
                 _assemblyRepository.Insert(assembly);
 
                 // Stok tüketimleri
-                int yapilanAdet = selectedRequest.ResultedAssemblyCount.Value;
+                int yapilanAdet = olusanMontajSayisi;
                 var order = selectedRequest.OrderId.HasValue ? _orderRepository.GetById(selectedRequest.OrderId.Value) : null;
                 
                 if (order != null)
@@ -3435,6 +3639,301 @@ namespace ERP.UI.Forms
             catch (Exception ex)
             {
                 MessageBox.Show("Montaj talebi onaylanırken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void CreateIsolationTab(TabPage tab)
+        {
+            // Ana panel - TableLayoutPanel kullan
+            var mainPanel = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 2,
+                BackColor = Color.White,
+                Padding = new Padding(20)
+            };
+            mainPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            mainPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F)); // Buton paneli için sabit yükseklik
+            mainPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F)); // Grid paneli için kalan alan
+
+            // Buton paneli - Üstte
+            var buttonPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Height = 50,
+                Padding = new Padding(0, 5, 20, 5),
+                BackColor = Color.White
+            };
+
+            // İzole Et butonu
+            var btnIzoleEt = ButtonFactory.CreateActionButton("🛡️ İzole Et", ThemeColors.Success, Color.White, 120, 35);
+            btnIzoleEt.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnIzoleEt.Location = new Point(buttonPanel.Width - 120, 5);
+            buttonPanel.Controls.Add(btnIzoleEt);
+
+            // DataGridView paneli
+            var gridPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(0),
+                BackColor = Color.White
+            };
+
+            // DataGridView
+            var dataGridView = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                ReadOnly = true,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                MultiSelect = false,
+                BackgroundColor = Color.White,
+                BorderStyle = BorderStyle.None,
+                AutoGenerateColumns = false,
+                ColumnHeadersVisible = true,
+                RowHeadersVisible = false,
+                GridColor = Color.White,
+                CellBorderStyle = DataGridViewCellBorderStyle.None
+            };
+
+            // Kolonları ekle
+            AddIsolationColumn(dataGridView, "Date", "Tarih", 100);
+            AddIsolationColumn(dataGridView, "OrderNo", "Sipariş No", 90);
+            AddIsolationColumn(dataGridView, "Hatve", "Hatve", 60);
+            AddIsolationColumn(dataGridView, "Size", "Ölçü", 70);
+            AddIsolationColumn(dataGridView, "Length", "Uzunluk (m)", 90);
+            AddIsolationColumn(dataGridView, "AssemblyCount", "Montaj Adedi", 100);
+            AddIsolationColumn(dataGridView, "Customer", "Müşteri", 130);
+            AddIsolationColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 110);
+            AddIsolationColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
+            AddIsolationColumn(dataGridView, "EmployeeName", "Operatör", 120);
+            AddIsolationColumn(dataGridView, "IsolationLiquidAmount", "İzolasyon Sıvısı (kg)", 150);
+
+            // Stil ayarları
+            dataGridView.ColumnHeadersVisible = true;
+            dataGridView.RowHeadersVisible = false;
+            dataGridView.EnableHeadersVisualStyles = false;
+            dataGridView.ColumnHeadersHeight = 40;
+            dataGridView.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            dataGridView.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
+            
+            dataGridView.ColumnHeadersDefaultCellStyle.BackColor = ThemeColors.Primary;
+            dataGridView.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            dataGridView.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            dataGridView.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dataGridView.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.False;
+
+            dataGridView.DefaultCellStyle.BackColor = Color.White;
+            dataGridView.BackgroundColor = Color.White;
+            dataGridView.DefaultCellStyle.ForeColor = ThemeColors.TextPrimary;
+            dataGridView.DefaultCellStyle.SelectionBackColor = ThemeColors.Primary;
+            dataGridView.DefaultCellStyle.SelectionForeColor = Color.White;
+            dataGridView.DefaultCellStyle.Font = new Font("Segoe UI", 9F);
+
+            gridPanel.Controls.Add(dataGridView);
+            
+            // TableLayoutPanel'e ekle
+            mainPanel.Controls.Add(buttonPanel, 0, 0);
+            mainPanel.Controls.Add(gridPanel, 0, 1);
+            
+            tab.Controls.Add(mainPanel);
+
+            // Event handler
+            btnIzoleEt.Click += (s, e) => BtnIzoleEt_Click(dataGridView);
+
+            // Verileri yükle
+            LoadIsolationData(dataGridView);
+        }
+
+        private void AddIsolationColumn(DataGridView dgv, string dataPropertyName, string headerText, int width)
+        {
+            var column = new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = dataPropertyName,
+                HeaderText = headerText,
+                Name = dataPropertyName,
+                Width = width,
+                Visible = true,
+                ReadOnly = true
+            };
+            dgv.Columns.Add(column);
+        }
+
+        private void LoadIsolationData(DataGridView dataGridView)
+        {
+            try
+            {
+                var order = _orderRepository.GetById(_orderId);
+                
+                // Onaylanmış izolasyon kayıtları
+                var isolations = _isolationRepository.GetByOrderId(_orderId);
+                var completedData = isolations.Select(i => new
+                {
+                    Id = i.Id,
+                    Date = i.IsolationDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
+                    OrderNo = order?.TrexOrderNo ?? "",
+                    Hatve = GetHatveLetter(i.Hatve),
+                    Size = i.Size.ToString("F2", CultureInfo.InvariantCulture),
+                    Length = (i.Length / 1000m).ToString("F2", CultureInfo.InvariantCulture), // MM'den metre'ye çevir
+                    AssemblyCount = i.IsolationCount.ToString(),
+                    Customer = order?.Company?.Name ?? "",
+                    PlateThickness = i.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
+                    SerialNumber = i.SerialNo?.SerialNumber ?? "",
+                    EmployeeName = i.Employee != null ? $"{i.Employee.FirstName} {i.Employee.LastName}" : "",
+                    IsolationLiquidAmount = i.IsolationLiquidAmount.ToString("F2", CultureInfo.InvariantCulture)
+                }).ToList();
+
+                // Tamamlanmış montaj kayıtları (henüz izole edilmemiş olanlar)
+                var assemblies = _assemblyRepository.GetByOrderId(_orderId);
+                var isolatedAssemblyIds = isolations.Where(i => i.AssemblyId.HasValue).Select(i => i.AssemblyId.Value).ToList();
+                var unisolatedAssemblies = assemblies.Where(a => !isolatedAssemblyIds.Contains(a.Id)).ToList();
+                
+                var pendingData = unisolatedAssemblies.Select(a => new
+                {
+                    Id = a.Id,
+                    Date = a.AssemblyDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
+                    OrderNo = order?.TrexOrderNo ?? "",
+                    Hatve = GetHatveLetter(a.Hatve),
+                    Size = a.Size.ToString("F2", CultureInfo.InvariantCulture),
+                    Length = (a.Length / 1000m).ToString("F2", CultureInfo.InvariantCulture), // MM'den metre'ye çevir
+                    AssemblyCount = a.AssemblyCount.ToString(),
+                    Customer = order?.Company?.Name ?? "",
+                    PlateThickness = a.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
+                    SerialNumber = a.SerialNo?.SerialNumber ?? "",
+                    EmployeeName = a.Employee != null ? $"{a.Employee.FirstName} {a.Employee.LastName}" : "",
+                    IsolationLiquidAmount = "-"
+                }).ToList();
+
+                // Birleştir
+                var data = completedData.Cast<object>().Concat(pendingData.Cast<object>()).ToList();
+
+                // Layout işlemlerini durdur - performans için kritik
+                dataGridView.SuspendLayout();
+                
+                try
+                {
+                    // DataSource'u null yap (kolonlar kaybolmasın diye)
+                    dataGridView.DataSource = null;
+                    
+                    // Kolonların var olduğundan emin ol
+                    if (dataGridView.Columns.Count == 0)
+                    {
+                        AddIsolationColumn(dataGridView, "Date", "Tarih", 100);
+                        AddIsolationColumn(dataGridView, "OrderNo", "Sipariş No", 90);
+                        AddIsolationColumn(dataGridView, "Hatve", "Hatve", 60);
+                        AddIsolationColumn(dataGridView, "Size", "Ölçü", 70);
+                        AddIsolationColumn(dataGridView, "Length", "Uzunluk (m)", 90);
+                        AddIsolationColumn(dataGridView, "AssemblyCount", "Montaj Adedi", 100);
+                        AddIsolationColumn(dataGridView, "Customer", "Müşteri", 130);
+                        AddIsolationColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 110);
+                        AddIsolationColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
+                        AddIsolationColumn(dataGridView, "EmployeeName", "Operatör", 120);
+                        AddIsolationColumn(dataGridView, "IsolationLiquidAmount", "İzolasyon Sıvısı (kg)", 150);
+                    }
+
+                    // Veri kaynağını ayarla
+                    dataGridView.DataSource = data;
+                }
+                finally
+                {
+                    dataGridView.ResumeLayout();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("İzolasyon verileri yüklenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BtnIzoleEt_Click(DataGridView dataGridView)
+        {
+            try
+            {
+                if (dataGridView.SelectedRows.Count == 0)
+                {
+                    MessageBox.Show("Lütfen izole edilecek montaj kaydını seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                var selectedRow = dataGridView.SelectedRows[0];
+                var dataItem = selectedRow.DataBoundItem;
+                if (dataItem == null)
+                {
+                    MessageBox.Show("Geçersiz satır seçildi.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Id'yi al
+                Guid assemblyId = Guid.Empty;
+                var idProperty = dataItem.GetType().GetProperty("Id");
+                if (idProperty != null)
+                {
+                    assemblyId = (Guid)idProperty.GetValue(dataItem);
+                }
+
+                if (assemblyId == Guid.Empty)
+                {
+                    MessageBox.Show("Montaj kaydı bulunamadı.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                var assembly = _assemblyRepository.GetById(assemblyId);
+                if (assembly == null)
+                {
+                    MessageBox.Show("Montaj kaydı bulunamadı.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // İzolasyon yöntemi seçim dialog'unu aç
+                using (var dialog = new IsolationDialog(assembly, _isolationStockRepository))
+                {
+                    if (dialog.ShowDialog() != DialogResult.OK)
+                    {
+                        return; // Kullanıcı iptal etti
+                    }
+
+                    string selectedMethod = dialog.SelectedMethod;
+                    decimal isolationLiquidAmount = dialog.IsolationLiquidAmount;
+                    int isolationCount = dialog.IsolationCount;
+                    int izosiyanatRatio = dialog.IzosiyanatRatio;
+                    int poliolRatio = dialog.PoliolRatio;
+
+                    // İzolasyon kaydı oluştur
+                    var isolation = new Isolation
+                    {
+                        OrderId = assembly.OrderId,
+                        AssemblyId = assembly.Id,
+                        PlateThickness = assembly.PlateThickness,
+                        Hatve = assembly.Hatve,
+                        Size = assembly.Size,
+                        Length = assembly.Length, // MM cinsinden sakla
+                        SerialNoId = assembly.SerialNoId,
+                        MachineId = assembly.MachineId,
+                        IsolationCount = isolationCount, // İzolasyon adedi (montaj adedi ile aynı)
+                        UsedAssemblyCount = assembly.AssemblyCount, // Kullanılan montaj adedi
+                        IsolationLiquidAmount = isolationLiquidAmount, // İzolasyon sıvısı miktarı (kg veya ml)
+                        IsolationMethod = selectedMethod, // "MS Silikon" veya "İzosiyanat+Poliol"
+                        EmployeeId = assembly.EmployeeId,
+                        IsolationDate = DateTime.Now
+                    };
+                    _isolationRepository.Insert(isolation);
+
+                    // İzolasyon sıvısı stoğundan tüketim
+                    ConsumeIsolationStock(selectedMethod, isolationLiquidAmount, izosiyanatRatio, poliolRatio);
+
+                    string amountUnit = selectedMethod == "MS Silikon" ? "ml" : "kg";
+                    MessageBox.Show($"İzolasyon kaydı oluşturuldu!\nKullanılan İzolasyon Sıvısı: {isolationLiquidAmount:F2} {amountUnit}", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                    // Verileri yeniden yükle
+                    LoadIsolationData(dataGridView);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("İzolasyon yapılırken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -3503,6 +4002,7 @@ namespace ERP.UI.Forms
             AddPackagingColumn(dataGridView, "Length", "Uzunluk", 80);
             AddPackagingColumn(dataGridView, "ProductType", "Ürün Türü", 100);
             AddPackagingColumn(dataGridView, "Profil", "Profil", 80);
+            AddPackagingColumn(dataGridView, "KapakTipi", "Kapak Tipi", 120);
             AddPackagingColumn(dataGridView, "PackagingCount", "Paketleme Adedi", 120);
             AddPackagingColumn(dataGridView, "Customer", "Müşteri", 130);
             AddPackagingColumn(dataGridView, "UsedAssemblyCount", "Kullanılan Montaj Adedi", 160);
@@ -3570,12 +4070,24 @@ namespace ERP.UI.Forms
                 // Ürün türü ve profil bilgilerini al
                 string productType = order?.ProductType ?? "";
                 string profil = "";
+                string kapakTipi = "";
                 if (order != null && !string.IsNullOrEmpty(order.ProductCode))
                 {
                     var parts = order.ProductCode.Split('-');
                     if (parts.Length >= 3 && parts[2].Length >= 2)
                     {
                         profil = parts[2].Substring(1, 1).ToUpper(); // Profil harfi (örn: LG -> G)
+                    }
+                    // Kapak tipini al (5. index: 002, 030, vb.)
+                    if (parts.Length > 5)
+                    {
+                        string kapakKodu = parts[5];
+                        if (kapakKodu == "002")
+                            kapakTipi = "2mm-düz kapak";
+                        else if (kapakKodu == "030")
+                            kapakTipi = "30mm-normal kapak";
+                        else
+                            kapakTipi = kapakKodu;
                     }
                 }
 
@@ -3591,6 +4103,7 @@ namespace ERP.UI.Forms
                     Length = (p.Length + kapakBoyuMM).ToString("F2", CultureInfo.InvariantCulture), // Uzunluk (MM) + kapak boyu (MM)
                     ProductType = productType,
                     Profil = profil,
+                    KapakTipi = kapakTipi,
                     PackagingCount = p.PackagingCount.ToString(),
                     Customer = order?.Company?.Name ?? "",
                     UsedAssemblyCount = p.UsedAssemblyCount.ToString(),
@@ -3599,27 +4112,28 @@ namespace ERP.UI.Forms
                     EmployeeName = p.Employee != null ? $"{p.Employee.FirstName} {p.Employee.LastName}" : ""
                 }).ToList();
 
-                // Tamamlanmış montaj kayıtları (henüz paketlenmemiş olanlar)
-                var assemblies = _assemblyRepository.GetByOrderId(_orderId);
-                var packagedAssemblyIds = packagings.Where(p => p.AssemblyId.HasValue).Select(p => p.AssemblyId.Value).ToList();
-                var unpackagedAssemblies = assemblies.Where(a => !packagedAssemblyIds.Contains(a.Id)).ToList();
+                // Tamamlanmış izolasyon kayıtları (henüz paketlenmemiş olanlar)
+                var isolations = _isolationRepository.GetByOrderId(_orderId);
+                var packagedIsolationIds = packagings.Where(p => p.IsolationId.HasValue).Select(p => p.IsolationId.Value).ToList();
+                var unpackagedIsolations = isolations.Where(i => !packagedIsolationIds.Contains(i.Id)).ToList();
                 
-                var pendingData = unpackagedAssemblies.Select(a => new
+                var pendingData = unpackagedIsolations.Select(i => new
                 {
-                    Id = a.Id,
-                    Date = a.AssemblyDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
+                    Id = i.Id,
+                    Date = i.IsolationDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
                     OrderNo = order?.TrexOrderNo ?? "",
-                    Hatve = GetHatveLetter(a.Hatve),
-                    Size = a.Size.ToString("F2", CultureInfo.InvariantCulture),
-                    Length = (a.Length + kapakBoyuMM).ToString("F2", CultureInfo.InvariantCulture), // Uzunluk (MM) + kapak boyu (MM)
+                    Hatve = GetHatveLetter(i.Hatve),
+                    Size = i.Size.ToString("F2", CultureInfo.InvariantCulture),
+                    Length = (i.Length + kapakBoyuMM).ToString("F2", CultureInfo.InvariantCulture), // Uzunluk (MM) + kapak boyu (MM)
                     ProductType = productType,
                     Profil = profil,
+                    KapakTipi = kapakTipi,
                     PackagingCount = "-",
                     Customer = order?.Company?.Name ?? "",
-                    UsedAssemblyCount = a.AssemblyCount.ToString(),
-                    PlateThickness = a.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
-                    SerialNumber = a.SerialNo?.SerialNumber ?? "",
-                    EmployeeName = a.Employee != null ? $"{a.Employee.FirstName} {a.Employee.LastName}" : ""
+                    UsedAssemblyCount = i.UsedAssemblyCount.ToString(),
+                    PlateThickness = i.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
+                    SerialNumber = i.SerialNo?.SerialNumber ?? "",
+                    EmployeeName = i.Employee != null ? $"{i.Employee.FirstName} {i.Employee.LastName}" : ""
                 }).ToList();
 
                 // Birleştir
@@ -3643,6 +4157,7 @@ namespace ERP.UI.Forms
                         AddPackagingColumn(dataGridView, "Length", "Uzunluk", 80);
                         AddPackagingColumn(dataGridView, "ProductType", "Ürün Türü", 100);
                         AddPackagingColumn(dataGridView, "Profil", "Profil", 80);
+                        AddPackagingColumn(dataGridView, "KapakTipi", "Kapak Tipi", 120);
                         AddPackagingColumn(dataGridView, "PackagingCount", "Paketleme Adedi", 120);
                         AddPackagingColumn(dataGridView, "Customer", "Müşteri", 130);
                         AddPackagingColumn(dataGridView, "UsedAssemblyCount", "Kullanılan Montaj Adedi", 160);
@@ -3671,7 +4186,7 @@ namespace ERP.UI.Forms
             {
                 if (dataGridView.SelectedRows.Count == 0)
                 {
-                    MessageBox.Show("Lütfen paketlenecek montaj kaydını seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("Lütfen paketlenecek izolasyon kaydını seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
@@ -3684,23 +4199,24 @@ namespace ERP.UI.Forms
                 }
 
                 // Id'yi al
-                Guid assemblyId = Guid.Empty;
+                Guid isolationId = Guid.Empty;
                 var idProperty = dataItem.GetType().GetProperty("Id");
                 if (idProperty != null)
                 {
-                    assemblyId = (Guid)idProperty.GetValue(dataItem);
+                    isolationId = (Guid)idProperty.GetValue(dataItem);
                 }
 
-                if (assemblyId == Guid.Empty)
+                if (isolationId == Guid.Empty)
                 {
-                    MessageBox.Show("Montaj kaydı bulunamadı.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("İzolasyon kaydı bulunamadı.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
-                var assembly = _assemblyRepository.GetById(assemblyId);
-                if (assembly == null)
+                // Izolasyon kaydını al
+                var isolation = _isolationRepository.GetById(isolationId);
+                if (isolation == null)
                 {
-                    MessageBox.Show("Montaj kaydı bulunamadı.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("İzolasyon kaydı bulunamadı.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
@@ -3718,7 +4234,7 @@ namespace ERP.UI.Forms
                 {
                     var lblPrompt = new Label
                     {
-                        Text = $"Kullanılacak Montaj Adedi: {assembly.AssemblyCount}\n\nPaketleme Adedi:",
+                        Text = $"Kullanılacak İzolasyon Adedi: {isolation.IsolationCount}\n\nPaketleme Adedi:",
                         Location = new Point(20, 20),
                         Width = 300,
                         Height = 60,
@@ -3730,8 +4246,8 @@ namespace ERP.UI.Forms
                         Location = new Point(20, 80),
                         Width = 290,
                         Minimum = 1,
-                        Maximum = assembly.AssemblyCount,
-                        Value = assembly.AssemblyCount,
+                        Maximum = isolation.IsolationCount,
+                        Value = isolation.IsolationCount,
                         Font = new Font("Segoe UI", 10F)
                     };
 
@@ -3773,14 +4289,14 @@ namespace ERP.UI.Forms
                     if (inputDialog.ShowDialog() == DialogResult.OK)
                     {
                         int packagingCount = (int)txtPackagingCount.Value;
-                        int usedAssemblyCount = packagingCount; // Kullanılan montaj adedi = paketleme adedi
+                        int usedIsolationCount = isolation.IsolationCount;
 
                         // Onaylama işlemi
                         var result = MessageBox.Show(
-                            $"Paketleme işlemi onaylanacak:\n\n" +
-                            $"Kullanılacak Montaj Adedi: {usedAssemblyCount}\n" +
-                            $"Paketleme Adedi: {packagingCount}\n\n" +
-                            $"Onaylamak istediğinize emin misiniz?",
+                            $"Paketleme yapılacak:\n\n" +
+                            $"Kullanılacak İzolasyon Adedi: {usedIsolationCount} adet\n" +
+                            $"Paketleme Adedi: {packagingCount} adet\n\n" +
+                            $"Paketlemek istediğinize emin misiniz?",
                             "Paketleme Onayla",
                             MessageBoxButtons.YesNo,
                             MessageBoxIcon.Question);
@@ -3791,17 +4307,17 @@ namespace ERP.UI.Forms
                         // Paketleme kaydı oluştur
                         var packaging = new Packaging
                         {
-                            OrderId = assembly.OrderId,
-                            AssemblyId = assembly.Id,
-                            PlateThickness = assembly.PlateThickness,
-                            Hatve = assembly.Hatve,
-                            Size = assembly.Size,
-                            Length = assembly.Length,
-                            SerialNoId = assembly.SerialNoId,
-                            MachineId = assembly.MachineId,
+                            OrderId = isolation.OrderId,
+                            IsolationId = isolation.Id,
+                            PlateThickness = isolation.PlateThickness,
+                            Hatve = isolation.Hatve,
+                            Size = isolation.Size,
+                            Length = isolation.Length,
+                            SerialNoId = isolation.SerialNoId,
+                            MachineId = isolation.MachineId,
                             PackagingCount = packagingCount,
-                            UsedAssemblyCount = usedAssemblyCount,
-                            EmployeeId = assembly.EmployeeId,
+                            UsedAssemblyCount = usedIsolationCount, // İzolasyon adedi
+                            EmployeeId = isolation.EmployeeId,
                             PackagingDate = DateTime.Now
                         };
                         _packagingRepository.Insert(packaging);

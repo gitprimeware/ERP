@@ -16,7 +16,87 @@ namespace ERP.UI.Services
 
         public IEnumerable<MenuItem> GetMenuItems()
         {
-            return _menuItems.Where(x => x.IsVisible).OrderBy(x => x.Order);
+            // İzin kontrolü yaparak menü öğelerini filtrele
+            return _menuItems
+                .Where(x => x.IsVisible && HasPermissionForMenuItem(x))
+                .OrderBy(x => x.Order)
+                .Select(item =>
+                {
+                    // Alt menü öğelerini de filtrele
+                    if (item.HasSubMenu)
+                    {
+                        var filteredSubItems = item.SubMenuItems
+                            .Where(sub => sub.IsVisible && HasPermissionForMenuItem(sub))
+                            .ToList();
+                        item.SubMenuItems = filteredSubItems;
+                    }
+                    return item;
+                });
+        }
+
+        private bool HasPermissionForMenuItem(MenuItem menuItem)
+        {
+            // Ana Sayfa her zaman görünür
+            if (menuItem.Tag == "Home")
+                return true;
+
+            // İzin kontrolü yap
+            string permissionKey = GetPermissionKeyForMenuItem(menuItem.Tag);
+            if (string.IsNullOrEmpty(permissionKey))
+                return true; // İzin anahtarı yoksa görünür (geriye uyumluluk)
+
+            return UserSessionService.HasPermission(permissionKey);
+        }
+
+        private string GetPermissionKeyForMenuItem(string tag)
+        {
+            // Tag'den PermissionKey'e mapping
+            switch (tag)
+            {
+                case "OrderEntry":
+                case "OrderList":
+                case "OrderCreate":
+                    return "OrderEntry";
+                case "StockEntry":
+                    return "StockEntry";
+                case "Accounting":
+                    return "Accounting";
+                case "Stock":
+                case "MaterialEntry":
+                case "MaterialExit":
+                case "StockDetail":
+                    return "StockManagement";
+                case "Production":
+                case "StockTracking":
+                    return "ProductionPlanning";
+                case "CuttingRequests":
+                    return "CuttingRequests";
+                case "PressingRequests":
+                    return "PressingRequests";
+                case "ClampingRequests":
+                    return "ClampingRequests";
+                case "Clamping2Requests":
+                    return "Clamping2Requests";
+                case "AssemblyRequests":
+                    return "AssemblyRequests";
+                case "Consumption":
+                    return "Consumption";
+                case "ConsumptionMaterialStock":
+                case "ConsumptionMaterialStockEntry":
+                case "ConsumptionMaterialStockView":
+                    return "ConsumptionMaterialStock";
+                case "Reports":
+                case "MRPReport":
+                case "CustomerReport":
+                case "AnnualReport":
+                case "GeneralReport":
+                    return "Reports";
+                case "Settings":
+                case "UserManagement":
+                    return "Settings";
+                default:
+                    return null; // Bilinmeyen tag için null döndür (görünür)
+            }
         }
 
         private List<MenuItem> InitializeMenuItems()

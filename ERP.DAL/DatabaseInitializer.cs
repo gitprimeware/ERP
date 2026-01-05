@@ -32,6 +32,7 @@ namespace ERP.DAL
                     CreatePressingsTable(connection);
                     CreateClampingsTable(connection);
                     CreateAssembliesTable(connection);
+                    CreateIsolationsTable(connection);
                     CreateCuttingRequestsTable(connection);
                     CreatePressingRequestsTable(connection);
                     CreateClampingRequestsTable(connection);
@@ -43,6 +44,9 @@ namespace ERP.DAL
                     CreateSideProfileStocksTable(connection);
                     CreateSideProfileRemnantsTable(connection);
                     CreateIsolationStocksTable(connection);
+                    CreateUsersTable(connection);
+                    CreateUserPermissionsTable(connection);
+                    CreateDefaultAdminUser(connection);
                 }
             }
             catch (Exception ex)
@@ -728,6 +732,52 @@ namespace ERP.DAL
             }
         }
 
+        private static void CreateIsolationsTable(SqlConnection connection)
+        {
+            var query = @"
+                IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Isolations]') AND type in (N'U'))
+                BEGIN
+                    CREATE TABLE [dbo].[Isolations] (
+                        [Id] UNIQUEIDENTIFIER PRIMARY KEY,
+                        [OrderId] UNIQUEIDENTIFIER NULL,
+                        [AssemblyId] UNIQUEIDENTIFIER NULL,
+                        [PlateThickness] DECIMAL(10,3) NOT NULL,
+                        [Hatve] DECIMAL(10,2) NOT NULL,
+                        [Size] DECIMAL(10,2) NOT NULL,
+                        [Length] DECIMAL(10,2) NOT NULL,
+                        [SerialNoId] UNIQUEIDENTIFIER NULL,
+                        [MachineId] UNIQUEIDENTIFIER NULL,
+                        [IsolationCount] INT NOT NULL,
+                        [UsedAssemblyCount] INT NOT NULL,
+                        [IsolationLiquidAmount] DECIMAL(10,2) NOT NULL,
+                        [IsolationMethod] NVARCHAR(50) NOT NULL DEFAULT 'İzosiyanat+Poliol',
+                        [EmployeeId] UNIQUEIDENTIFIER NULL,
+                        [IsolationDate] DATETIME NOT NULL,
+                        [CreatedDate] DATETIME NOT NULL,
+                        [ModifiedDate] DATETIME NULL,
+                        [IsActive] BIT NOT NULL DEFAULT 1,
+                        FOREIGN KEY ([OrderId]) REFERENCES [Orders]([Id]),
+                        FOREIGN KEY ([AssemblyId]) REFERENCES [Assemblies]([Id]),
+                        FOREIGN KEY ([SerialNoId]) REFERENCES [SerialNos]([Id]),
+                        FOREIGN KEY ([MachineId]) REFERENCES [Machines]([Id]),
+                        FOREIGN KEY ([EmployeeId]) REFERENCES [Employees]([Id])
+                    )
+                END
+                ELSE
+                BEGIN
+                    -- Migration: Add IsolationMethod column if it doesn't exist
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Isolations]') AND name = 'IsolationMethod')
+                    BEGIN
+                        ALTER TABLE [dbo].[Isolations] ADD [IsolationMethod] NVARCHAR(50) NOT NULL DEFAULT 'İzosiyanat+Poliol'
+                    END
+                END";
+
+            using (var command = new SqlCommand(query, connection))
+            {
+                command.ExecuteNonQuery();
+            }
+        }
+
         private static void CreatePackagingsTable(SqlConnection connection)
         {
             var query = @"
@@ -737,6 +787,7 @@ namespace ERP.DAL
                         [Id] UNIQUEIDENTIFIER PRIMARY KEY,
                         [OrderId] UNIQUEIDENTIFIER NULL,
                         [AssemblyId] UNIQUEIDENTIFIER NULL,
+                        [IsolationId] UNIQUEIDENTIFIER NULL,
                         [PlateThickness] DECIMAL(10,3) NOT NULL,
                         [Hatve] DECIMAL(10,2) NOT NULL,
                         [Size] DECIMAL(10,2) NOT NULL,
@@ -752,6 +803,7 @@ namespace ERP.DAL
                         [IsActive] BIT NOT NULL DEFAULT 1,
                         FOREIGN KEY ([OrderId]) REFERENCES [Orders]([Id]),
                         FOREIGN KEY ([AssemblyId]) REFERENCES [Assemblies]([Id]),
+                        FOREIGN KEY ([IsolationId]) REFERENCES [Isolations]([Id]),
                         FOREIGN KEY ([SerialNoId]) REFERENCES [SerialNos]([Id]),
                         FOREIGN KEY ([MachineId]) REFERENCES [Machines]([Id]),
                         FOREIGN KEY ([EmployeeId]) REFERENCES [Employees]([Id])
@@ -761,6 +813,30 @@ namespace ERP.DAL
             using (var command = new SqlCommand(query, connection))
             {
                 command.ExecuteNonQuery();
+            }
+
+            // Mevcut Packagings tablosuna IsolationId kolonu ekle (migration)
+            var migrationQuery = @"
+                IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Packagings]') AND name = 'IsolationId')
+                BEGIN
+                    ALTER TABLE [dbo].[Packagings]
+                    ADD [IsolationId] UNIQUEIDENTIFIER NULL;
+                    
+                    ALTER TABLE [dbo].[Packagings]
+                    ADD CONSTRAINT FK_Packagings_Isolations FOREIGN KEY ([IsolationId]) REFERENCES [Isolations]([Id]);
+                END";
+
+            using (var migrationCommand = new SqlCommand(migrationQuery, connection))
+            {
+                try
+                {
+                    migrationCommand.ExecuteNonQuery();
+                }
+                catch (Exception ex)
+                {
+                    // Migration hatası olursa devam et (tablo zaten oluşturulmuş olabilir)
+                    System.Diagnostics.Debug.WriteLine($"Packagings IsolationId migration hatası: {ex.Message}");
+                }
             }
         }
 
@@ -816,6 +892,7 @@ namespace ERP.DAL
                 BEGIN
                     CREATE TABLE [dbo].[SideProfileStocks] (
                         [Id] UNIQUEIDENTIFIER PRIMARY KEY,
+                        [ProfileType] NVARCHAR(50) NOT NULL DEFAULT 'Standart',
                         [Length] DECIMAL(10,2) NOT NULL,
                         [InitialQuantity] INT NOT NULL,
                         [UsedLength] DECIMAL(10,2) NOT NULL DEFAULT 0,
@@ -826,6 +903,14 @@ namespace ERP.DAL
                         [ModifiedDate] DATETIME NULL,
                         [IsActive] BIT NOT NULL DEFAULT 1
                     )
+                END
+                ELSE
+                BEGIN
+                    -- Migration: Add ProfileType column if it doesn't exist
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[SideProfileStocks]') AND name = 'ProfileType')
+                    BEGIN
+                        ALTER TABLE [dbo].[SideProfileStocks] ADD [ProfileType] NVARCHAR(50) NOT NULL DEFAULT 'Standart'
+                    END
                 END";
 
             using (var command = new SqlCommand(query, connection))
@@ -841,6 +926,7 @@ namespace ERP.DAL
                 BEGIN
                     CREATE TABLE [dbo].[SideProfileRemnants] (
                         [Id] UNIQUEIDENTIFIER PRIMARY KEY,
+                        [ProfileType] NVARCHAR(50) NOT NULL DEFAULT 'Standart',
                         [Length] DECIMAL(10,2) NOT NULL,
                         [Quantity] INT NOT NULL,
                         [IsWaste] BIT NOT NULL DEFAULT 0,
@@ -849,6 +935,14 @@ namespace ERP.DAL
                         [ModifiedDate] DATETIME NULL,
                         [IsActive] BIT NOT NULL DEFAULT 1
                     )
+                END
+                ELSE
+                BEGIN
+                    -- Migration: Add ProfileType column if it doesn't exist
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[SideProfileRemnants]') AND name = 'ProfileType')
+                    BEGIN
+                        ALTER TABLE [dbo].[SideProfileRemnants] ADD [ProfileType] NVARCHAR(50) NOT NULL DEFAULT 'Standart'
+                    END
                 END";
 
             using (var command = new SqlCommand(query, connection))
@@ -865,12 +959,27 @@ namespace ERP.DAL
                     CREATE TABLE [dbo].[IsolationStocks] (
                         [Id] UNIQUEIDENTIFIER PRIMARY KEY,
                         [LiquidType] NVARCHAR(50) NOT NULL,
-                        [Liter] DECIMAL(10,2) NOT NULL,
+                        [Kilogram] DECIMAL(10,3) NOT NULL DEFAULT 0,
+                        [Quantity] INT NOT NULL DEFAULT 0,
+                        [Liter] DECIMAL(10,2) NOT NULL DEFAULT 0,
                         [EntryDate] DATETIME NOT NULL,
                         [CreatedDate] DATETIME NOT NULL,
                         [ModifiedDate] DATETIME NULL,
                         [IsActive] BIT NOT NULL DEFAULT 1
                     )
+                END
+                ELSE
+                BEGIN
+                    -- Migration: Add Kilogram column if it doesn't exist
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[IsolationStocks]') AND name = 'Kilogram')
+                    BEGIN
+                        ALTER TABLE [dbo].[IsolationStocks] ADD [Kilogram] DECIMAL(10,3) NOT NULL DEFAULT 0
+                    END
+                    -- Migration: Add Quantity column if it doesn't exist (geriye uyumluluk)
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[IsolationStocks]') AND name = 'Quantity')
+                    BEGIN
+                        ALTER TABLE [dbo].[IsolationStocks] ADD [Quantity] INT NOT NULL DEFAULT 0
+                    END
                 END";
 
             using (var command = new SqlCommand(query, connection))
@@ -1199,6 +1308,104 @@ namespace ERP.DAL
             using (var command = new SqlCommand(query, connection))
             {
                 command.ExecuteNonQuery();
+            }
+        }
+
+        private static void CreateUsersTable(SqlConnection connection)
+        {
+            var query = @"
+                IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND type in (N'U'))
+                BEGIN
+                    CREATE TABLE [dbo].[Users] (
+                        [Id] UNIQUEIDENTIFIER PRIMARY KEY,
+                        [Username] NVARCHAR(100) NOT NULL UNIQUE,
+                        [PasswordHash] NVARCHAR(500) NOT NULL,
+                        [FullName] NVARCHAR(200) NOT NULL,
+                        [IsAdmin] BIT NOT NULL DEFAULT 0,
+                        [CreatedDate] DATETIME NOT NULL,
+                        [ModifiedDate] DATETIME NULL,
+                        [IsActive] BIT NOT NULL DEFAULT 1
+                    )
+                END";
+
+            using (var command = new SqlCommand(query, connection))
+            {
+                command.ExecuteNonQuery();
+            }
+        }
+
+        private static void CreateUserPermissionsTable(SqlConnection connection)
+        {
+            var query = @"
+                IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[UserPermissions]') AND type in (N'U'))
+                BEGIN
+                    CREATE TABLE [dbo].[UserPermissions] (
+                        [Id] UNIQUEIDENTIFIER PRIMARY KEY,
+                        [UserId] UNIQUEIDENTIFIER NOT NULL,
+                        [PermissionKey] NVARCHAR(100) NOT NULL,
+                        [CreatedDate] DATETIME NOT NULL,
+                        [ModifiedDate] DATETIME NULL,
+                        [IsActive] BIT NOT NULL DEFAULT 1,
+                        FOREIGN KEY ([UserId]) REFERENCES [Users]([Id]),
+                        UNIQUE ([UserId], [PermissionKey])
+                    )
+                END";
+
+            using (var command = new SqlCommand(query, connection))
+            {
+                command.ExecuteNonQuery();
+            }
+        }
+
+        private static void CreateDefaultAdminUser(SqlConnection connection)
+        {
+            // Admin kullanıcısının var olup olmadığını kontrol et
+            var checkQuery = "SELECT COUNT(*) FROM [Users] WHERE Username = 'admin'";
+            using (var checkCommand = new SqlCommand(checkQuery, connection))
+            {
+                var count = (int)checkCommand.ExecuteScalar();
+                if (count > 0)
+                {
+                    return; // Admin kullanıcısı zaten var
+                }
+            }
+
+            // Admin kullanıcısını oluştur (şifre: admin123 - SHA256 hash)
+            // admin123'ün SHA256 hash'i: 240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9
+            var adminId = Guid.NewGuid();
+            var insertQuery = @"
+                INSERT INTO [Users] (Id, Username, PasswordHash, FullName, IsAdmin, CreatedDate, IsActive)
+                VALUES (@Id, 'admin', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', 'Administrator', 1, @CreatedDate, 1)";
+
+            using (var insertCommand = new SqlCommand(insertQuery, connection))
+            {
+                insertCommand.Parameters.AddWithValue("@Id", adminId);
+                insertCommand.Parameters.AddWithValue("@CreatedDate", DateTime.Now);
+                insertCommand.ExecuteNonQuery();
+            }
+
+            // Admin kullanıcısına tüm izinleri ekle
+            var permissionKeys = new[]
+            {
+                "OrderEntry", "StockEntry", "Accounting", "StockManagement", "ProductionPlanning",
+                "CuttingRequests", "PressingRequests", "ClampingRequests", "Clamping2Requests",
+                "AssemblyRequests", "Consumption", "ConsumptionMaterialStock", "Reports", "Settings"
+            };
+
+            foreach (var permissionKey in permissionKeys)
+            {
+                var permissionQuery = @"
+                    INSERT INTO [UserPermissions] (Id, UserId, PermissionKey, CreatedDate, IsActive)
+                    VALUES (@Id, @UserId, @PermissionKey, @CreatedDate, 1)";
+
+                using (var permissionCommand = new SqlCommand(permissionQuery, connection))
+                {
+                    permissionCommand.Parameters.AddWithValue("@Id", Guid.NewGuid());
+                    permissionCommand.Parameters.AddWithValue("@UserId", adminId);
+                    permissionCommand.Parameters.AddWithValue("@PermissionKey", permissionKey);
+                    permissionCommand.Parameters.AddWithValue("@CreatedDate", DateTime.Now);
+                    permissionCommand.ExecuteNonQuery();
+                }
             }
         }
     }

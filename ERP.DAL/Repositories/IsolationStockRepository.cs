@@ -16,7 +16,7 @@ namespace ERP.DAL.Repositories
             using (var connection = DatabaseHelper.GetConnection())
             {
                 connection.Open();
-                var query = @"SELECT Id, LiquidType, Liter, EntryDate, 
+                var query = @"SELECT Id, LiquidType, Kilogram, Quantity, Liter, EntryDate, 
                              CreatedDate, ModifiedDate, IsActive
                              FROM IsolationStocks
                              WHERE IsActive = 1
@@ -42,7 +42,7 @@ namespace ERP.DAL.Repositories
             using (var connection = DatabaseHelper.GetConnection())
             {
                 connection.Open();
-                var query = @"SELECT Id, LiquidType, Liter, EntryDate, 
+                var query = @"SELECT Id, LiquidType, Kilogram, Quantity, Liter, EntryDate, 
                              CreatedDate, ModifiedDate, IsActive
                              FROM IsolationStocks
                              WHERE Id = @Id AND IsActive = 1";
@@ -74,8 +74,8 @@ namespace ERP.DAL.Repositories
             using (var connection = DatabaseHelper.GetConnection())
             {
                 connection.Open();
-                var query = @"INSERT INTO IsolationStocks (Id, LiquidType, Liter, EntryDate, CreatedDate, IsActive) 
-                             VALUES (@Id, @LiquidType, @Liter, @EntryDate, @CreatedDate, @IsActive)";
+                var query = @"INSERT INTO IsolationStocks (Id, LiquidType, Kilogram, Quantity, Liter, EntryDate, CreatedDate, IsActive) 
+                             VALUES (@Id, @LiquidType, @Kilogram, @Quantity, @Liter, @EntryDate, @CreatedDate, @IsActive)";
                 
                 using (var command = new SqlCommand(query, connection))
                 {
@@ -96,6 +96,8 @@ namespace ERP.DAL.Repositories
                 connection.Open();
                 var query = @"UPDATE IsolationStocks SET 
                              LiquidType = @LiquidType,
+                             Kilogram = @Kilogram,
+                             Quantity = @Quantity,
                              Liter = @Liter,
                              EntryDate = @EntryDate,
                              ModifiedDate = @ModifiedDate
@@ -105,6 +107,8 @@ namespace ERP.DAL.Repositories
                 {
                     command.Parameters.AddWithValue("@Id", stock.Id);
                     command.Parameters.AddWithValue("@LiquidType", stock.LiquidType);
+                    command.Parameters.AddWithValue("@Kilogram", stock.Kilogram);
+                    command.Parameters.AddWithValue("@Quantity", stock.Quantity);
                     command.Parameters.AddWithValue("@Liter", stock.Liter);
                     command.Parameters.AddWithValue("@EntryDate", stock.EntryDate);
                     command.Parameters.AddWithValue("@ModifiedDate", stock.ModifiedDate ?? (object)DBNull.Value);
@@ -167,6 +171,8 @@ namespace ERP.DAL.Repositories
         {
             command.Parameters.AddWithValue("@Id", stock.Id);
             command.Parameters.AddWithValue("@LiquidType", stock.LiquidType);
+            command.Parameters.AddWithValue("@Kilogram", stock.Kilogram);
+            command.Parameters.AddWithValue("@Quantity", stock.Quantity);
             command.Parameters.AddWithValue("@Liter", stock.Liter);
             command.Parameters.AddWithValue("@EntryDate", stock.EntryDate);
             command.Parameters.AddWithValue("@CreatedDate", stock.CreatedDate);
@@ -175,16 +181,49 @@ namespace ERP.DAL.Repositories
 
         private IsolationStock MapToIsolationStock(SqlDataReader reader)
         {
-            return new IsolationStock
+            var stock = new IsolationStock
             {
                 Id = reader.GetGuid("Id"),
                 LiquidType = reader.GetString("LiquidType"),
-                Liter = reader.GetDecimal("Liter"),
                 EntryDate = reader.GetDateTime("EntryDate"),
                 CreatedDate = reader.GetDateTime("CreatedDate"),
                 ModifiedDate = reader.IsDBNull("ModifiedDate") ? (DateTime?)null : reader.GetDateTime("ModifiedDate"),
                 IsActive = reader.GetBoolean("IsActive")
             };
+            
+            // Kilogram kolonu varsa onu kullan, yoksa Quantity'den hesapla (geriye uyumluluk)
+            if (HasColumn(reader, "Kilogram"))
+            {
+                stock.Kilogram = reader.IsDBNull("Kilogram") ? 0 : reader.GetDecimal("Kilogram");
+            }
+            else
+            {
+                // Eski veriler için Quantity'den kg'a çevir (geriye uyumluluk)
+                int quantity = reader.IsDBNull("Quantity") ? 0 : reader.GetInt32("Quantity");
+                if (stock.LiquidType == "İzosiyanat")
+                    stock.Kilogram = quantity * 250m; // 1 adet = 250 kg
+                else if (stock.LiquidType == "Poliol")
+                    stock.Kilogram = quantity * 25m; // 1 adet = 25 kg
+                else if (stock.LiquidType == "MS Silikon")
+                    stock.Kilogram = quantity * 0.95m; // 1 adet = 0.95 kg (950 gr)
+                else
+                    stock.Kilogram = 0;
+            }
+            
+            stock.Quantity = reader.IsDBNull("Quantity") ? 0 : reader.GetInt32("Quantity");
+            stock.Liter = reader.IsDBNull("Liter") ? 0 : reader.GetDecimal("Liter");
+            
+            return stock;
+        }
+        
+        private bool HasColumn(SqlDataReader reader, string columnName)
+        {
+            for (int i = 0; i < reader.FieldCount; i++)
+            {
+                if (reader.GetName(i).Equals(columnName, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
         }
     }
 }

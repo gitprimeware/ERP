@@ -4,6 +4,7 @@ namespace ERP.Core.Models
 {
     public class SideProfileStock : BaseModel
     {
+        public string ProfileType { get; set; } // "Standart" veya "Geniş"
         public decimal Length { get; set; } // Metre cinsinden (örn: 6)
         public int InitialQuantity { get; set; } // Başlangıç adedi (örn: 500)
         public decimal UsedLength { get; set; } // Kullanılan toplam metre

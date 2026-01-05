@@ -25,6 +25,7 @@ namespace ERP.UI.Forms
         private Button _btnKapakSave;
 
         // Yan Profil tab kontrolleri
+        private ComboBox _cmbYanProfilProfileType;
         private TextBox _txtYanProfilLength;
         private TextBox _txtYanProfilQuantity;
         private Button _btnYanProfilSave;
@@ -32,7 +33,7 @@ namespace ERP.UI.Forms
 
         // İzolasyon Sıvısı tab kontrolleri
         private ComboBox _cmbIzolasyonType;
-        private TextBox _txtIzolasyonLiter;
+        private TextBox _txtIzolasyonQuantity;
         private Button _btnIzolasyonSave;
 
         public ConsumptionMaterialStockEntryForm()
@@ -229,6 +230,28 @@ namespace ERP.UI.Forms
             panel.Controls.Add(titleLabel);
             yPos += 50;
 
+            // Profil Tipi
+            var lblProfileType = new Label
+            {
+                Text = "Profil Tipi:",
+                Location = new Point(20, yPos),
+                Width = labelWidth,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold)
+            };
+            _cmbYanProfilProfileType = new ComboBox
+            {
+                Location = new Point(180, yPos - 3),
+                Width = controlWidth,
+                Height = controlHeight,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 10F)
+            };
+            _cmbYanProfilProfileType.Items.Add("Standart");
+            _cmbYanProfilProfileType.Items.Add("Geniş");
+            panel.Controls.Add(lblProfileType);
+            panel.Controls.Add(_cmbYanProfilProfileType);
+            yPos += spacing;
+
             // Uzunluk (Metre)
             var lblLength = new Label
             {
@@ -326,6 +349,14 @@ namespace ERP.UI.Forms
 
             _dgvYanProfilRemnants.Columns.Add(new DataGridViewTextBoxColumn
             {
+                DataPropertyName = "ProfileType",
+                HeaderText = "Profil Tipi",
+                Name = "ProfileType",
+                Width = 120
+            });
+
+            _dgvYanProfilRemnants.Columns.Add(new DataGridViewTextBoxColumn
+            {
                 DataPropertyName = "Length",
                 HeaderText = "Uzunluk (m)",
                 Name = "Length",
@@ -374,6 +405,12 @@ namespace ERP.UI.Forms
             try
             {
                 // Validasyon
+                if (_cmbYanProfilProfileType.SelectedItem == null)
+                {
+                    MessageBox.Show("Lütfen profil tipi seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
                 if (string.IsNullOrWhiteSpace(_txtYanProfilLength.Text) || !decimal.TryParse(_txtYanProfilLength.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal length) || length <= 0)
                 {
                     MessageBox.Show("Lütfen geçerli bir uzunluk giriniz (metre cinsinden).", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -389,18 +426,20 @@ namespace ERP.UI.Forms
                 // SideProfileStock oluştur
                 var stock = new SideProfileStock
                 {
+                    ProfileType = _cmbYanProfilProfileType.SelectedItem.ToString(),
                     Length = length,
                     InitialQuantity = quantity,
                     UsedLength = 0,
                     WastedLength = 0
                 };
 
-                // Aynı uzunlukta varsa adedi artır, yoksa yeni kayıt oluştur
+                // Aynı uzunlukta ve profil tipinde varsa adedi artır, yoksa yeni kayıt oluştur
                 _sideProfileStockRepository.InsertOrUpdate(stock);
 
                 MessageBox.Show("Yan profil stoku başarıyla kaydedildi!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                 // Formu temizle
+                _cmbYanProfilProfileType.SelectedIndex = -1;
                 _txtYanProfilLength.Text = "";
                 _txtYanProfilQuantity.Text = "";
             }
@@ -419,6 +458,7 @@ namespace ERP.UI.Forms
                 var data = remnants.Select(r => new
                 {
                     Id = r.Id,
+                    ProfileType = r.ProfileType,
                     Length = $"{r.Length.ToString("F2", CultureInfo.InvariantCulture)} m",
                     Quantity = r.Quantity.ToString()
                 }).ToList();
@@ -516,7 +556,7 @@ namespace ERP.UI.Forms
             // Ölçü
             var lblSize = new Label
             {
-                Text = "Ölçü (mm):",
+                Text = "Kapak Ölçüsü mm:",
                 Location = new Point(30, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold)
@@ -534,10 +574,10 @@ namespace ERP.UI.Forms
             panel.Controls.Add(_cmbKapakSize);
             yPos += spacing;
 
-            // Kapak Boyu
+            // Kapak Modeli
             var lblCoverLength = new Label
             {
-                Text = "Kapak Boyu (mm):",
+                Text = "Kapak Modeli:",
                 Location = new Point(30, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold)
@@ -550,8 +590,8 @@ namespace ERP.UI.Forms
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 10F)
             };
-            _cmbKapakLength.Items.Add(new LengthItem { Value = 2, Display = "002 (2 mm)" });
-            _cmbKapakLength.Items.Add(new LengthItem { Value = 30, Display = "030 (30 mm)" });
+            _cmbKapakLength.Items.Add(new LengthItem { Value = 2, Display = "2mm-düz kapak" });
+            _cmbKapakLength.Items.Add(new LengthItem { Value = 30, Display = "30mm-normal kapak" });
             _cmbKapakLength.DisplayMember = "Display";
             _cmbKapakLength.ValueMember = "Value";
             panel.Controls.Add(lblCoverLength);
@@ -674,10 +714,10 @@ namespace ERP.UI.Forms
             panel.Controls.Add(titleLabel);
             yPos += 50;
 
-            // Sıvı Türü
+            // Ürün Türü
             var lblLiquidType = new Label
             {
-                Text = "Sıvı Türü:",
+                Text = "Ürün Türü:",
                 Location = new Point(30, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold)
@@ -692,28 +732,28 @@ namespace ERP.UI.Forms
             };
             _cmbIzolasyonType.Items.Add("İzosiyanat");
             _cmbIzolasyonType.Items.Add("Poliol");
-            _cmbIzolasyonType.Items.Add("İzolasyon");
+            _cmbIzolasyonType.Items.Add("MS Silikon");
             panel.Controls.Add(lblLiquidType);
             panel.Controls.Add(_cmbIzolasyonType);
             yPos += spacing;
 
-            // Litre
-            var lblLiter = new Label
+            // Kilogram
+            var lblQuantity = new Label
             {
-                Text = "Litre:",
+                Text = "Kilogram (kg):",
                 Location = new Point(30, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold)
             };
-            _txtIzolasyonLiter = new TextBox
+            _txtIzolasyonQuantity = new TextBox
             {
                 Location = new Point(190, yPos - 3),
                 Width = controlWidth,
                 Height = controlHeight,
                 Font = new Font("Segoe UI", 10F)
             };
-            panel.Controls.Add(lblLiter);
-            panel.Controls.Add(_txtIzolasyonLiter);
+            panel.Controls.Add(lblQuantity);
+            panel.Controls.Add(_txtIzolasyonQuantity);
             yPos += spacing + 20;
 
             // Kaydet butonu
@@ -742,13 +782,13 @@ namespace ERP.UI.Forms
                 // Validasyon
                 if (_cmbIzolasyonType.SelectedItem == null)
                 {
-                    MessageBox.Show("Lütfen sıvı türü seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("Lütfen ürün türü seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
-                if (string.IsNullOrWhiteSpace(_txtIzolasyonLiter.Text) || !decimal.TryParse(_txtIzolasyonLiter.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal liter) || liter <= 0)
+                if (string.IsNullOrWhiteSpace(_txtIzolasyonQuantity.Text) || !decimal.TryParse(_txtIzolasyonQuantity.Text, out decimal kilogram) || kilogram <= 0)
                 {
-                    MessageBox.Show("Lütfen geçerli bir litre miktarı giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("Lütfen geçerli bir kilogram değeri giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
@@ -756,7 +796,9 @@ namespace ERP.UI.Forms
                 var stock = new IsolationStock
                 {
                     LiquidType = _cmbIzolasyonType.SelectedItem.ToString(),
-                    Liter = liter
+                    Kilogram = kilogram,
+                    Quantity = 0, // Geriye uyumluluk için 0 (artık kullanılmıyor)
+                    Liter = 0 // Geriye uyumluluk için 0 (artık kullanılmıyor)
                 };
 
                 _isolationStockRepository.Insert(stock);
@@ -765,7 +807,7 @@ namespace ERP.UI.Forms
 
                 // Formu temizle
                 _cmbIzolasyonType.SelectedIndex = -1;
-                _txtIzolasyonLiter.Text = "";
+                _txtIzolasyonQuantity.Text = "";
             }
             catch (Exception ex)
             {
@@ -792,7 +834,7 @@ namespace ERP.UI.Forms
 
                 if (_cmbKapakLength.SelectedItem == null)
                 {
-                    MessageBox.Show("Lütfen kapak boyu seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("Lütfen kapak modeli seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 

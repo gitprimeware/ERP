@@ -118,9 +118,10 @@ namespace ERP.UI.Forms
                 Location = new Point(150, yPos - 3),
                 Width = controlWidth,
                 Height = controlHeight,
-                DropDownStyle = ComboBoxStyle.DropDown,
+                DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 10F)
             };
+            _cmbPlateThickness.SelectedIndexChanged += CmbFilter_SelectedIndexChanged;
             this.Controls.Add(lblPlateThickness);
             this.Controls.Add(_cmbPlateThickness);
             yPos += spacing;
@@ -138,9 +139,10 @@ namespace ERP.UI.Forms
                 Location = new Point(150, yPos - 3),
                 Width = controlWidth,
                 Height = controlHeight,
-                DropDownStyle = ComboBoxStyle.DropDown,
+                DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 10F)
             };
+            _cmbHatve.SelectedIndexChanged += CmbFilter_SelectedIndexChanged;
             this.Controls.Add(lblHatve);
             this.Controls.Add(_cmbHatve);
             yPos += spacing;
@@ -158,9 +160,10 @@ namespace ERP.UI.Forms
                 Location = new Point(150, yPos - 3),
                 Width = controlWidth,
                 Height = controlHeight,
-                DropDownStyle = ComboBoxStyle.DropDown,
+                DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 10F)
             };
+            _cmbSize.SelectedIndexChanged += CmbFilter_SelectedIndexChanged;
             this.Controls.Add(lblSize);
             this.Controls.Add(_cmbSize);
             yPos += spacing;
@@ -181,7 +184,8 @@ namespace ERP.UI.Forms
                 DropDownStyle = ComboBoxStyle.DropDown,
                 Font = new Font("Segoe UI", 10F)
             };
-            _cmbLength.TextChanged += CmbLength_TextChanged; // Uzunluk değiştiğinde kenetlenmiş stokları yeniden yükle
+            _cmbLength.DropDownStyle = ComboBoxStyle.DropDownList;
+            _cmbLength.SelectedIndexChanged += CmbFilter_SelectedIndexChanged;
             this.Controls.Add(lblLength);
             this.Controls.Add(_cmbLength);
             yPos += spacing;
@@ -466,26 +470,17 @@ namespace ERP.UI.Forms
             this.Controls.Add(_dgvSideProfiles);
             yPos += 160;
 
-            // Butonlar
-            _btnCancel = new Button
-            {
-                Text = "İptal",
-                DialogResult = DialogResult.Cancel,
-                Location = new Point(720, yPos),
-                Width = 90,
-                Height = 32,
-                BackColor = ThemeColors.Secondary,
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 10F),
-                Cursor = Cursors.Hand
-            };
-            UIHelper.ApplyRoundedButton(_btnCancel, 4);
-
+            // Butonlar (ortalanmış)
+            int buttonWidth = 90;
+            int buttonSpacing = 10;
+            int totalButtonWidth = (buttonWidth * 2) + buttonSpacing;
+            int startX = (this.Width - totalButtonWidth) / 2;
+            
             _btnSave = new Button
             {
                 Text = "Kaydet",
-                Location = new Point(625, yPos),
-                Width = 90,
+                Location = new Point(startX, yPos),
+                Width = buttonWidth,
                 Height = 32,
                 BackColor = ThemeColors.Success,
                 ForeColor = Color.White,
@@ -494,6 +489,20 @@ namespace ERP.UI.Forms
             };
             UIHelper.ApplyRoundedButton(_btnSave, 4);
             _btnSave.Click += BtnSave_Click;
+
+            _btnCancel = new Button
+            {
+                Text = "İptal",
+                DialogResult = DialogResult.Cancel,
+                Location = new Point(startX + buttonWidth + buttonSpacing, yPos),
+                Width = buttonWidth,
+                Height = 32,
+                BackColor = ThemeColors.Secondary,
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 10F),
+                Cursor = Cursors.Hand
+            };
+            UIHelper.ApplyRoundedButton(_btnCancel, 4);
 
             this.Controls.Add(_btnSave);
             this.Controls.Add(_btnCancel);
@@ -579,8 +588,6 @@ namespace ERP.UI.Forms
                     var sizeText = sizeCM.ToString("F2", CultureInfo.InvariantCulture);
                     if (_cmbSize.Items.Contains(sizeText))
                         _cmbSize.SelectedItem = sizeText;
-                    else
-                        _cmbSize.Text = sizeText;
                 }
                 
                 // Hatve bilgisini siparişten al
@@ -609,8 +616,6 @@ namespace ERP.UI.Forms
                         var hatveText = GetHatveLetter(hatve);
                         if (_cmbHatve.Items.Contains(hatveText))
                             _cmbHatve.SelectedItem = hatveText;
-                        else
-                            _cmbHatve.Text = hatveText;
                     }
                 }
                 
@@ -632,8 +637,6 @@ namespace ERP.UI.Forms
                     var plateThicknessText = order.LamelThickness.Value.ToString("F3", CultureInfo.InvariantCulture);
                     if (_cmbPlateThickness.Items.Contains(plateThicknessText))
                         _cmbPlateThickness.SelectedItem = plateThicknessText;
-                    else
-                        _cmbPlateThickness.Text = plateThicknessText;
                 }
                 
                 // Uzunluk bilgisini siparişten al (kapak boyu çıkarılmış, MM olarak göster)
@@ -665,8 +668,6 @@ namespace ERP.UI.Forms
                     var lengthText = kapaksizUzunlukMM.ToString("F2", CultureInfo.InvariantCulture);
                     if (_cmbLength.Items.Contains(lengthText))
                         _cmbLength.SelectedItem = lengthText;
-                    else
-                        _cmbLength.Text = lengthText;
                 }
             }
             catch (Exception ex)
@@ -719,19 +720,20 @@ namespace ERP.UI.Forms
                 _cmbClamping.Items.Clear();
                 
                 // Form alanlarından filtreleme değerlerini al
-                if (string.IsNullOrWhiteSpace(_cmbHatve.Text) || 
-                    string.IsNullOrWhiteSpace(_cmbSize.Text) || 
-                    string.IsNullOrWhiteSpace(_cmbPlateThickness.Text) ||
-                    string.IsNullOrWhiteSpace(_cmbLength.Text))
+                if (_cmbHatve.SelectedItem == null || 
+                    _cmbSize.SelectedItem == null || 
+                    _cmbPlateThickness.SelectedItem == null ||
+                    _cmbLength.SelectedItem == null)
                 {
                     _cmbClamping.Enabled = false;
                     return;
                 }
 
-                if (!decimal.TryParse(_cmbHatve.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal hatve) ||
-                    !decimal.TryParse(_cmbSize.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal size) ||
-                    !decimal.TryParse(_cmbPlateThickness.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal plateThickness) ||
-                    !decimal.TryParse(_cmbLength.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal lengthMM))
+                decimal hatve = ParseHatveValue(_cmbHatve.SelectedItem.ToString());
+                if (hatve == 0 ||
+                    !decimal.TryParse(_cmbSize.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out decimal size) ||
+                    !decimal.TryParse(_cmbPlateThickness.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out decimal plateThickness) ||
+                    !decimal.TryParse(_cmbLength.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out decimal lengthMM))
                 {
                     _cmbClamping.Enabled = false;
                     return;
@@ -1027,7 +1029,7 @@ namespace ERP.UI.Forms
                 _lblSideProfileInfo.Text = $"Her adet için 4 tane - Toplam {requiredSideProfileCount} tane ({requiredTotalLengthM.ToString("F2", CultureInfo.InvariantCulture)} m) gerekiyor";
 
                 // Kullanılabilir yan profilleri hesapla ve göster
-                CalculateAndDisplaySideProfiles(sideProfileLengthM, requiredSideProfileCount, requiredTotalLengthM);
+                CalculateAndDisplaySideProfiles(order, sideProfileLengthM, requiredSideProfileCount, requiredTotalLengthM);
             }
             catch (Exception ex)
             {
@@ -1036,9 +1038,9 @@ namespace ERP.UI.Forms
             }
         }
 
-        private void CmbLength_TextChanged(object sender, EventArgs e)
+        private void CmbFilter_SelectedIndexChanged(object sender, EventArgs e)
         {
-            // Uzunluk değiştiğinde kenetlenmiş stokları yeniden yükle
+            // Hatve, Ölçü, Plaka Kalınlığı veya Uzunluk değiştiğinde kenetlenmiş stokları yeniden yükle
             LoadClampingsBasedOnOrder();
         }
 
@@ -1063,16 +1065,37 @@ namespace ERP.UI.Forms
             }
         }
 
-        private void CalculateAndDisplaySideProfiles(decimal requiredLengthM, int requiredCount, decimal requiredTotalLengthM)
+        private void CalculateAndDisplaySideProfiles(Order order, decimal requiredLengthM, int requiredCount, decimal requiredTotalLengthM)
         {
             try
             {
+                // Profil tipini Order'dan al (ürün kodundan)
+                string profileType = "";
+                if (order != null && !string.IsNullOrEmpty(order.ProductCode))
+                {
+                    var parts = order.ProductCode.Split('-');
+                    if (parts.Length >= 3)
+                    {
+                        string modelProfile = parts[2];
+                        if (modelProfile.Length >= 2)
+                        {
+                            char profileLetter = modelProfile[1];
+                            profileType = profileLetter == 'S' || profileLetter == 's' ? "Standart" : "Geniş";
+                        }
+                    }
+                }
+
+                if (string.IsNullOrEmpty(profileType))
+                {
+                    profileType = "Standart"; // Varsayılan
+                }
+
                 var profiles = new List<object>();
                 int remainingCount = requiredCount;
 
-                // Önce kalanlardan (remnants) kontrol et - eşit veya daha uzun olanları öncelikli kullan
+                // Önce kalanlardan (remnants) kontrol et - profil tipine göre - eşit veya daha uzun olanları öncelikli kullan
                 var usableRemnants = _sideProfileRemnantRepository.GetAll(includeWaste: false)
-                    .Where(r => r.Length >= requiredLengthM && r.Quantity > 0)
+                    .Where(r => r.ProfileType == profileType && r.Length >= requiredLengthM && r.Quantity > 0)
                     .OrderBy(r => r.Length) // En kısa olanlardan başla (öncelik)
                     .ToList();
 
@@ -1095,10 +1118,10 @@ namespace ERP.UI.Forms
                     remainingCount -= useCount;
                 }
 
-                // Hala ihtiyaç varsa 6 metrelik stoklardan kullan
+                // Hala ihtiyaç varsa 6 metrelik stoklardan kullan - profil tipine göre
                 if (remainingCount > 0)
                 {
-                    var sixMeterStock = _sideProfileStockRepository.GetByLength(6.0m);
+                    var sixMeterStock = _sideProfileStockRepository.GetByLengthAndProfileType(6.0m, profileType);
                     if (sixMeterStock != null && sixMeterStock.RemainingLength > 0)
                     {
                         // Her bir 6 metrelik profilden kaç tane yan profil çıkar (6m / requiredLengthM)
@@ -1262,19 +1285,41 @@ namespace ERP.UI.Forms
                 // OrderId: Dialog hangi sipariş için açıldıysa o siparişe ait olmalı
                 // Stoktan kenetlenmiş plaka kullanılsa bile, montaj talebi açıldığı siparişe bağlı olmalı
                 var orderId = _orderId != Guid.Empty ? _orderId : (Guid?)null;
+                var order = _orderRepository.GetById(_orderId);
+                
+                int requestedCount = int.Parse(_txtRequestedAssemblyCount.Text);
+                
+                // Stok kontrolleri - montaj talebi oluşturulmadan önce kontrol et
+                if (order != null)
+                {
+                    // Kapak stok kontrolü
+                    if (!CheckCoverStock(order, requestedCount))
+                    {
+                        return; // Hata mesajı zaten gösterildi
+                    }
+
+                    // Yan profil stok kontrolü
+                    if (clamping != null)
+                    {
+                        if (!CheckSideProfileStock(order, clamping, requestedCount))
+                        {
+                            return; // Hata mesajı zaten gösterildi
+                        }
+                    }
+                }
                 
                 var assemblyRequest = new AssemblyRequest
                 {
                     OrderId = orderId, // Dialog hangi sipariş için açıldıysa o siparişe ait
                     ClampingId = clampingId,
-                    PlateThickness = decimal.Parse(_cmbPlateThickness.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
-                    Hatve = ParseHatveValue(_cmbHatve.Text),
-                    Size = decimal.Parse(_cmbSize.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
+                    PlateThickness = decimal.Parse(_cmbPlateThickness.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture),
+                    Hatve = ParseHatveValue(_cmbHatve.SelectedItem.ToString()),
+                    Size = decimal.Parse(_cmbSize.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture),
                     // Uzunluk MM olarak giriliyor, direkt kaydet (Length MM cinsinden saklanıyor)
-                    Length = decimal.Parse(_cmbLength.Text, NumberStyles.Any, CultureInfo.InvariantCulture),
+                    Length = decimal.Parse(_cmbLength.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture),
                     SerialNoId = clamping?.SerialNoId,
                     MachineId = _cmbMachine.SelectedItem != null ? GetSelectedId(_cmbMachine) : (Guid?)null,
-                    RequestedAssemblyCount = int.Parse(_txtRequestedAssemblyCount.Text),
+                    RequestedAssemblyCount = requestedCount,
                     EmployeeId = _cmbEmployee.SelectedItem != null ? GetSelectedId(_cmbEmployee) : (Guid?)null,
                     Status = "Beklemede",
                     RequestDate = DateTime.Now
@@ -1299,46 +1344,47 @@ namespace ERP.UI.Forms
                 return false;
             }
 
-            // Plaka Kalınlığı kontrolü (Text veya SelectedItem olabilir - DropDown style)
-            if (string.IsNullOrWhiteSpace(_cmbPlateThickness.Text))
+            // Plaka Kalınlığı kontrolü
+            if (_cmbPlateThickness.SelectedItem == null)
             {
-                MessageBox.Show("Lütfen plaka kalınlığı giriniz veya seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Lütfen plaka kalınlığı seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
 
-            if (!decimal.TryParse(_cmbPlateThickness.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal plateThickness) || plateThickness <= 0)
+            if (!decimal.TryParse(_cmbPlateThickness.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out decimal plateThickness) || plateThickness <= 0)
             {
-                MessageBox.Show("Lütfen geçerli bir plaka kalınlığı giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Lütfen geçerli bir plaka kalınlığı seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
 
-            // Hatve kontrolü (Text veya SelectedItem olabilir - DropDown style)
-            if (string.IsNullOrWhiteSpace(_cmbHatve.Text))
+            // Hatve kontrolü
+            if (_cmbHatve.SelectedItem == null)
             {
-                MessageBox.Show("Lütfen hatve giriniz veya seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Lütfen hatve seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
 
-            if (!decimal.TryParse(_cmbHatve.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal hatve) || hatve <= 0)
+            decimal hatve = ParseHatveValue(_cmbHatve.SelectedItem.ToString());
+            if (hatve <= 0)
             {
-                MessageBox.Show("Lütfen geçerli bir hatve giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Lütfen geçerli bir hatve seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
 
-            // Ölçü kontrolü (Text veya SelectedItem olabilir - DropDown style)
-            if (string.IsNullOrWhiteSpace(_cmbSize.Text))
+            // Ölçü kontrolü
+            if (_cmbSize.SelectedItem == null)
             {
-                MessageBox.Show("Lütfen ölçü giriniz veya seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Lütfen ölçü seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
 
-            if (!decimal.TryParse(_cmbSize.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal size) || size <= 0)
+            if (!decimal.TryParse(_cmbSize.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out decimal size) || size <= 0)
             {
-                MessageBox.Show("Lütfen geçerli bir ölçü giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Lütfen geçerli bir ölçü seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
 
-            if (string.IsNullOrWhiteSpace(_cmbLength.Text) || !decimal.TryParse(_cmbLength.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal length) || length <= 0)
+            if (_cmbLength.SelectedItem == null || !decimal.TryParse(_cmbLength.SelectedItem.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out decimal length) || length <= 0)
             {
                 MessageBox.Show("Uzunluk bilgisi yüklenemedi. Lütfen tekrar deneyiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
@@ -1428,6 +1474,155 @@ namespace ERP.UI.Forms
                 return hatve;
 
             return 0;
+        }
+
+        private bool CheckCoverStock(Order order, int requestedAdet)
+        {
+            try
+            {
+                if (order == null || string.IsNullOrEmpty(order.ProductCode))
+                    return true; // Kontrol edilemiyorsa geç
+
+                var parts = order.ProductCode.Split('-');
+                
+                // Profil tipi (S=Standart, G=Geniş)
+                string profileType = "";
+                if (parts.Length >= 3)
+                {
+                    string modelProfile = parts[2];
+                    if (modelProfile.Length >= 2)
+                    {
+                        char profileLetter = modelProfile[1];
+                        profileType = profileLetter == 'S' || profileLetter == 's' ? "Standart" : "Geniş";
+                    }
+                }
+
+                // Plaka ölçüsü
+                int plateSizeMM = 0;
+                if (parts.Length >= 4 && int.TryParse(parts[3], out int plakaOlcusuMM))
+                {
+                    plateSizeMM = plakaOlcusuMM <= 1150 ? plakaOlcusuMM : plakaOlcusuMM / 2;
+                }
+
+                // Kapak boyu
+                int coverLengthMM = GetKapakBoyuFromOrder();
+
+                if (!string.IsNullOrEmpty(profileType) && plateSizeMM > 0 && coverLengthMM > 0)
+                {
+                    // CoverStock'tan bul
+                    var coverStock = _coverStockRepository.GetByProperties(profileType, plateSizeMM, coverLengthMM);
+                    if (coverStock == null)
+                    {
+                        MessageBox.Show($"Uygun ölçüde kapak stoku bulunamadı! (Profil Tipi: {profileType}, Ölçü: {plateSizeMM}mm, Uzunluk: {coverLengthMM}mm)\n\nMontaj talebi oluşturulamadı.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return false;
+                    }
+
+                    // Her adet için 2 tane kapak kullanılacak
+                    int neededCoverCount = requestedAdet * 2;
+                    
+                    if (coverStock.Quantity < neededCoverCount)
+                    {
+                        MessageBox.Show($"Yetersiz kapak stoku! Gereken: {neededCoverCount} adet, Mevcut: {coverStock.Quantity} adet\n\nMontaj talebi oluşturulamadı.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Kapak stok kontrolü yapılırken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+        }
+
+        private bool CheckSideProfileStock(Order order, Clamping clamping, int requestedAdet)
+        {
+            try
+            {
+                // Profil tipini Order'dan al (ürün kodundan)
+                string profileType = "";
+                if (order != null && !string.IsNullOrEmpty(order.ProductCode))
+                {
+                    var parts = order.ProductCode.Split('-');
+                    if (parts.Length >= 3)
+                    {
+                        string modelProfile = parts[2];
+                        if (modelProfile.Length >= 2)
+                        {
+                            char profileLetter = modelProfile[1];
+                            profileType = profileLetter == 'S' || profileLetter == 's' ? "Standart" : "Geniş";
+                        }
+                    }
+                }
+
+                if (string.IsNullOrEmpty(profileType))
+                {
+                    profileType = "Standart"; // Varsayılan
+                }
+
+                // Yan profil uzunluğu = clamping.Length (MM cinsinden)
+                decimal sideProfileLengthMM = clamping.Length;
+                decimal sideProfileLengthM = sideProfileLengthMM / 1000.0m; // MM'den metreye çevir
+                
+                // Her adet için 4 tane yan profil gerekiyor
+                int neededProfileCount = requestedAdet * 4;
+
+                // Önce kalanlardan (remnants) kontrol et - profil tipine göre
+                var usableRemnants = _sideProfileRemnantRepository.GetAll(includeWaste: false)
+                    .Where(r => r.ProfileType == profileType && r.Length >= sideProfileLengthM && r.Quantity > 0)
+                    .OrderBy(r => r.Length)
+                    .ToList();
+
+                int remainingNeeded = neededProfileCount;
+                foreach (var remnant in usableRemnants)
+                {
+                    if (remainingNeeded <= 0)
+                        break;
+                    remainingNeeded -= remnant.Quantity;
+                }
+
+                // Hala ihtiyaç varsa 6 metrelik stoklardan kontrol et - profil tipine göre
+                if (remainingNeeded > 0)
+                {
+                    var sixMeterStock = _sideProfileStockRepository.GetByLengthAndProfileType(6.0m, profileType);
+                    if (sixMeterStock == null || sixMeterStock.RemainingLength <= 0)
+                    {
+                        MessageBox.Show($"Yetersiz yan profil stoku! Gereken: {neededProfileCount} adet ({sideProfileLengthMM}mm uzunluğunda), ancak yeterli stok bulunamadı.\n\nMontaj talebi oluşturulamadı.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return false;
+                    }
+
+                    // Her bir 6 metrelik profilden kaç tane yan profil çıkar
+                    int profilesPerSixMeter = (int)Math.Floor(6.0m / sideProfileLengthM);
+                    
+                    if (profilesPerSixMeter > 0)
+                    {
+                        // Kaç tane 6 metrelik profil gerekiyor
+                        int neededSixMeterProfiles = (int)Math.Ceiling((decimal)remainingNeeded / profilesPerSixMeter);
+                        
+                        // Mevcut 6 metrelik stoktan kaç tane kullanılabilir
+                        int availableSixMeterProfiles = (int)Math.Floor(sixMeterStock.RemainingLength / 6.0m);
+                        
+                        if (availableSixMeterProfiles < neededSixMeterProfiles)
+                        {
+                            MessageBox.Show($"Yetersiz yan profil stoku! Gereken: {neededProfileCount} adet ({sideProfileLengthMM}mm uzunluğunda), ancak yeterli stok bulunamadı.\n\nMontaj talebi oluşturulamadı.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        MessageBox.Show($"Yan profil uzunluğu ({sideProfileLengthMM}mm) çok uzun! 6 metrelik stoktan kesilemez.\n\nMontaj talebi oluşturulamadı.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Yan profil stok kontrolü yapılırken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
         }
     }
 }

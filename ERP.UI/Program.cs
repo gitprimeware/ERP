@@ -1,5 +1,6 @@
 using ERP.DAL;
 using ERP.UI.Forms;
+using ERP.UI.Services;
 using System;
 using System.Windows.Forms;
 
@@ -27,7 +28,18 @@ namespace ERP.UI
                     "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             
-            Application.Run(new MainForm());
+            // Login ekranını göster
+            using (var loginForm = new LoginForm())
+            {
+                if (loginForm.ShowDialog() == DialogResult.OK && loginForm.LoggedInUser != null)
+                {
+                    // Kullanıcı oturumunu başlat
+                    UserSessionService.CurrentUser = loginForm.LoggedInUser;
+                    
+                    // Ana formu göster
+                    Application.Run(new MainForm());
+                }
+            }
         }
     }
 }

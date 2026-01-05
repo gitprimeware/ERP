@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using ERP.UI.UI;
+using ERP.UI.Services;
 
 namespace ERP.UI.Forms
 {
@@ -76,6 +77,14 @@ namespace ERP.UI.Forms
             tabContact.UseVisualStyleBackColor = false;
             CreateContactTab(tabContact);
             _tabControl.TabPages.Add(tabContact);
+
+            // Kullanıcı Yönetimi Tab
+            var tabUserManagement = new TabPage("👥 Kullanıcı Yönetimi");
+            tabUserManagement.Padding = new Padding(0);
+            tabUserManagement.BackColor = Color.White;
+            tabUserManagement.UseVisualStyleBackColor = false;
+            CreateUserManagementTab(tabUserManagement);
+            _tabControl.TabPages.Add(tabUserManagement);
 
             this.Controls.Add(_tabControl);
         }
@@ -358,6 +367,14 @@ namespace ERP.UI.Forms
             card.Controls.Add(featureLabel);
 
             return card;
+        }
+
+        private void CreateUserManagementTab(TabPage tab)
+        {
+            // UserManagementForm'u dinamik olarak yükle
+            var formResolver = new Services.FormResolverService();
+            var userManagementForm = formResolver.ResolveForm("UserManagement");
+            tab.Controls.Add(userManagementForm);
         }
     }
 }

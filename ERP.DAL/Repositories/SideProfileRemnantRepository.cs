@@ -16,7 +16,7 @@ namespace ERP.DAL.Repositories
             using (var connection = DatabaseHelper.GetConnection())
             {
                 connection.Open();
-                var query = @"SELECT Id, Length, Quantity, IsWaste, CreatedDate, WasteDate, 
+                var query = @"SELECT Id, ProfileType, Length, Quantity, IsWaste, CreatedDate, WasteDate, 
                              ModifiedDate, IsActive
                              FROM SideProfileRemnants
                              WHERE IsActive = 1";
@@ -70,12 +70,46 @@ namespace ERP.DAL.Repositories
             return null;
         }
 
-        public SideProfileRemnant GetByLength(decimal length, bool includeWaste = false)
+        public SideProfileRemnant GetByLengthAndProfileType(decimal length, string profileType, bool includeWaste = false)
         {
             using (var connection = DatabaseHelper.GetConnection())
             {
                 connection.Open();
-                var query = @"SELECT Id, Length, Quantity, IsWaste, CreatedDate, WasteDate, 
+                var query = @"SELECT Id, ProfileType, Length, Quantity, IsWaste, CreatedDate, WasteDate, 
+                             ModifiedDate, IsActive
+                             FROM SideProfileRemnants
+                             WHERE Length = @Length AND ProfileType = @ProfileType AND IsActive = 1";
+                
+                if (!includeWaste)
+                {
+                    query += " AND IsWaste = 0";
+                }
+                
+                using (var command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@Length", length);
+                    command.Parameters.AddWithValue("@ProfileType", profileType);
+                    
+                    using (var reader = command.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            return MapToSideProfileRemnant(reader);
+                        }
+                    }
+                }
+            }
+            
+            return null;
+        }
+
+        public SideProfileRemnant GetByLength(decimal length, bool includeWaste = false)
+        {
+            // Backward compatibility - returns first match (deprecated, use GetByLengthAndProfileType instead)
+            using (var connection = DatabaseHelper.GetConnection())
+            {
+                connection.Open();
+                var query = @"SELECT TOP 1 Id, ProfileType, Length, Quantity, IsWaste, CreatedDate, WasteDate, 
                              ModifiedDate, IsActive
                              FROM SideProfileRemnants
                              WHERE Length = @Length AND IsActive = 1";
@@ -84,6 +118,8 @@ namespace ERP.DAL.Repositories
                 {
                     query += " AND IsWaste = 0";
                 }
+                
+                query += " ORDER BY CreatedDate DESC";
                 
                 using (var command = new SqlCommand(query, connection))
                 {
@@ -104,8 +140,8 @@ namespace ERP.DAL.Repositories
 
         public Guid InsertOrMerge(SideProfileRemnant remnant)
         {
-            // Aynı uzunlukta (ve hurda değilse) remnant var mı kontrol et
-            var existing = GetByLength(remnant.Length, includeWaste: false);
+            // Aynı uzunlukta ve profil tipinde (ve hurda değilse) remnant var mı kontrol et
+            var existing = GetByLengthAndProfileType(remnant.Length, remnant.ProfileType, includeWaste: false);
             
             if (existing != null)
             {
@@ -131,8 +167,8 @@ namespace ERP.DAL.Repositories
             using (var connection = DatabaseHelper.GetConnection())
             {
                 connection.Open();
-                var query = @"INSERT INTO SideProfileRemnants (Id, Length, Quantity, IsWaste, CreatedDate, WasteDate, IsActive) 
-                             VALUES (@Id, @Length, @Quantity, @IsWaste, @CreatedDate, @WasteDate, @IsActive)";
+                var query = @"INSERT INTO SideProfileRemnants (Id, ProfileType, Length, Quantity, IsWaste, CreatedDate, WasteDate, IsActive) 
+                             VALUES (@Id, @ProfileType, @Length, @Quantity, @IsWaste, @CreatedDate, @WasteDate, @IsActive)";
                 
                 using (var command = new SqlCommand(query, connection))
                 {
@@ -211,6 +247,7 @@ namespace ERP.DAL.Repositories
         private void AddSideProfileRemnantParameters(SqlCommand command, SideProfileRemnant remnant)
         {
             command.Parameters.AddWithValue("@Id", remnant.Id);
+            command.Parameters.AddWithValue("@ProfileType", remnant.ProfileType);
             command.Parameters.AddWithValue("@Length", remnant.Length);
             command.Parameters.AddWithValue("@Quantity", remnant.Quantity);
             command.Parameters.AddWithValue("@IsWaste", remnant.IsWaste);
@@ -224,6 +261,7 @@ namespace ERP.DAL.Repositories
             return new SideProfileRemnant
             {
                 Id = reader.GetGuid("Id"),
+                ProfileType = reader.IsDBNull("ProfileType") ? "Standart" : reader.GetString("ProfileType"),
                 Length = reader.GetDecimal("Length"),
                 Quantity = reader.GetInt32("Quantity"),
                 IsWaste = reader.GetBoolean("IsWaste"),

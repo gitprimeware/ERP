@@ -49,10 +49,14 @@ namespace ERP.UI.Forms
 
         private void CreateHeaderPanel()
         {
+            var userName = UserSessionService.IsLoggedIn 
+                ? $"Kullanıcı: {UserSessionService.CurrentUser.FullName}" 
+                : "Kullanıcı: Bilinmiyor";
+
             _headerPanel = new HeaderPanel
             {
                 Title = "ERP YÖNETİM SİSTEMİ",
-                UserName = "Kullanıcı: Admin"
+                UserName = userName
             };
 
             this.Controls.Add(_headerPanel);
