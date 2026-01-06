@@ -7,6 +7,7 @@ using System.Windows.Forms;
 using ERP.Core.Models;
 using ERP.DAL.Repositories;
 using ERP.UI.Factories;
+using ERP.UI.Services;
 using ERP.UI.UI;
 
 namespace ERP.UI.Forms
@@ -383,7 +384,16 @@ namespace ERP.UI.Forms
                 {
                     try
                     {
-                        _repository.Insert(dialog.MaterialEntry);
+                        var materialEntryId = _repository.Insert(dialog.MaterialEntry);
+                        
+                        // Event feed kaydı ekle
+                        var serialNoRepository = new SerialNoRepository();
+                        var serialNo = dialog.MaterialEntry.SerialNoId.HasValue 
+                            ? serialNoRepository.GetById(dialog.MaterialEntry.SerialNoId.Value) 
+                            : null;
+                        var serialNumber = serialNo?.SerialNumber ?? "Bilinmeyen";
+                        EventFeedService.MaterialEntryCreated(materialEntryId, serialNumber, dialog.MaterialEntry.Quantity);
+                        
                         MessageBox.Show("Malzeme girişi başarıyla eklendi!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         PerformSearch();
                     }

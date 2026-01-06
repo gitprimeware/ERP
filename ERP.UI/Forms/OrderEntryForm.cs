@@ -4,6 +4,7 @@ using System.Linq;
 using System.Windows.Forms;
 using ERP.DAL.Repositories;
 using ERP.UI.Factories;
+using ERP.UI.Services;
 using ERP.UI.UI;
 
 namespace ERP.UI.Forms
@@ -774,6 +775,10 @@ namespace ERP.UI.Forms
                         // Sevk tarihi seçildiğinde durumu "Sevk Edildi" olarak güncelle
                         currentOrder.Status = "Sevk Edildi";
                         orderRepository.Update(currentOrder);
+                        
+                        // Event feed kaydı ekle
+                        EventFeedService.OrderShipped(_orderId, currentOrder.TrexOrderNo);
+                        
                         MessageBox.Show("Sevk tarihi güncellendi ve sipariş 'Sevk Edildi' durumuna getirildi!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         return;
                     }
@@ -814,6 +819,13 @@ namespace ERP.UI.Forms
                             UpdateButtonPositions(buttonPanel);
                         }
                     }
+                    
+                    // Event feed kaydı ekle
+                    var companyRepository = new CompanyRepository();
+                    var company = companyRepository.GetById(order.CompanyId);
+                    var companyName = company != null ? company.Name : "Bilinmeyen";
+                    EventFeedService.OrderCreated(orderId, order.TrexOrderNo, companyName);
+                    
                     MessageBox.Show("Sipariş tamamlandı!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }

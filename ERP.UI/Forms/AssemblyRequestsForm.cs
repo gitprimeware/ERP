@@ -6,6 +6,7 @@ using System.Windows.Forms;
 using ERP.Core.Models;
 using ERP.DAL.Repositories;
 using ERP.UI.Factories;
+using ERP.UI.Services;
 using ERP.UI.UI;
 
 namespace ERP.UI.Forms
@@ -461,6 +462,17 @@ namespace ERP.UI.Forms
                 {
                     request.Status = "Montajda";
                     request.CompletionDate = null;
+                }
+                
+                // Event feed kaydı ekle - Montaj tamamlandı, onay bekliyor
+                if (request.OrderId.HasValue)
+                {
+                    var orderRepository = new OrderRepository();
+                    var order = orderRepository.GetById(request.OrderId.Value);
+                    if (order != null)
+                    {
+                        EventFeedService.AssemblyCompleted(request.Id, request.OrderId.Value, order.TrexOrderNo, yapilan.Value);
+                    }
                 }
                 
                 _assemblyRequestRepository.Update(request);

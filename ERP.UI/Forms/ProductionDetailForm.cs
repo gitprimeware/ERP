@@ -6,6 +6,7 @@ using System.Windows.Forms;
 using ERP.Core.Models;
 using ERP.DAL.Repositories;
 using ERP.UI.Factories;
+using ERP.UI.Services;
 using ERP.UI.UI;
 
 namespace ERP.UI.Forms
@@ -2140,10 +2141,20 @@ namespace ERP.UI.Forms
                     EmployeeId = selectedRequest.EmployeeId,
                     CuttingDate = DateTime.Now
                 };
-                _cuttingRepository.Insert(cutting);
-
+                var cuttingId = _cuttingRepository.Insert(cutting);
+                
+                // Event feed kaydı ekle - Kesim onaylandı
+                if (selectedRequest.OrderId != Guid.Empty)
+                {
+                    var orderForCutting = _orderRepository.GetById(selectedRequest.OrderId);
+                    if (orderForCutting != null)
+                    {
+                        EventFeedService.CuttingApproved(selectedRequest.Id, selectedRequest.OrderId, orderForCutting.TrexOrderNo);
+                    }
+                }
+                
                 MessageBox.Show("Kesim talebi onaylandı ve kesim kaydı oluşturuldu!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
+                
                 // Verileri yeniden yükle
                 LoadKesimData(dataGridView);
                 
@@ -2610,10 +2621,20 @@ namespace ERP.UI.Forms
                     EmployeeId = selectedRequest.EmployeeId,
                     PressingDate = DateTime.Now
                 };
-                _pressingRepository.Insert(pressing);
-
+                var pressingId = _pressingRepository.Insert(pressing);
+                
+                // Event feed kaydı ekle - Pres onaylandı
+                if (selectedRequest.OrderId != Guid.Empty)
+                {
+                    var orderForPressing = _orderRepository.GetById(selectedRequest.OrderId);
+                    if (orderForPressing != null)
+                    {
+                        EventFeedService.PressingApproved(selectedRequest.Id, selectedRequest.OrderId, orderForPressing.TrexOrderNo);
+                    }
+                }
+                
                 MessageBox.Show("Pres talebi onaylandı ve pres kaydı oluşturuldu!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
+                
                 // Verileri yeniden yükle
                 LoadPresData(dataGridView);
             }
@@ -2780,7 +2801,7 @@ namespace ERP.UI.Forms
         {
             try
             {
-                var order = _orderRepository.GetById(_orderId);
+                var orderForClamping = _orderRepository.GetById(_orderId);
                 
                 // Onaylanmış kenetleme kayıtları
                 // NOT: Kenetlemede kapaksız üretim yapıldığı için uzunluktan kapak boyu çıkarılmıyor
@@ -2789,12 +2810,12 @@ namespace ERP.UI.Forms
                 {
                     Id = c.Id,
                     Date = c.ClampingDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
-                    OrderNo = order?.TrexOrderNo ?? "",
+                    OrderNo = orderForClamping?.TrexOrderNo ?? "",
                     Hatve = GetHatveLetter(c.Hatve),
                     Size = c.Size.ToString("F2", CultureInfo.InvariantCulture),
                     Length = c.Length.ToString("F2", CultureInfo.InvariantCulture), // Kapaksız - doğrudan uzunluk
                     ClampCount = c.ClampCount.ToString(),
-                    Customer = order?.Company?.Name ?? "",
+                    Customer = orderForClamping?.Company?.Name ?? "",
                     UsedPlateCount = c.UsedPlateCount.ToString(),
                     PlateThickness = c.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
                     SerialNumber = c.SerialNo?.SerialNumber ?? "",
@@ -2811,12 +2832,12 @@ namespace ERP.UI.Forms
                     {
                         Id = r.Id,
                         Date = r.RequestDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
-                        OrderNo = order?.TrexOrderNo ?? "",
+                        OrderNo = orderForClamping?.TrexOrderNo ?? "",
                         Hatve = GetHatveLetter(r.Hatve),
                         Size = r.Size.ToString("F2", CultureInfo.InvariantCulture),
                         Length = r.Length.ToString("F2", CultureInfo.InvariantCulture), // Kapaksız - doğrudan uzunluk
                         ClampCount = r.ResultedClampCount?.ToString() ?? "-",
-                        Customer = order?.Company?.Name ?? "",
+                        Customer = orderForClamping?.Company?.Name ?? "",
                         UsedPlateCount = r.ActualClampCount?.ToString() ?? "-",
                         PlateThickness = r.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
                         SerialNumber = r.SerialNo?.SerialNumber ?? "-",
@@ -3064,10 +3085,20 @@ namespace ERP.UI.Forms
                     EmployeeId = selectedRequest.EmployeeId,
                     ClampingDate = DateTime.Now
                 };
-                _clampingRepository.Insert(clamping);
-
+                var clampingId = _clampingRepository.Insert(clamping);
+                
+                // Event feed kaydı ekle - Kenetleme onaylandı
+                if (selectedRequest.OrderId != Guid.Empty)
+                {
+                    var orderForClamping = _orderRepository.GetById(selectedRequest.OrderId);
+                    if (orderForClamping != null)
+                    {
+                        EventFeedService.ClampingApproved(selectedRequest.Id, selectedRequest.OrderId, orderForClamping.TrexOrderNo);
+                    }
+                }
+                
                 MessageBox.Show("Kenetleme talebi onaylandı ve kenetleme kaydı oluşturuldu!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
+                
                 // Verileri yeniden yükle
                 LoadClampingData(dataGridView);
             }
@@ -3309,8 +3340,8 @@ namespace ERP.UI.Forms
         {
             try
             {
-                var order = _orderRepository.GetById(_orderId);
-                int kapakBoyuMM = GetKapakBoyuFromOrder(order);
+                var orderForAssembly = _orderRepository.GetById(_orderId);
+                int kapakBoyuMM = GetKapakBoyuFromOrder(orderForAssembly);
                 
                 // Onaylanmış montaj kayıtları
                 var assemblies = _assemblyRepository.GetByOrderId(_orderId);
@@ -3318,12 +3349,12 @@ namespace ERP.UI.Forms
                 {
                     Id = a.Id,
                     Date = a.AssemblyDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
-                    OrderNo = order?.TrexOrderNo ?? "",
+                    OrderNo = orderForAssembly?.TrexOrderNo ?? "",
                     Hatve = GetHatveLetter(a.Hatve),
                     Size = a.Size.ToString("F2", CultureInfo.InvariantCulture),
                     Length = a.Length.ToString("F2", CultureInfo.InvariantCulture), // Length MM cinsinden saklanıyor
                     AssemblyCount = a.AssemblyCount.ToString(),
-                    Customer = order?.Company?.Name ?? "",
+                    Customer = orderForAssembly?.Company?.Name ?? "",
                     UsedClampCount = a.UsedClampCount.ToString(),
                     PlateThickness = a.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
                     SerialNumber = a.SerialNo?.SerialNumber ?? "",
@@ -3338,12 +3369,12 @@ namespace ERP.UI.Forms
                     {
                         Id = r.Id,
                         Date = r.RequestDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
-                        OrderNo = order?.TrexOrderNo ?? "",
+                        OrderNo = orderForAssembly?.TrexOrderNo ?? "",
                         Hatve = GetHatveLetter(r.Hatve),
                         Size = r.Size.ToString("F2", CultureInfo.InvariantCulture),
                         Length = r.Length.ToString("F2", CultureInfo.InvariantCulture), // Length MM cinsinden saklanıyor
                         AssemblyCount = r.ResultedAssemblyCount?.ToString() ?? "-",
-                        Customer = order?.Company?.Name ?? "",
+                        Customer = orderForAssembly?.Company?.Name ?? "",
                         UsedClampCount = r.ActualClampCount?.ToString() ?? "-",
                         PlateThickness = r.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
                         SerialNumber = r.SerialNo?.SerialNumber ?? "-",
@@ -3398,8 +3429,8 @@ namespace ERP.UI.Forms
             try
             {
                 // YM (stok) ürünleri için montaj işlemi yapılamaz
-                var order = _orderRepository.GetById(_orderId);
-                if (order != null && order.IsStockOrder)
+                var orderForAssemblyCheck = _orderRepository.GetById(_orderId);
+                if (orderForAssemblyCheck != null && orderForAssemblyCheck.IsStockOrder)
                 {
                     MessageBox.Show("Stok (YM) ürünleri için montaj işlemi yapılamaz!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
@@ -3609,16 +3640,27 @@ namespace ERP.UI.Forms
                     EmployeeId = selectedRequest.EmployeeId,
                     AssemblyDate = DateTime.Now
                 };
-                _assemblyRepository.Insert(assembly);
-
+                var assemblyId = _assemblyRepository.Insert(assembly);
+                
+                // Event feed kaydı ekle ve stok tüketimleri için order'ı al
+                Order orderForStock = null;
+                if (selectedRequest.OrderId.HasValue)
+                {
+                    var orderForEvent = _orderRepository.GetById(selectedRequest.OrderId.Value);
+                    if (orderForEvent != null)
+                    {
+                        EventFeedService.AssemblyApproved(selectedRequest.Id, selectedRequest.OrderId.Value, orderForEvent.TrexOrderNo);
+                        orderForStock = orderForEvent;
+                    }
+                }
+                
                 // Stok tüketimleri
                 int yapilanAdet = olusanMontajSayisi;
-                var order = selectedRequest.OrderId.HasValue ? _orderRepository.GetById(selectedRequest.OrderId.Value) : null;
                 
-                if (order != null)
+                if (orderForStock != null)
                 {
                     // 1. Kapak stokundan tüketim (her adet için 2 tane)
-                    ConsumeCoverStock(order, yapilanAdet);
+                    ConsumeCoverStock(orderForStock, yapilanAdet);
                     
                     // 2. Yan profil stokundan tüketim (her adet için 4 tane)
                     if (selectedRequest.ClampingId.HasValue)
@@ -3626,7 +3668,7 @@ namespace ERP.UI.Forms
                         var clamping = _clampingRepository.GetById(selectedRequest.ClampingId.Value);
                         if (clamping != null)
                         {
-                            ConsumeSideProfileStock(order, clamping, yapilanAdet);
+                            ConsumeSideProfileStock(orderForStock, clamping, yapilanAdet);
                         }
                     }
                 }
@@ -3766,7 +3808,7 @@ namespace ERP.UI.Forms
         {
             try
             {
-                var order = _orderRepository.GetById(_orderId);
+                var orderForIsolation = _orderRepository.GetById(_orderId);
                 
                 // Onaylanmış izolasyon kayıtları
                 var isolations = _isolationRepository.GetByOrderId(_orderId);
@@ -3774,12 +3816,12 @@ namespace ERP.UI.Forms
                 {
                     Id = i.Id,
                     Date = i.IsolationDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
-                    OrderNo = order?.TrexOrderNo ?? "",
+                    OrderNo = orderForIsolation?.TrexOrderNo ?? "",
                     Hatve = GetHatveLetter(i.Hatve),
                     Size = i.Size.ToString("F2", CultureInfo.InvariantCulture),
                     Length = (i.Length / 1000m).ToString("F2", CultureInfo.InvariantCulture), // MM'den metre'ye çevir
                     AssemblyCount = i.IsolationCount.ToString(),
-                    Customer = order?.Company?.Name ?? "",
+                    Customer = orderForIsolation?.Company?.Name ?? "",
                     PlateThickness = i.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
                     SerialNumber = i.SerialNo?.SerialNumber ?? "",
                     EmployeeName = i.Employee != null ? $"{i.Employee.FirstName} {i.Employee.LastName}" : "",
@@ -3795,12 +3837,12 @@ namespace ERP.UI.Forms
                 {
                     Id = a.Id,
                     Date = a.AssemblyDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
-                    OrderNo = order?.TrexOrderNo ?? "",
+                    OrderNo = orderForIsolation?.TrexOrderNo ?? "",
                     Hatve = GetHatveLetter(a.Hatve),
                     Size = a.Size.ToString("F2", CultureInfo.InvariantCulture),
                     Length = (a.Length / 1000m).ToString("F2", CultureInfo.InvariantCulture), // MM'den metre'ye çevir
                     AssemblyCount = a.AssemblyCount.ToString(),
-                    Customer = order?.Company?.Name ?? "",
+                    Customer = orderForIsolation?.Company?.Name ?? "",
                     PlateThickness = a.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
                     SerialNumber = a.SerialNo?.SerialNumber ?? "",
                     EmployeeName = a.Employee != null ? $"{a.Employee.FirstName} {a.Employee.LastName}" : "",
@@ -3919,11 +3961,21 @@ namespace ERP.UI.Forms
                         EmployeeId = assembly.EmployeeId,
                         IsolationDate = DateTime.Now
                     };
-                    _isolationRepository.Insert(isolation);
-
+                    var isolationId = _isolationRepository.Insert(isolation);
+                    
+                    // Event feed kaydı ekle
+                    if (assembly.OrderId.HasValue)
+                    {
+                        var orderForEvent = _orderRepository.GetById(assembly.OrderId.Value);
+                        if (orderForEvent != null)
+                        {
+                            EventFeedService.IsolationCompleted(isolationId, assembly.OrderId.Value, orderForEvent.TrexOrderNo);
+                        }
+                    }
+                    
                     // İzolasyon sıvısı stoğundan tüketim
                     ConsumeIsolationStock(selectedMethod, isolationLiquidAmount, izosiyanatRatio, poliolRatio);
-
+                    
                     string amountUnit = selectedMethod == "MS Silikon" ? "ml" : "kg";
                     MessageBox.Show($"İzolasyon kaydı oluşturuldu!\nKullanılan İzolasyon Sıvısı: {isolationLiquidAmount:F2} {amountUnit}", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
@@ -4064,16 +4116,16 @@ namespace ERP.UI.Forms
         {
             try
             {
-                var order = _orderRepository.GetById(_orderId);
-                int kapakBoyuMM = GetKapakBoyuFromOrder(order);
+                var orderForPackaging = _orderRepository.GetById(_orderId);
+                int kapakBoyuMM = GetKapakBoyuFromOrder(orderForPackaging);
                 
                 // Ürün türü ve profil bilgilerini al
-                string productType = order?.ProductType ?? "";
+                string productType = orderForPackaging?.ProductType ?? "";
                 string profil = "";
                 string kapakTipi = "";
-                if (order != null && !string.IsNullOrEmpty(order.ProductCode))
+                if (orderForPackaging != null && !string.IsNullOrEmpty(orderForPackaging.ProductCode))
                 {
-                    var parts = order.ProductCode.Split('-');
+                    var parts = orderForPackaging.ProductCode.Split('-');
                     if (parts.Length >= 3 && parts[2].Length >= 2)
                     {
                         profil = parts[2].Substring(1, 1).ToUpper(); // Profil harfi (örn: LG -> G)
@@ -4097,7 +4149,7 @@ namespace ERP.UI.Forms
                 {
                     Id = p.Id,
                     Date = p.PackagingDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
-                    OrderNo = order?.TrexOrderNo ?? "",
+                    OrderNo = orderForPackaging?.TrexOrderNo ?? "",
                     Hatve = GetHatveLetter(p.Hatve),
                     Size = p.Size.ToString("F2", CultureInfo.InvariantCulture),
                     Length = (p.Length + kapakBoyuMM).ToString("F2", CultureInfo.InvariantCulture), // Uzunluk (MM) + kapak boyu (MM)
@@ -4105,7 +4157,7 @@ namespace ERP.UI.Forms
                     Profil = profil,
                     KapakTipi = kapakTipi,
                     PackagingCount = p.PackagingCount.ToString(),
-                    Customer = order?.Company?.Name ?? "",
+                    Customer = orderForPackaging?.Company?.Name ?? "",
                     UsedAssemblyCount = p.UsedAssemblyCount.ToString(),
                     PlateThickness = p.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
                     SerialNumber = p.SerialNo?.SerialNumber ?? "",
@@ -4121,7 +4173,7 @@ namespace ERP.UI.Forms
                 {
                     Id = i.Id,
                     Date = i.IsolationDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
-                    OrderNo = order?.TrexOrderNo ?? "",
+                    OrderNo = orderForPackaging?.TrexOrderNo ?? "",
                     Hatve = GetHatveLetter(i.Hatve),
                     Size = i.Size.ToString("F2", CultureInfo.InvariantCulture),
                     Length = (i.Length + kapakBoyuMM).ToString("F2", CultureInfo.InvariantCulture), // Uzunluk (MM) + kapak boyu (MM)
@@ -4129,7 +4181,7 @@ namespace ERP.UI.Forms
                     Profil = profil,
                     KapakTipi = kapakTipi,
                     PackagingCount = "-",
-                    Customer = order?.Company?.Name ?? "",
+                    Customer = orderForPackaging?.Company?.Name ?? "",
                     UsedAssemblyCount = i.UsedAssemblyCount.ToString(),
                     PlateThickness = i.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
                     SerialNumber = i.SerialNo?.SerialNumber ?? "",
@@ -4320,10 +4372,20 @@ namespace ERP.UI.Forms
                             EmployeeId = isolation.EmployeeId,
                             PackagingDate = DateTime.Now
                         };
-                        _packagingRepository.Insert(packaging);
-
+                        var packagingId = _packagingRepository.Insert(packaging);
+                        
+                        // Event feed kaydı ekle
+                        if (isolation.OrderId.HasValue)
+                        {
+                            var orderForPackaging = _orderRepository.GetById(isolation.OrderId.Value);
+                            if (orderForPackaging != null)
+                            {
+                                EventFeedService.PackagingCompleted(packagingId, isolation.OrderId.Value, orderForPackaging.TrexOrderNo);
+                            }
+                        }
+                        
                         MessageBox.Show("Paketleme işlemi tamamlandı!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
+                        
                         // Verileri yeniden yükle
                         LoadPackagingData(dataGridView);
                     }
@@ -4472,8 +4534,8 @@ namespace ERP.UI.Forms
             try
             {
                 var clamping2Requests = _clamping2RequestRepository.GetByOrderId(_orderId);
-                var order = _orderRepository.GetById(_orderId);
-                int kapakBoyuMM = GetKapakBoyuFromOrder(order);
+                var orderForClamping2 = _orderRepository.GetById(_orderId);
+                int kapakBoyuMM = GetKapakBoyuFromOrder(orderForClamping2);
                 
                 var data = clamping2Requests.Select(cr2 =>
                 {
@@ -4513,7 +4575,7 @@ namespace ERP.UI.Forms
                     {
                         cr2.Id,
                         Date = cr2.RequestDate.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
-                        OrderNo = order?.TrexOrderNo ?? "",
+                        OrderNo = orderForClamping2?.TrexOrderNo ?? "",
                         Hatve = GetHatveLetter(cr2.Hatve),
                         PlateThickness = cr2.PlateThickness.ToString("F3", CultureInfo.InvariantCulture),
                         ResultedSize = cr2.ResultedSize.ToString("F2", CultureInfo.InvariantCulture),
@@ -4724,6 +4786,8 @@ namespace ERP.UI.Forms
                 // Bölme işlemi mi kontrol et (SecondClampingId null ise bölme)
                 bool isDivideOperation = !selectedRequest.SecondClampingId.HasValue;
                 Clamping secondClamping = null;
+                Clamping firstClampingResult = null;
+                Clamping newClamping = null;
                 
                 if (!isDivideOperation)
                 {
@@ -4744,7 +4808,7 @@ namespace ERP.UI.Forms
                     var secondLength = originalLength - firstLength; // İkinci uzunluk
 
                     // İlk uzunluk stoğa ekle
-                    var firstClampingResult = new Clamping
+                    firstClampingResult = new Clamping
                     {
                         OrderId = _orderId,
                         PlateThickness = selectedRequest.PlateThickness,
@@ -4783,7 +4847,7 @@ namespace ERP.UI.Forms
                 else
                 {
                     // Birleştirme işlemi: Tek bir kenetlenmiş ürün oluşur
-                    var newClamping = new Clamping
+                    newClamping = new Clamping
                     {
                         OrderId = _orderId,
                         PlateThickness = selectedRequest.PlateThickness,
@@ -4807,9 +4871,32 @@ namespace ERP.UI.Forms
                 selectedRequest.Status = "Tamamlandı";
                 selectedRequest.CompletionDate = DateTime.Now;
                 _clamping2RequestRepository.Update(selectedRequest);
-
+                
+                // Event feed kaydı ekle
+                if (selectedRequest.OrderId.HasValue && selectedRequest.OrderId.Value != Guid.Empty)
+                {
+                    var orderForClamping2 = _orderRepository.GetById(selectedRequest.OrderId.Value);
+                    if (orderForClamping2 != null)
+                    {
+                        // Clamping2 için oluşturulan clamping ID'sini al
+                        Guid? clampingId = null;
+                        if (isDivideOperation)
+                        {
+                            // Bölme işlemi: İlk clamping ID'sini kullan
+                            clampingId = firstClampingResult?.Id;
+                        }
+                        else
+                        {
+                            // Birleştirme işlemi: Yeni oluşturulan clamping ID'sini kullan
+                            clampingId = newClamping?.Id;
+                        }
+                        // Event feed kaydı ekle - Kenetleme 2 onaylandı
+                        EventFeedService.Clamping2Approved(selectedRequest.Id, selectedRequest.OrderId.Value, orderForClamping2.TrexOrderNo);
+                    }
+                }
+                
                 MessageBox.Show("Kenetleme 2 talebi başarıyla onaylandı!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
+                
                 // Verileri yeniden yükle
                 LoadClamping2Data(dataGridView);
             }

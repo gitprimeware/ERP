@@ -6,6 +6,7 @@ using System.Linq;
 using System.Windows.Forms;
 using ERP.Core.Models;
 using ERP.DAL.Repositories;
+using ERP.UI.Services;
 using ERP.UI.UI;
 
 namespace ERP.UI.Forms
@@ -1474,7 +1475,14 @@ namespace ERP.UI.Forms
                     Status = "Beklemede"
                 };
 
-                _cuttingRequestRepository.Insert(cuttingRequest);
+                var cuttingRequestId = _cuttingRequestRepository.Insert(cuttingRequest);
+                
+                // Event feed kaydı ekle
+                if (order != null)
+                {
+                    EventFeedService.CuttingRequestCreated(cuttingRequestId, _orderId, order.TrexOrderNo);
+                }
+                
                 MessageBox.Show("Kesim talebi başarıyla oluşturuldu!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 this.DialogResult = DialogResult.OK;
                 this.Close();

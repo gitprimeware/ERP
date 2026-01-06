@@ -46,6 +46,7 @@ namespace ERP.DAL
                     CreateIsolationStocksTable(connection);
                     CreateUsersTable(connection);
                     CreateUserPermissionsTable(connection);
+                    CreateEventFeedsTable(connection);
                     CreateDefaultAdminUser(connection);
                 }
             }
@@ -1348,6 +1349,35 @@ namespace ERP.DAL
                         [IsActive] BIT NOT NULL DEFAULT 1,
                         FOREIGN KEY ([UserId]) REFERENCES [Users]([Id]),
                         UNIQUE ([UserId], [PermissionKey])
+                    )
+                END";
+
+            using (var command = new SqlCommand(query, connection))
+            {
+                command.ExecuteNonQuery();
+            }
+        }
+
+        private static void CreateEventFeedsTable(SqlConnection connection)
+        {
+            var query = @"
+                IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[EventFeeds]') AND type in (N'U'))
+                BEGIN
+                    CREATE TABLE [dbo].[EventFeeds] (
+                        [Id] UNIQUEIDENTIFIER PRIMARY KEY,
+                        [EventType] NVARCHAR(100) NOT NULL,
+                        [Title] NVARCHAR(200) NOT NULL,
+                        [Message] NVARCHAR(500) NOT NULL,
+                        [RequiredPermission] NVARCHAR(100) NULL,
+                        [RelatedEntityId] UNIQUEIDENTIFIER NULL,
+                        [RelatedEntityType] NVARCHAR(100) NULL,
+                        [CreatedByUserId] UNIQUEIDENTIFIER NULL,
+                        [EventDate] DATETIME NOT NULL,
+                        [IsRead] BIT NOT NULL DEFAULT 0,
+                        [CreatedDate] DATETIME NOT NULL,
+                        [ModifiedDate] DATETIME NULL,
+                        [IsActive] BIT NOT NULL DEFAULT 1,
+                        FOREIGN KEY ([CreatedByUserId]) REFERENCES [Users]([Id])
                     )
                 END";
 

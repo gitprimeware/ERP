@@ -6,6 +6,7 @@ using System.Linq;
 using System.Windows.Forms;
 using ERP.Core.Models;
 using ERP.DAL.Repositories;
+using ERP.UI.Services;
 using ERP.UI.UI;
 
 namespace ERP.UI.Forms
@@ -1032,6 +1033,7 @@ namespace ERP.UI.Forms
                         }
                     }
                     
+
                     // Eğer plateThickness hala 0 ise, mevcut siparişten al
                     if (plateThickness == 0 && order.LamelThickness.HasValue)
                     {
@@ -1075,7 +1077,13 @@ namespace ERP.UI.Forms
                         RequestDate = DateTime.Now
                 };
 
-                    _pressingRequestRepository.Insert(pressingRequest);
+                    var pressingRequestId = _pressingRequestRepository.Insert(pressingRequest);
+                    
+                    // Event feed kaydı ekle
+                    if (order != null)
+                    {
+                        EventFeedService.PressingRequestCreated(pressingRequestId, _orderId, order.TrexOrderNo);
+                    }
                 }
 
                 if (hasError)

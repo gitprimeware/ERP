@@ -98,6 +98,7 @@ namespace ERP.UI.Services
             RegisterForm("UserManagement", typeof(UserManagementForm), "Kullanıcı Yönetimi");
             RegisterForm("StockTrackingContainer", typeof(StockTrackingContainerForm), "Stok Takip");
             RegisterForm("StockTracking", typeof(StockTrackingContainerForm), "Stok Takip");
+            RegisterForm("EventFeed", typeof(EventFeedForm), "Olay Akışı");
             // Diğer formlar buraya eklenecek
         }
 

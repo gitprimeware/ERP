@@ -6,6 +6,7 @@ using System.Windows.Forms;
 using ERP.Core.Models;
 using ERP.DAL.Repositories;
 using ERP.UI.Factories;
+using ERP.UI.Services;
 using ERP.UI.UI;
 
 namespace ERP.UI.Forms
@@ -330,6 +331,18 @@ namespace ERP.UI.Forms
                         request.ActualPressCount = resultedPressCount.Value + (request.WasteCount ?? 0);
                         request.Status = "Presde";
                         _pressingRequestRepository.Update(request);
+                        
+                        // Event feed kaydı ekle - Pres tamamlandı, onay bekliyor
+                        if (request.OrderId != Guid.Empty)
+                        {
+                            var orderRepository = new OrderRepository();
+                            var order = orderRepository.GetById(request.OrderId);
+                            if (order != null)
+                            {
+                                EventFeedService.PressingCompleted(request.Id, request.OrderId, order.TrexOrderNo, resultedPressCount.Value);
+                            }
+                        }
+                        
                         LoadData(); // Verileri yeniden yükle
                     }
                 }

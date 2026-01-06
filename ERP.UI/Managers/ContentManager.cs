@@ -179,6 +179,10 @@ namespace ERP.UI.Managers
                 {
                     order.Status = "Üretimde";
                     orderRepository.Update(order);
+                    
+                    // Event feed kaydı ekle
+                    EventFeedService.OrderSentToProduction(orderId, order.TrexOrderNo);
+                    
                     MessageBox.Show("Sipariş üretime gönderildi!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     
                     // Listeyi yenile
@@ -203,6 +207,10 @@ namespace ERP.UI.Managers
                     // Status'u "Muhasebede" yap
                     order.Status = "Muhasebede";
                     orderRepository.Update(order);
+                    
+                    // Event feed kaydı ekle
+                    EventFeedService.OrderSentToAccounting(orderId, order.TrexOrderNo);
+                    
                     MessageBox.Show($"Sipariş {order.TrexOrderNo} muhasebeye gönderildi.", 
                         "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     
@@ -551,6 +559,10 @@ namespace ERP.UI.Managers
                     // Status'u "Sevkiyata Hazır" yap
                     order.Status = "Sevkiyata Hazır";
                     orderRepository.Update(order);
+                    
+                    // Event feed kaydı ekle
+                    EventFeedService.OrderReadyForShipment(orderId, order.TrexOrderNo);
+                    
                     MessageBox.Show($"Sipariş {order.TrexOrderNo} sevkiyata hazır durumuna getirildi.", 
                         "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     
@@ -600,11 +612,22 @@ namespace ERP.UI.Managers
         {
             _contentPanel.Controls.Clear();
             _currentRuloStokTakipForm = null;
+            
+            // EventFeedForm göster
+            var eventFeedForm = _formResolver.ResolveForm("EventFeed");
+            eventFeedForm.Dock = DockStyle.Fill;
+            _contentPanel.Controls.Add(eventFeedForm);
+            eventFeedForm.BringToFront();
+            
+            // Eski WelcomePanel yerine EventFeedForm kullanıyoruz
+            // Eğer WelcomePanel'e geri dönmek isterseniz, aşağıdaki kodu kullanabilirsiniz:
+            /*
             var welcomePanel = new Components.WelcomePanel();
             welcomePanel.Dock = DockStyle.Fill;
             welcomePanel.CardClicked += (s, formTag) => HandleCardClick(formTag);
             _contentPanel.Controls.Add(welcomePanel);
             welcomePanel.BringToFront();
+            */
         }
 
         private void HandleCardClick(string formTag)

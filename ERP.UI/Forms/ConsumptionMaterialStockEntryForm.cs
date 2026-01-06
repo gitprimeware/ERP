@@ -5,6 +5,7 @@ using System.Linq;
 using System.Windows.Forms;
 using ERP.Core.Models;
 using ERP.DAL.Repositories;
+using ERP.UI.Services;
 using ERP.UI.UI;
 
 namespace ERP.UI.Forms
@@ -435,7 +436,10 @@ namespace ERP.UI.Forms
 
                 // Aynı uzunlukta ve profil tipinde varsa adedi artır, yoksa yeni kayıt oluştur
                 _sideProfileStockRepository.InsertOrUpdate(stock);
-
+                
+                // Event feed kaydı ekle
+                EventFeedService.SideProfileStockEntryCreated(stock.ProfileType, length, quantity);
+                
                 MessageBox.Show("Yan profil stoku başarıyla kaydedildi!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                 // Formu temizle
@@ -802,7 +806,10 @@ namespace ERP.UI.Forms
                 };
 
                 _isolationStockRepository.Insert(stock);
-
+                
+                // Event feed kaydı ekle
+                EventFeedService.IsolationStockEntryCreated(stock.LiquidType, kilogram);
+                
                 MessageBox.Show("İzolasyon sıvısı stoku başarıyla kaydedildi!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                 // Formu temizle
@@ -862,7 +869,10 @@ namespace ERP.UI.Forms
 
                 // InsertOrUpdate: Varsa stoğa ekle, yoksa yeni kayıt oluştur
                 _coverStockRepository.InsertOrUpdate(coverStock);
-
+                
+                // Event feed kaydı ekle
+                EventFeedService.CoverStockEntryCreated(quantity, profileType, size);
+                
                 MessageBox.Show("Kapak stoku başarıyla kaydedildi!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                 // Formu temizle

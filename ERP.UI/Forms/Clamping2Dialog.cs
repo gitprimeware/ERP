@@ -6,6 +6,7 @@ using System.Linq;
 using System.Windows.Forms;
 using ERP.Core.Models;
 using ERP.DAL.Repositories;
+using ERP.UI.Services;
 using ERP.UI.UI;
 
 namespace ERP.UI.Forms
@@ -888,7 +889,18 @@ namespace ERP.UI.Forms
                     });
                 }
                 
-                _clamping2RequestRepository.Insert(clamping2Request);
+                var clamping2RequestId = _clamping2RequestRepository.Insert(clamping2Request);
+                
+                // Event feed kaydı ekle
+                var orderRepository = new OrderRepository();
+                if (orderId.HasValue)
+                {
+                    var order = orderRepository.GetById(orderId.Value);
+                    if (order != null)
+                    {
+                        EventFeedService.Clamping2RequestCreated(clamping2RequestId, orderId.Value, order.TrexOrderNo);
+                    }
+                }
                 
                 MessageBox.Show("Kenetleme 2 talebi başarıyla oluşturuldu!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 this.DialogResult = DialogResult.OK;

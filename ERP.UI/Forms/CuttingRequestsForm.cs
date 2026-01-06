@@ -6,6 +6,7 @@ using System.Windows.Forms;
 using ERP.Core.Models;
 using ERP.DAL.Repositories;
 using ERP.UI.Factories;
+using ERP.UI.Services;
 using ERP.UI.UI;
 
 namespace ERP.UI.Forms
@@ -339,6 +340,17 @@ namespace ERP.UI.Forms
                         request.ActualCutCount = actualCutCount.Value;
                         request.Status = "Kesimde"; // İşçi kesim adedini girdiğinde durum "Kesimde" olur
                         _cuttingRequestRepository.Update(request);
+                        
+                        // Event feed kaydı ekle - Kesim tamamlandı, onay bekliyor
+                        if (request.OrderId != Guid.Empty)
+                        {
+                            var order = _orderRepository.GetById(request.OrderId);
+                            if (order != null)
+                            {
+                                EventFeedService.CuttingCompleted(request.Id, request.OrderId, order.TrexOrderNo, actualCutCount.Value);
+                            }
+                        }
+                        
                         LoadData(); // Verileri yeniden yükle
                     }
                 }

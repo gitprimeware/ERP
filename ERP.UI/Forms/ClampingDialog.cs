@@ -5,6 +5,7 @@ using System.Linq;
 using System.Windows.Forms;
 using ERP.Core.Models;
 using ERP.DAL.Repositories;
+using ERP.UI.Services;
 using ERP.UI.UI;
 
 namespace ERP.UI.Forms
@@ -690,7 +691,7 @@ namespace ERP.UI.Forms
                 var pressing = _pressingRepository.GetAll().FirstOrDefault(p => p.Id == pressingId);
 
                 // OrderId'yi preslenmiş plakadan al (eğer yoksa mevcut orderId'yi kullan)
-                var orderId = pressing?.OrderId ?? _orderId;
+                Guid orderId = pressing?.OrderId ?? _orderId;
                 if (orderId == Guid.Empty && _orderId != Guid.Empty)
                     orderId = _orderId;
                 
@@ -711,7 +712,19 @@ namespace ERP.UI.Forms
                     RequestDate = DateTime.Now
                 };
 
-                _clampingRequestRepository.Insert(clampingRequest);
+                var clampingRequestId = _clampingRequestRepository.Insert(clampingRequest);
+                
+                // Event feed kaydı ekle
+                if (orderId != Guid.Empty)
+                {
+                    var orderRepository = new OrderRepository();
+                    var orderForEvent = orderRepository.GetById(orderId);
+                    if (orderForEvent != null)
+                    {
+                        EventFeedService.ClampingRequestCreated(clampingRequestId, orderId, orderForEvent.TrexOrderNo);
+                    }
+                }
+                
                 MessageBox.Show("Kenetleme talebi başarıyla oluşturuldu!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 this.DialogResult = DialogResult.OK;
                 this.Close();

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Windows.Forms;
 using ERP.Core.Models;
 using ERP.DAL.Repositories;
+using ERP.UI.Services;
 using ERP.UI.UI;
 
 namespace ERP.UI.Forms
@@ -1285,15 +1286,15 @@ namespace ERP.UI.Forms
                 // OrderId: Dialog hangi sipariş için açıldıysa o siparişe ait olmalı
                 // Stoktan kenetlenmiş plaka kullanılsa bile, montaj talebi açıldığı siparişe bağlı olmalı
                 var orderId = _orderId != Guid.Empty ? _orderId : (Guid?)null;
-                var order = _orderRepository.GetById(_orderId);
+                var orderForAssembly = _orderRepository.GetById(_orderId);
                 
                 int requestedCount = int.Parse(_txtRequestedAssemblyCount.Text);
                 
                 // Stok kontrolleri - montaj talebi oluşturulmadan önce kontrol et
-                if (order != null)
+                if (orderForAssembly != null)
                 {
                     // Kapak stok kontrolü
-                    if (!CheckCoverStock(order, requestedCount))
+                    if (!CheckCoverStock(orderForAssembly, requestedCount))
                     {
                         return; // Hata mesajı zaten gösterildi
                     }
@@ -1301,7 +1302,7 @@ namespace ERP.UI.Forms
                     // Yan profil stok kontrolü
                     if (clamping != null)
                     {
-                        if (!CheckSideProfileStock(order, clamping, requestedCount))
+                        if (!CheckSideProfileStock(orderForAssembly, clamping, requestedCount))
                         {
                             return; // Hata mesajı zaten gösterildi
                         }
@@ -1324,7 +1325,14 @@ namespace ERP.UI.Forms
                     Status = "Beklemede",
                     RequestDate = DateTime.Now
                 };
-                _assemblyRequestRepository.Insert(assemblyRequest);
+                var assemblyRequestId = _assemblyRequestRepository.Insert(assemblyRequest);
+                
+                // Event feed kaydı ekle
+                if (orderId.HasValue && orderForAssembly != null)
+                {
+                    EventFeedService.AssemblyRequestCreated(assemblyRequestId, orderId.Value, orderForAssembly.TrexOrderNo);
+                }
+                
                 MessageBox.Show("Montaj talebi başarıyla oluşturuldu!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 this.DialogResult = DialogResult.OK;
                 this.Close();

@@ -6,6 +6,7 @@ using System.Windows.Forms;
 using ERP.Core.Models;
 using ERP.DAL.Repositories;
 using ERP.UI.Factories;
+using ERP.UI.Services;
 using ERP.UI.UI;
 
 namespace ERP.UI.Forms
@@ -305,6 +306,18 @@ namespace ERP.UI.Forms
                         request.ActualClampCount = actualClampCount.Value;
                         request.Status = "Kenetmede";
                         _clampingRequestRepository.Update(request);
+                        
+                        // Event feed kaydı ekle - Kenetleme tamamlandı, onay bekliyor
+                        if (request.OrderId != Guid.Empty)
+                        {
+                            var orderRepository = new OrderRepository();
+                            var order = orderRepository.GetById(request.OrderId);
+                            if (order != null)
+                            {
+                                EventFeedService.ClampingCompleted(request.Id, request.OrderId, order.TrexOrderNo, actualClampCount.Value);
+                            }
+                        }
+                        
                         LoadData();
                     }
                 }
