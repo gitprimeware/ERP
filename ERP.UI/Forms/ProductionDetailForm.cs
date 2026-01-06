@@ -91,6 +91,10 @@ namespace ERP.UI.Forms
         private SideProfileRemnantRepository _sideProfileRemnantRepository;
         private IsolationStockRepository _isolationStockRepository;
         private Order _order;
+        
+        // Tab DataGridView referansları (otomatik refresh için)
+        private DataGridView _isolationDataGridView;
+        private DataGridView _packagingDataGridView;
 
         public event EventHandler BackRequested;
         public event EventHandler<Guid> ReportRequested;
@@ -659,50 +663,62 @@ namespace ERP.UI.Forms
                 }
             }
 
-            // Yükseklik (mm) - Önce kapak boyunu çıkar, belli bir yüksekliğin üstündeyse 16 daha çıkar
+            // Yükseklik (mm) - SP ürünleri için kapak boyunu çıkar, YM ürünleri için çıkarma
             int raporYukseklikMM = 0;
             if (txtReportYukseklikCM != null && txtYukseklikMM != null && txtKapakBoyuMM != null)
             {
                 if (int.TryParse(txtYukseklikMM.Text, out int yukseklikMM))
                 {
+                    // YM (stok) ürünleri kontrolü
+                    bool isYM = _order?.IsStockOrder ?? false;
+                    
                     // Yükseklik 1800 üzerindeyse 2'ye böl
                     int yukseklikCom = yukseklikMM <= 1800 ? yukseklikMM : yukseklikMM / 2;
                     
-                    // Kapak boyunu al ve çıkar
-                    int kapakBoyuMM = 0;
-                    if (int.TryParse(txtKapakBoyuMM.Text, out kapakBoyuMM))
+                    // YM ürünleri için kapağı çıkarma, SP ürünleri için çıkar
+                    if (isYM)
                     {
-                        // Kapak boyunu çıkar
-                        raporYukseklikMM = yukseklikCom - kapakBoyuMM;
+                        // YM ürünleri için kapağı çıkarma
+                        raporYukseklikMM = yukseklikCom;
                     }
-                    else if (_order != null && !string.IsNullOrEmpty(_order.ProductCode))
+                    else
                     {
-                        // Ürün kodundan kapak değerini çıkar
-                        var productCodeParts = _order.ProductCode.Split('-');
-                        if (productCodeParts.Length > 5)
+                        // SP ürünleri için kapak boyunu çıkar
+                        int kapakBoyuMM = 0;
+                        if (int.TryParse(txtKapakBoyuMM.Text, out kapakBoyuMM))
                         {
-                            string kapakDegeri = productCodeParts[5];
-                            
-                            // Ürün kodunda DisplayText formatı kullanılıyor: 030, 002, 016
-                            if (kapakDegeri == "030")
-                                kapakBoyuMM = 30;
-                            else if (kapakDegeri == "002")
-                                kapakBoyuMM = 2;
-                            else if (kapakDegeri == "016")
-                                kapakBoyuMM = 16;
-                            else if (int.TryParse(kapakDegeri, out int parsedKapak))
-                                kapakBoyuMM = parsedKapak;
-                            
                             // Kapak boyunu çıkar
                             raporYukseklikMM = yukseklikCom - kapakBoyuMM;
                         }
-                    }
-                    
-                    // Eğer yükseklik com belli bir değerin üstündeyse (örneğin 1800), ek olarak 16 çıkar
-                    // Not: Bu mantık kullanıcıya göre değişebilir, şimdilik yukseklikCom > 1800 kontrolü yapıyoruz
-                    if (yukseklikCom > 1800)
-                    {
-                        raporYukseklikMM = raporYukseklikMM - 16;
+                        else if (_order != null && !string.IsNullOrEmpty(_order.ProductCode))
+                        {
+                            // Ürün kodundan kapak değerini çıkar
+                            var productCodeParts = _order.ProductCode.Split('-');
+                            if (productCodeParts.Length > 5)
+                            {
+                                string kapakDegeri = productCodeParts[5];
+                                
+                                // Ürün kodunda DisplayText formatı kullanılıyor: 030, 002, 016
+                                if (kapakDegeri == "030")
+                                    kapakBoyuMM = 30;
+                                else if (kapakDegeri == "002")
+                                    kapakBoyuMM = 2;
+                                else if (kapakDegeri == "016")
+                                    kapakBoyuMM = 16;
+                                else if (int.TryParse(kapakDegeri, out int parsedKapak))
+                                    kapakBoyuMM = parsedKapak;
+                                
+                                // Kapak boyunu çıkar
+                                raporYukseklikMM = yukseklikCom - kapakBoyuMM;
+                            }
+                        }
+                        
+                        // Eğer yükseklik com belli bir değerin üstündeyse (örneğin 1800), ek olarak 16 çıkar
+                        // Not: Bu mantık kullanıcıya göre değişebilir, şimdilik yukseklikCom > 1800 kontrolü yapıyoruz
+                        if (yukseklikCom > 1800)
+                        {
+                            raporYukseklikMM = raporYukseklikMM - 16;
+                        }
                     }
                     
                     txtReportYukseklikCM.Text = raporYukseklikMM.ToString();
@@ -716,38 +732,60 @@ namespace ERP.UI.Forms
             // Plaka Adedi - Formül: yükseklik mm/100 * 10cm plaka adedi * toplam sipariş adedi
             if (txtReportPlakaAdedi != null && txtYukseklikMM != null && txtToplamAdet != null && txtPlakaAdedi10cm != null)
             {
-                // Yükseklik (mm) - Rapor için kapaksız yükseklik kullanılır
+                // YM (stok) ürünleri kontrolü
+                bool isYM = _order?.IsStockOrder ?? false;
+                
+                // Yükseklik (mm) - SP ürünleri için kapaksız yükseklik, YM ürünleri için kapaklı yükseklik kullanılır
                 int yukseklikMM = raporYukseklikMM > 0 ? raporYukseklikMM : 0;
                 
-                // Eğer raporYukseklikMM hesaplanamadıysa, txtYukseklikCom kullan (kapak boyu çıkarılmış)
-                if (yukseklikMM == 0 && txtYukseklikCom != null && int.TryParse(txtYukseklikCom.Text, out int yukseklikComFromText))
-                {
-                    yukseklikMM = yukseklikComFromText;
-                }
-                // Eğer txtYukseklikCom da yoksa, yükseklikMM'den kapak boyunu çıkar
-                else if (yukseklikMM == 0 && int.TryParse(txtYukseklikMM.Text, out int yukseklikMMFromText))
+                // Eğer raporYukseklikMM hesaplanamadıysa
+                if (yukseklikMM == 0 && int.TryParse(txtYukseklikMM.Text, out int yukseklikMMFromText))
                 {
                     // Yükseklik 1800 üzerindeyse 2'ye böl
                     int yukseklikCom = yukseklikMMFromText <= 1800 ? yukseklikMMFromText : yukseklikMMFromText / 2;
                     
-                    // Kapak boyunu çıkar
-                    if (txtKapakBoyuMM != null && int.TryParse(txtKapakBoyuMM.Text, out int kapakBoyuMM))
-                    {
-                        yukseklikMM = yukseklikCom - kapakBoyuMM;
-                    }
-                    else
+                    // YM ürünleri için kapağı çıkarma, SP ürünleri için çıkar
+                    if (isYM)
                     {
                         yukseklikMM = yukseklikCom;
                     }
+                    else
+                    {
+                        // SP ürünleri için kapak boyunu çıkar
+                        if (txtKapakBoyuMM != null && int.TryParse(txtKapakBoyuMM.Text, out int kapakBoyuMM))
+                        {
+                            yukseklikMM = yukseklikCom - kapakBoyuMM;
+                        }
+                        else if (txtYukseklikCom != null && int.TryParse(txtYukseklikCom.Text, out int yukseklikComFromText))
+                        {
+                            yukseklikMM = yukseklikComFromText;
+                        }
+                        else
+                        {
+                            yukseklikMM = yukseklikCom;
+                        }
+                    }
                 }
                 
-                if (yukseklikMM > 0 &&
-                    int.TryParse(txtToplamAdet.Text, out int toplamSiparisAdedi) &&
-                    int.TryParse(txtPlakaAdedi10cm.Text, out int plakaAdedi10cm))
+                // Hatve değerini al
+                decimal hatve = 0;
+                if (txtHtave != null)
                 {
-                    // Çarpılmamış: yükseklik mm/100 * 10cm plaka adedi
-                    decimal carpilmamisPlakaAdedi = (decimal)yukseklikMM / 100m * plakaAdedi10cm;
-                    decimal carpilmamisYuvarlanmis = Math.Round(carpilmamisPlakaAdedi, 0, MidpointRounding.AwayFromZero);
+                    // Hatve text'inden sayısal değeri çıkar (örn: "3.10(H)" -> 3.10)
+                    string hatveText = txtHtave.Text;
+                    var hatveMatch = System.Text.RegularExpressions.Regex.Match(hatveText, @"(\d+\.?\d*)");
+                    if (hatveMatch.Success && decimal.TryParse(hatveMatch.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal parsedHatve))
+                    {
+                        hatve = parsedHatve;
+                    }
+                }
+                
+                if (yukseklikMM > 0 && hatve > 0 &&
+                    int.TryParse(txtToplamAdet.Text, out int toplamSiparisAdedi))
+                {
+                    // Yeni formül: çarpılmamış = Math.Ceiling(yükseklik mm / hatve)
+                    decimal birimPlakaAdedi = (decimal)yukseklikMM / hatve;
+                    decimal carpilmamisYuvarlanmis = Math.Ceiling(birimPlakaAdedi);
                     
                     // Çarpılmış: çarpılmamış * toplam sipariş adedi
                     decimal carpilmisPlakaAdedi = carpilmamisYuvarlanmis * toplamSiparisAdedi;
@@ -1056,15 +1094,20 @@ namespace ERP.UI.Forms
         private string GetHatveLetter(decimal hatveValue)
         {
             // Hatve değerlerini harfe çevir (yeni format): 3.10, 3.25=H | 4.3, 4.5=D | 6.3, 6.4, 6.5=M | 9.0=L
-            const decimal tolerance = 0.1m;
+            // Tolerance'ı biraz artırdık (0.1'den 0.15'e) - 6.4 ve benzeri değerleri daha iyi yakalamak için
+            const decimal tolerance = 0.15m;
             
-            if (Math.Abs(hatveValue - 3.25m) < tolerance || Math.Abs(hatveValue - 3.10m) < tolerance)
+            // H: 3.10, 3.25 (±0.15 = 2.95-3.40 arası)
+            if (hatveValue >= 2.95m && hatveValue <= 3.40m)
                 return "H";
-            else if (Math.Abs(hatveValue - 4.5m) < tolerance || Math.Abs(hatveValue - 4.3m) < tolerance)
+            // D: 4.3, 4.5 (±0.15 = 4.15-4.65 arası)
+            else if (hatveValue >= 4.15m && hatveValue <= 4.65m)
                 return "D";
-            else if (Math.Abs(hatveValue - 6.5m) < tolerance || Math.Abs(hatveValue - 6.3m) < tolerance || Math.Abs(hatveValue - 6.4m) < tolerance)
+            // M: 6.3, 6.4, 6.5 (±0.15 = 6.15-6.65 arası)
+            else if (hatveValue >= 6.15m && hatveValue <= 6.65m)
                 return "M";
-            else if (Math.Abs(hatveValue - 9m) < tolerance || Math.Abs(hatveValue - 8.7m) < tolerance || Math.Abs(hatveValue - 8.65m) < tolerance)
+            // L: 8.65, 8.7, 9.0 (±0.15 = 8.50-9.15 arası)
+            else if (hatveValue >= 8.50m && hatveValue <= 9.15m)
                 return "L";
             else
                 return hatveValue.ToString("F2", CultureInfo.InvariantCulture); // Eğer tanınmazsa sayısal göster
@@ -1230,8 +1273,9 @@ namespace ERP.UI.Forms
                 {
                     // MS Silikon tüketimi (kg cinsinden)
                     // isolationLiquidAmount zaten kg cinsinden geliyor (IsolationDialog'dan)
-                    // MS Silikon için 1 metre = 2 kg izolasyon sıvısı = 0.95 kg MS Silikon tüketimi
-                    decimal msSilikonNeededKg = isolationLiquidAmount * 0.95m / 2m; // Toplam kg'dan MS Silikon kg'ına çevir
+                    // MS Silikon için 1 metre = 2 kg MS Silikon tüketimi
+                    // isolationLiquidAmount = totalLengthM * 2m (1 metre = 2 kg MS Silikon)
+                    decimal msSilikonNeededKg = isolationLiquidAmount; // isolationLiquidAmount zaten 1 metre = 2 kg MS Silikon olarak hesaplanmış
 
                     var msSilikonStocks = _isolationStockRepository.GetAll()
                         .Where(s => s.LiquidType == "MS Silikon" && s.Kilogram > 0)
@@ -3677,6 +3721,12 @@ namespace ERP.UI.Forms
 
                 // Verileri yeniden yükle
                 LoadAssemblyData(dataGridView);
+                
+                // İzolasyon tab'ını otomatik yenile (montaj onaylandıktan sonra izolasyon tab'ına ürün düşer)
+                if (_isolationDataGridView != null)
+                {
+                    LoadIsolationData(_isolationDataGridView);
+                }
             }
             catch (Exception ex)
             {
@@ -3740,6 +3790,9 @@ namespace ERP.UI.Forms
                 GridColor = Color.White,
                 CellBorderStyle = DataGridViewCellBorderStyle.None
             };
+            
+            // DataGridView referansını sakla (otomatik refresh için)
+            _isolationDataGridView = dataGridView;
 
             // Kolonları ekle
             AddIsolationColumn(dataGridView, "Date", "Tarih", 100);
@@ -3969,18 +4022,24 @@ namespace ERP.UI.Forms
                         var orderForEvent = _orderRepository.GetById(assembly.OrderId.Value);
                         if (orderForEvent != null)
                         {
-                            EventFeedService.IsolationCompleted(isolationId, assembly.OrderId.Value, orderForEvent.TrexOrderNo);
+                            EventFeedService.IsolationCompleted(isolationId, assembly.OrderId.Value, orderForEvent.TrexOrderNo, isolationCount);
                         }
                     }
                     
                     // İzolasyon sıvısı stoğundan tüketim
                     ConsumeIsolationStock(selectedMethod, isolationLiquidAmount, izosiyanatRatio, poliolRatio);
                     
-                    string amountUnit = selectedMethod == "MS Silikon" ? "ml" : "kg";
-                    MessageBox.Show($"İzolasyon kaydı oluşturuldu!\nKullanılan İzolasyon Sıvısı: {isolationLiquidAmount:F2} {amountUnit}", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    string amountUnit = "kg"; // Hem MS Silikon hem de İzosiyanat+Poliol için kg cinsinden
+                    MessageBox.Show($"İzolasyon kaydı oluşturuldu!\nKullanılan İzolasyon Sıvısı: {isolationLiquidAmount:F3} {amountUnit}", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                     // Verileri yeniden yükle
                     LoadIsolationData(dataGridView);
+                    
+                    // Paketleme tab'ını otomatik yenile (izolasyon yapıldıktan sonra paketleme tab'ına ürün düşer)
+                    if (_packagingDataGridView != null)
+                    {
+                        LoadPackagingData(_packagingDataGridView);
+                    }
                 }
             }
             catch (Exception ex)
@@ -4045,6 +4104,9 @@ namespace ERP.UI.Forms
                 GridColor = Color.White,
                 CellBorderStyle = DataGridViewCellBorderStyle.None
             };
+            
+            // DataGridView referansını sakla (otomatik refresh için)
+            _packagingDataGridView = dataGridView;
 
             // Kolonları ekle
             AddPackagingColumn(dataGridView, "Date", "Tarih", 100);
@@ -4380,7 +4442,7 @@ namespace ERP.UI.Forms
                             var orderForPackaging = _orderRepository.GetById(isolation.OrderId.Value);
                             if (orderForPackaging != null)
                             {
-                                EventFeedService.PackagingCompleted(packagingId, isolation.OrderId.Value, orderForPackaging.TrexOrderNo);
+                                EventFeedService.PackagingCompleted(packagingId, isolation.OrderId.Value, orderForPackaging.TrexOrderNo, packagingCount);
                             }
                         }
                         
@@ -4724,7 +4786,8 @@ namespace ERP.UI.Forms
                                 clampingsList = string.Join(" + ", clampingInfos);
                             }
                             
-                            listBox.Items.Add(new { Request = req, Display = $"Sonuç: {req.ResultedSize:F2} x {req.ResultedLength:F2} (Ürünler: {clampingsList})" });
+                            string hatveLetter = GetHatveLetter(req.Hatve);
+                            listBox.Items.Add(new { Request = req, Display = $"Hatve: {hatveLetter} | Sonuç: {req.ResultedSize:F2} x {req.ResultedLength:F2} (Ürünler: {clampingsList})" });
                         }
                         listBox.DisplayMember = "Display";
                         listBox.ValueMember = "Request";

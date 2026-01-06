@@ -6,6 +6,7 @@ using System.Windows.Forms;
 using ERP.Core.Models;
 using ERP.DAL.Repositories;
 using ERP.UI.Factories;
+using ERP.UI.Services;
 using ERP.UI.UI;
 
 namespace ERP.UI.Forms
@@ -367,6 +368,17 @@ namespace ERP.UI.Forms
                         request.ResultedCount = resultedCount.Value;
                         request.Status = "Kenetmede";
                         _clamping2RequestRepository.Update(request);
+                        
+                        // Event feed kaydı ekle - Kenetleme 2 tamamlandı, onay bekliyor
+                        if (request.OrderId.HasValue && request.OrderId.Value != Guid.Empty)
+                        {
+                            var order = _orderRepository.GetById(request.OrderId.Value);
+                            if (order != null)
+                            {
+                                EventFeedService.Clamping2Completed(request.Id, request.OrderId.Value, order.TrexOrderNo, resultedCount.Value);
+                            }
+                        }
+                        
                         LoadData();
                     }
                 }
@@ -509,16 +521,26 @@ namespace ERP.UI.Forms
             return null;
         }
 
-        private string GetHatveLetter(decimal hatve)
+        private string GetHatveLetter(decimal hatveValue)
         {
-            // Hatve değerine göre harf döndür
-            if (hatve == 2.5m) return "A";
-            if (hatve == 3.0m) return "B";
-            if (hatve == 3.5m) return "C";
-            if (hatve == 4.0m) return "D";
-            if (hatve == 4.5m) return "E";
-            if (hatve == 5.0m) return "F";
-            return hatve.ToString("F2", CultureInfo.InvariantCulture);
+            // Hatve değerlerini harfe çevir (yeni format): 3.10, 3.25=H | 4.3, 4.5=D | 6.3, 6.4, 6.5=M | 9.0=L
+            // Tolerance'ı biraz artırdık (0.1'den 0.15'e) - 6.4 ve benzeri değerleri daha iyi yakalamak için
+            const decimal tolerance = 0.15m;
+            
+            // H: 3.10, 3.25 (±0.15 = 2.95-3.40 arası)
+            if (hatveValue >= 2.95m && hatveValue <= 3.40m)
+                return "H";
+            // D: 4.3, 4.5 (±0.15 = 4.15-4.65 arası)
+            else if (hatveValue >= 4.15m && hatveValue <= 4.65m)
+                return "D";
+            // M: 6.3, 6.4, 6.5 (±0.15 = 6.15-6.65 arası)
+            else if (hatveValue >= 6.15m && hatveValue <= 6.65m)
+                return "M";
+            // L: 8.65, 8.7, 9.0 (±0.15 = 8.50-9.15 arası)
+            else if (hatveValue >= 8.50m && hatveValue <= 9.15m)
+                return "L";
+            else
+                return hatveValue.ToString("F2", CultureInfo.InvariantCulture); // Eğer tanınmazsa sayısal göster
         }
     }
 }

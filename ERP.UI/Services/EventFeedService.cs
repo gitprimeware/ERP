@@ -208,12 +208,12 @@ namespace ERP.UI.Services
             );
         }
 
-        public static void Clamping2Completed(Guid clamping2RequestId, Guid orderId, string orderNo)
+        public static void Clamping2Completed(Guid clamping2RequestId, Guid orderId, string orderNo, int resultedCount)
         {
             CreateEvent(
                 "Clamping2Completed",
                 "Kenetleme 2 Tamamlandı",
-                $"{orderNo} siparişi için kenetleme 2 tamamlandı, onay bekliyor",
+                $"{orderNo} siparişi için {resultedCount} adet kenetleme 2 tamamlandı, onay bekliyor",
                 "ProductionPlanning",
                 clamping2RequestId,
                 "Clamping2Request"
@@ -283,12 +283,12 @@ namespace ERP.UI.Services
         }
 
         // İzolasyon tamamlandı
-        public static void IsolationCompleted(Guid isolationId, Guid orderId, string orderNo)
+        public static void IsolationCompleted(Guid isolationId, Guid orderId, string orderNo, int isolationCount)
         {
             CreateEvent(
                 "IsolationCompleted",
                 "İzolasyon Tamamlandı",
-                $"{orderNo} siparişi için izolasyon tamamlandı",
+                $"{orderNo} siparişi için {isolationCount} adet izolasyon tamamlandı, onay bekliyor",
                 "ProductionPlanning",
                 isolationId,
                 "Isolation"
@@ -296,12 +296,12 @@ namespace ERP.UI.Services
         }
 
         // Paketleme tamamlandı
-        public static void PackagingCompleted(Guid packagingId, Guid orderId, string orderNo)
+        public static void PackagingCompleted(Guid packagingId, Guid orderId, string orderNo, int packagingCount)
         {
             CreateEvent(
                 "PackagingCompleted",
                 "Paketleme Tamamlandı",
-                $"{orderNo} siparişi için paketleme tamamlandı",
+                $"{orderNo} siparişi için {packagingCount} adet paketleme tamamlandı, onay bekliyor",
                 "ProductionPlanning",
                 packagingId,
                 "Packaging"

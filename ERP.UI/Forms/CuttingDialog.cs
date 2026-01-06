@@ -989,19 +989,6 @@ namespace ERP.UI.Forms
                     hatve = GetHtave(modelLetter);
                 }
 
-                // 10cm Plaka Adedi: 100 / hatve (tam bölünmüyorsa 1 ekle)
-                int plakaAdedi10cm = 0;
-                if (hatve > 0)
-                {
-                    decimal plakaAdedi10cmDecimal = 100m / hatve;
-                    int tamKisim = (int)Math.Floor(plakaAdedi10cmDecimal);
-                    // Eğer tam bölünmüyorsa (ondalık kısmı varsa) 1 ekle
-                    if (plakaAdedi10cmDecimal % 1 != 0)
-                        plakaAdedi10cm = tamKisim + 1;
-                    else
-                        plakaAdedi10cm = tamKisim;
-                }
-
                 // Yükseklik (mm)
                 int yukseklikMM = 0;
                 if (productCodeParts.Length >= 5 && int.TryParse(productCodeParts[4], out int yukseklik))
@@ -1024,10 +1011,10 @@ namespace ERP.UI.Forms
                         kapakDegeriMM = parsedKapak;
                 }
 
-                // Kapaksız yükseklik
-                int kapaksizYukseklikMM = yukseklikMM - kapakDegeriMM;
+                // Kapaksız yükseklik - YM ürünleri için kapağı çıkarma, SP ürünleri için çıkar
+                bool isYM = order.IsStockOrder;
+                int kapaksizYukseklikMM = isYM ? yukseklikMM : (yukseklikMM - kapakDegeriMM);
 
-                // Formül: plaka adedi = (Kapaksız Yükseklik (mm) / 100) * 10cm Plaka Adedi * Toplam Sipariş Adedi
                 // Toplam Sipariş Adedi = Sipariş Adedi * Boy Adet * Plaka Adet
                 int boyAdet = yukseklikMM <= 1800 ? 1 : 2;
                 int plakaAdet = 1; // Varsayılan
@@ -1037,8 +1024,10 @@ namespace ERP.UI.Forms
                 }
                 int toplamSiparisAdedi = order.Quantity * boyAdet * plakaAdet;
 
-                decimal onCmDilimi = kapaksizYukseklikMM / 100m;
-                decimal gerekenPlakaAdedi = onCmDilimi * plakaAdedi10cm * toplamSiparisAdedi;
+                // Yeni formül: plaka adedi = Math.Ceiling(Kapaksız Yükseklik (mm) / hatve) * Toplam Sipariş Adedi
+                decimal birimPlakaAdedi = hatve > 0 ? (decimal)kapaksizYukseklikMM / hatve : 0;
+                decimal birimPlakaAdediYuvarlanmis = Math.Ceiling(birimPlakaAdedi);
+                decimal gerekenPlakaAdedi = birimPlakaAdediYuvarlanmis * toplamSiparisAdedi;
                 
                 _txtGerekenPlakaAdedi.Text = Math.Round(gerekenPlakaAdedi, 0, MidpointRounding.AwayFromZero).ToString(CultureInfo.InvariantCulture);
             }

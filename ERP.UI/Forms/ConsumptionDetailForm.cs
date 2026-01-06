@@ -425,13 +425,29 @@ namespace ERP.UI.Forms
             if (txtPlakaAdedi == null)
                 return;
 
-            if (_yukseklikMM > 0 && _order != null && _order.Quantity > 0 && _plakaAdedi10cm > 0)
+            // Hatve değerini al
+            decimal hatve = 0;
+            if (txtHatve != null)
             {
-                // Kapaksız yükseklik: Yükseklik (mm) - Kapak değeri (mm)
+                // Hatve text'inden sayısal değeri çıkar (örn: "3.25 (H)" -> 3.25)
+                string hatveText = txtHatve.Text;
+                var hatveMatch = System.Text.RegularExpressions.Regex.Match(hatveText, @"(\d+\.?\d*)");
+                if (hatveMatch.Success && decimal.TryParse(hatveMatch.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal parsedHatve))
+                {
+                    hatve = parsedHatve;
+                }
+            }
+            
+            if (_yukseklikMM > 0 && _order != null && _order.Quantity > 0 && hatve > 0)
+            {
+                // YM (stok) ürünleri kontrolü
+                bool isYM = _order.IsStockOrder;
+                
+                // Kapaksız yükseklik: YM ürünleri için kapağı çıkarma, SP ürünleri için çıkar
                 int kapaksizYukseklikMM = _yukseklikMM;
                 
-                // Ürün kodundan kapak değerini çıkar
-                if (!string.IsNullOrEmpty(_order.ProductCode))
+                // SP ürünleri için ürün kodundan kapak değerini çıkar
+                if (!isYM && !string.IsNullOrEmpty(_order.ProductCode))
                 {
                     var productCodeParts = _order.ProductCode.Split('-');
                     if (productCodeParts.Length > 5)
@@ -456,11 +472,11 @@ namespace ERP.UI.Forms
                     }
                 }
                 
-                // Kapaksız yükseklik (mm) / 100 = 10cm dilimi
-                decimal onCmDilimi = kapaksizYukseklikMM / 100m;
-                decimal hesaplananPlakaAdedi = onCmDilimi * _order.Quantity * _plakaAdedi10cm;
-                txtPlakaAdedi.Text = Math.Round(hesaplananPlakaAdedi, 0, MidpointRounding.AwayFromZero)
-                    .ToString(CultureInfo.InvariantCulture);
+                // Yeni formül: plaka adedi = Math.Ceiling(Kapaksız Yükseklik (mm) / hatve) * Sipariş Adedi
+                decimal birimPlakaAdedi = (decimal)kapaksizYukseklikMM / hatve;
+                decimal birimPlakaAdediYuvarlanmis = Math.Ceiling(birimPlakaAdedi);
+                decimal hesaplananPlakaAdedi = birimPlakaAdediYuvarlanmis * _order.Quantity;
+                txtPlakaAdedi.Text = hesaplananPlakaAdedi.ToString(CultureInfo.InvariantCulture);
             }
             else if (_plakaAdet > 0)
             {

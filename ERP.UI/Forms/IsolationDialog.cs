@@ -102,11 +102,11 @@ namespace ERP.UI.Forms
             yPos += 30;
 
             // MS Silikon bilgisi
-            // 1 metre = 2 kg izolasyon sıvısı = 0.95 kg MS Silikon tüketimi
-            decimal msSilikonNeededKg = totalLengthM * 2m * 0.95m / 2m; // Toplam kg'dan MS Silikon kg'ına çevir
+            // 1 metre = 2 kg MS Silikon tüketimi
+            decimal msSilikonNeededKg = totalLengthM * 2m; // 1 metre = 2 kg MS Silikon
             _lblMsSilikonInfo = new Label
             {
-                Text = $"Gereken MS Silikon: {msSilikonNeededKg:F3} kg - (1 metre = 0.95 kg MS Silikon)",
+                Text = $"Gereken MS Silikon: {msSilikonNeededKg:F3} kg - (1 metre = 2 kg MS Silikon)",
                 Location = new Point(50, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 9F),
@@ -272,7 +272,11 @@ namespace ERP.UI.Forms
                 // MS Silikon için kg cinsinden hesapla
                 decimal lengthInMeters = _assembly.Length / 1000m;
                 decimal totalLengthM = lengthInMeters * IsolationCount;
-                IsolationLiquidAmount = totalLengthM * 2m; // kg cinsinden (1 metre = 2 kg izolasyon sıvısı)
+                IsolationLiquidAmount = totalLengthM * 2m; // kg cinsinden (1 metre = 2 kg MS Silikon)
+                
+                // MS Silikon bilgisini güncelle
+                decimal msSilikonNeededKg = totalLengthM * 2m;
+                _lblMsSilikonInfo.Text = $"Gereken MS Silikon: {msSilikonNeededKg:F3} kg - (1 metre = 2 kg MS Silikon)";
             }
             else if (_rdoIzosiyanatPoliol.Checked)
             {
@@ -346,9 +350,10 @@ namespace ERP.UI.Forms
                 if (SelectedMethod == "MS Silikon")
                 {
                     // MS Silikon stok kontrolü (kg cinsinden)
+                    // 1 metre = 2 kg MS Silikon
                     decimal lengthInMeters = _assembly.Length / 1000m;
                     decimal totalLengthM = lengthInMeters * IsolationCount;
-                    decimal msSilikonNeededKg = totalLengthM * 2m * 0.95m / 2m; // Toplam kg'dan MS Silikon kg'ına çevir
+                    decimal msSilikonNeededKg = totalLengthM * 2m; // 1 metre = 2 kg MS Silikon
 
                     var msSilikonStocks = _isolationStockRepository.GetAll()
                         .Where(s => s.LiquidType == "MS Silikon" && s.Kilogram > 0)

@@ -370,19 +370,6 @@ namespace ERP.UI.Forms
                     hatve = GetHtave(modelLetter);
                 }
 
-                // 10cm Plaka Adedi: 100 / hatve (tam bölünmüyorsa 1 ekle)
-                int plakaAdedi10cm = 0;
-                if (hatve > 0)
-                {
-                    decimal plakaAdedi10cmDecimal = 100m / hatve;
-                    int tamKisim = (int)Math.Floor(plakaAdedi10cmDecimal);
-                    // Eğer tam bölünmüyorsa (ondalık kısmı varsa) 1 ekle
-                    if (plakaAdedi10cmDecimal % 1 != 0)
-                        plakaAdedi10cm = tamKisim + 1;
-                    else
-                        plakaAdedi10cm = tamKisim;
-                }
-
                 // Yükseklik (mm)
                 int yukseklikMM = 0;
                 if (parts.Length >= 5 && int.TryParse(parts[4], out int yukseklik))
@@ -403,8 +390,9 @@ namespace ERP.UI.Forms
                         kapakDegeriMM = parsedKapak;
                 }
 
-                // Kapaksız yükseklik
-                int kapaksizYukseklikMM = yukseklikMM - kapakDegeriMM;
+                // Kapaksız yükseklik - YM ürünleri için kapağı çıkarma, SP ürünleri için çıkar
+                bool isYM = order.IsStockOrder;
+                int kapaksizYukseklikMM = isYM ? yukseklikMM : (yukseklikMM - kapakDegeriMM);
 
                 // Toplam Sipariş Adedi
                 int boyAdet = yukseklikMM <= 1800 ? 1 : 2;
@@ -414,10 +402,11 @@ namespace ERP.UI.Forms
                     plakaAdet = plakaOlcusuMMValue <= 1150 ? 1 : 4;
                 int toplamSiparisAdedi = order.Quantity * boyAdet * plakaAdet;
 
-                // Formül: plaka adedi = (Kapaksız Yükseklik (mm) / 100) * 10cm Plaka Adedi * Toplam Sipariş Adedi
+                // Yeni formül: plaka adedi = Math.Ceiling(Kapaksız Yükseklik (mm) / hatve) * Toplam Sipariş Adedi
                 // Pres adedi = Plaka adedi (çünkü her plaka bir pres işlemi gerektirir)
-                decimal onCmDilimi = kapaksizYukseklikMM / 100m;
-                decimal gerekenPresAdedi = onCmDilimi * plakaAdedi10cm * toplamSiparisAdedi;
+                decimal birimPlakaAdedi = hatve > 0 ? (decimal)kapaksizYukseklikMM / hatve : 0;
+                decimal birimPlakaAdediYuvarlanmis = Math.Ceiling(birimPlakaAdedi);
+                decimal gerekenPresAdedi = birimPlakaAdediYuvarlanmis * toplamSiparisAdedi;
                 
                 _txtGerekenPresAdedi.Text = Math.Round(gerekenPresAdedi, 0, MidpointRounding.AwayFromZero).ToString(CultureInfo.InvariantCulture);
             }

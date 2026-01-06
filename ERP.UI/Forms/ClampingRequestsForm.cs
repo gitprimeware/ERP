@@ -410,18 +410,24 @@ namespace ERP.UI.Forms
 
         private string GetHatveLetter(decimal hatveValue)
         {
-            const decimal tolerance = 0.1m;
+            // Hatve değerlerini harfe çevir (yeni format): 3.10, 3.25=H | 4.3, 4.5=D | 6.3, 6.4, 6.5=M | 9.0=L
+            // Tolerance'ı biraz artırdık (0.1'den 0.15'e) - 6.4 ve benzeri değerleri daha iyi yakalamak için
+            const decimal tolerance = 0.15m;
             
-            if (Math.Abs(hatveValue - 3.25m) < tolerance)
+            // H: 3.10, 3.25 (±0.15 = 2.95-3.40 arası)
+            if (hatveValue >= 2.95m && hatveValue <= 3.40m)
                 return "H";
-            else if (Math.Abs(hatveValue - 4.5m) < tolerance)
+            // D: 4.3, 4.5 (±0.15 = 4.15-4.65 arası)
+            else if (hatveValue >= 4.15m && hatveValue <= 4.65m)
                 return "D";
-            else if (Math.Abs(hatveValue - 6.5m) < tolerance)
+            // M: 6.3, 6.4, 6.5 (±0.15 = 6.15-6.65 arası)
+            else if (hatveValue >= 6.15m && hatveValue <= 6.65m)
                 return "M";
-            else if (Math.Abs(hatveValue - 9m) < tolerance)
+            // L: 8.65, 8.7, 9.0 (±0.15 = 8.50-9.15 arası)
+            else if (hatveValue >= 8.50m && hatveValue <= 9.15m)
                 return "L";
             else
-                return hatveValue.ToString("F2", CultureInfo.InvariantCulture);
+                return hatveValue.ToString("F2", CultureInfo.InvariantCulture); // Eğer tanınmazsa sayısal göster
         }
     }
 }

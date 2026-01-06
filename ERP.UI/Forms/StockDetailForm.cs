@@ -412,8 +412,8 @@ namespace ERP.UI.Forms
                                         }
                                     }
                                     
-                                    // 10cm Plaka Adedi: H=32, D=24, M=17, L=12
-                                    int plakaAdedi10cm = GetPlakaAdedi10cm(modelLetter);
+                                    // Hatve değerini al
+                                    decimal hatve = GetHtave(modelLetter);
                                     
                                     // Yükseklik (mm)
                                     int yukseklikMM = 0;
@@ -422,8 +422,10 @@ namespace ERP.UI.Forms
                                         yukseklikMM = yukseklik;
                                     }
                                     
-                                    // Plaka Adedi: Yükseklik (mm) / 100 * Sipariş Adedi * 10cm Plaka Adedi
-                                    decimal plakaAdedi = (decimal)yukseklikMM / 100m * order.Quantity * plakaAdedi10cm;
+                                    // Yeni formül: Plaka Adedi = Math.Ceiling(Yükseklik (mm) / hatve) * Sipariş Adedi
+                                    decimal birimPlakaAdedi = hatve > 0 ? (decimal)yukseklikMM / hatve : 0;
+                                    decimal birimPlakaAdediYuvarlanmis = Math.Ceiling(birimPlakaAdedi);
+                                    decimal plakaAdedi = birimPlakaAdediYuvarlanmis * order.Quantity;
                                     
                                     // Toplam Alüminyum Ağırlığı = Plaka Ağırlığı * Plaka Adedi
                                     decimal toplamAluminyumAgirligi = plakaAgirligi * Math.Ceiling(plakaAdedi);
@@ -603,6 +605,18 @@ namespace ERP.UI.Forms
                 case 'M': return 17;
                 case 'L': return 12;
                 default: return 0;
+            }
+        }
+
+        private decimal GetHtave(char modelLetter)
+        {
+            switch (char.ToUpper(modelLetter))
+            {
+                case 'H': return 3.25m;
+                case 'D': return 4.5m;
+                case 'M': return 6.5m;
+                case 'L': return 9m;
+                default: return 0m;
             }
         }
 
