@@ -333,8 +333,8 @@ namespace ERP.UI.Forms
             btnCancel.Visible = true;
             btnCancel.BringToFront();
 
-            // Siparişe Geri Gönder (sadece muhasebede ise)
-            btnSendToShipment = ButtonFactory.CreateActionButton("📦 Siparişe Geri Gönder", ThemeColors.Success, Color.White, 180, 40);
+            // Siparişe Dön (sadece muhasebede ise)
+            btnSendToShipment = ButtonFactory.CreateActionButton("📦 Siparişe Dön", ThemeColors.Success, Color.White, 180, 40);
             btnSendToShipment.Anchor = AnchorStyles.None;
             btnSendToShipment.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             btnSendToShipment.Click += BtnSendToShipment_Click;
@@ -456,7 +456,7 @@ namespace ERP.UI.Forms
                     btnSave.Enabled = isInAccounting;
                 }
 
-                // Siparişe Geri Gönder butonunu güncelle (sadece muhasebede ise)
+                // Siparişe Dön butonunu güncelle (sadece muhasebede ise)
                 if (btnSendToShipment != null)
                 {
                     btnSendToShipment.Visible = isInAccounting;
@@ -535,8 +535,8 @@ namespace ERP.UI.Forms
             if (_order == null) return;
 
             var result = MessageBox.Show(
-                $"Sipariş {_order.TrexOrderNo} siparişe geri gönderilecek. Emin misiniz?",
-                "Siparişe Geri Gönder",
+                $"Sipariş {_order.TrexOrderNo} siparişe döndürülecek (Sevkiyata Hazır). Emin misiniz?",
+                "Siparişe Dön",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Question);
 

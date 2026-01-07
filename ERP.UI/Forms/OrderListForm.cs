@@ -31,6 +31,7 @@ namespace ERP.UI.Forms
         public event EventHandler<Guid> OrderUpdateRequested;
         public event EventHandler<Guid> OrderDeleteRequested;
         public event EventHandler<Guid> OrderSendToProductionRequested;
+        public event EventHandler<Guid> OrderSendToAccountingRequested; // Siparişten muhasebeye gönder
         public event EventHandler<Guid> OrderGetWorkOrderRequested;
         public event EventHandler<List<Guid>> OrderGetBulkWorkOrderRequested; // Toplu iş emri için
 
@@ -589,8 +590,8 @@ namespace ERP.UI.Forms
                 bool isReadyForShipment = order.Status == "Sevkiyata Hazır";
                 bool isNew = order.Status == "Yeni";
                 
-                // Emoji sayısını belirle - sadece "Yeni" durumunda Üretime Gönder butonu var
-                int emojiCount = (isReadyForShipment || !isNew) ? 3 : 4;
+                // Emoji sayısını belirle - "Yeni" durumunda 5 buton (Detay, İş Emri, Üretime Gönder, Muhasebeye Gönder, Sil)
+                int emojiCount = isNew ? 5 : 3;
 
                 // İşlemler kolonuna tıklandı
                 if (_dataGridView.Columns[e.ColumnIndex].Name == "Actions")
@@ -604,7 +605,8 @@ namespace ERP.UI.Forms
 
                     if (isNew)
                     {
-                        // 📋 📄 🏭 🗑️ - Sadece "Yeni" durumunda 4 buton
+                        // 📋 📄 🏭 💰 🗑️ - "Yeni" durumunda 5 buton (Detay, İş Emri, Üretime Gönder, Muhasebeye Gönder, Sil)
+                        // emojiCount zaten üstte 5 olarak hesaplanmış, emojiIndex de doğru hesaplanmış
                         switch (emojiIndex)
                         {
                             case 0: // 📋 Detay
@@ -624,7 +626,18 @@ namespace ERP.UI.Forms
                                     OrderSendToProductionRequested?.Invoke(this, order.Id);
                                 }
                                 break;
-                            case 3: // 🗑️ Sil
+                            case 3: // 💰 Muhasebeye Gönder
+                                var resultAccounting = MessageBox.Show(
+                                    $"Sipariş {order.TrexOrderNo} muhasebeye gönderilecek. Emin misiniz?",
+                                    "Muhasebeye Gönder",
+                                    MessageBoxButtons.YesNo,
+                                    MessageBoxIcon.Question);
+                                if (resultAccounting == DialogResult.Yes)
+                                {
+                                    OrderSendToAccountingRequested?.Invoke(this, order.Id);
+                                }
+                                break;
+                            case 4: // 🗑️ Sil
                                 var resultDelete = MessageBox.Show(
                                     $"Sipariş {order.TrexOrderNo} silinecek. Emin misiniz?",
                                     "Sipariş Sil",
@@ -1120,8 +1133,8 @@ namespace ERP.UI.Forms
                         }
                         else if (isNew)
                         {
-                            emojis = new[] { "📋", "📄", "🏭", "🗑️" };
-                            colors = new[] { ThemeColors.Info, ThemeColors.Primary, ThemeColors.Warning, ThemeColors.Error };
+                            emojis = new[] { "📋", "📄", "🏭", "💰", "🗑️" };
+                            colors = new[] { ThemeColors.Info, ThemeColors.Primary, ThemeColors.Warning, ThemeColors.Success, ThemeColors.Error };
                         }
                         else
                         {

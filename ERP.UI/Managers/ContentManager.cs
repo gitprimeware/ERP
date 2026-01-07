@@ -47,6 +47,7 @@ namespace ERP.UI.Managers
                     orderListForm.OrderUpdateRequested += (s, id) => ShowOrderUpdate(id);
                     orderListForm.OrderDeleteRequested += (s, id) => HandleOrderDelete(id);
                     orderListForm.OrderSendToProductionRequested += (s, id) => HandleSendToProduction(id);
+                    orderListForm.OrderSendToAccountingRequested += (s, id) => HandleSendToAccountingFromOrder(id);
                     orderListForm.OrderGetWorkOrderRequested += (s, id) => HandleGetWorkOrder(id);
                     orderListForm.OrderGetBulkWorkOrderRequested += (s, ids) => HandleGetBulkWorkOrder(ids);
                 }
@@ -62,7 +63,7 @@ namespace ERP.UI.Managers
                 if (control is Forms.ProductionListForm productionListForm)
                 {
                     productionListForm.ProductionDetailRequested += (s, id) => ShowProductionDetail(id);
-                    productionListForm.ProductionSendToAccountingRequested += (s, id) => HandleSendToAccounting(id);
+                    productionListForm.ProductionReturnToOrderRequested += (s, id) => HandleReturnToOrderFromProduction(id);
                     productionListForm.ProductionReportRequested += (s, id) => HandleProductionReport(id);
                 }
 
@@ -71,7 +72,7 @@ namespace ERP.UI.Managers
                 {
                     productionDetailForm.BackRequested += (s, e) => ShowForm("Production");
                     productionDetailForm.ReportRequested += (s, id) => HandleProductionReport(id);
-                    productionDetailForm.SendToAccountingRequested += (s, id) => HandleSendToAccounting(id);
+                    productionDetailForm.ReturnToOrderRequested += (s, id) => HandleReturnToOrderFromProduction(id);
                 }
 
                 // ConsumptionListForm için event'leri bağla
@@ -195,7 +196,35 @@ namespace ERP.UI.Managers
             }
         }
 
-        private void HandleSendToAccounting(Guid orderId)
+        // Üretimden siparişe dön (Status: "Üretimde" → "Yeni")
+        private void HandleReturnToOrderFromProduction(Guid orderId)
+        {
+            try
+            {
+                var orderRepository = new ERP.DAL.Repositories.OrderRepository();
+                var order = orderRepository.GetById(orderId);
+                
+                if (order != null)
+                {
+                    // Status'u "Yeni" yap (üretim tamamlandı, siparişe döndü)
+                    order.Status = "Yeni";
+                    orderRepository.Update(order);
+                    
+                    MessageBox.Show($"Sipariş {order.TrexOrderNo} siparişe döndürüldü.", 
+                        "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    
+                    // Üretim listesini yenile
+                    ShowForm("Production");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Sipariş siparişe döndürülürken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        // Siparişten muhasebeye gönder (Status: "Yeni" → "Muhasebede")
+        private void HandleSendToAccountingFromOrder(Guid orderId)
         {
             try
             {
@@ -214,7 +243,7 @@ namespace ERP.UI.Managers
                     MessageBox.Show($"Sipariş {order.TrexOrderNo} muhasebeye gönderildi.", 
                         "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     
-                    // Listeyi yenile
+                    // Sipariş listesini yenile
                     ShowForm("OrderList");
                 }
             }
@@ -547,6 +576,7 @@ namespace ERP.UI.Managers
             ShowForm("AccountingEntry", orderId);
         }
 
+        // Muhasebeden siparişe dön (Status: "Muhasebede" → "Sevkiyata Hazır")
         private void HandleSendToShipment(Guid orderId)
         {
             try
@@ -556,14 +586,14 @@ namespace ERP.UI.Managers
                 
                 if (order != null)
                 {
-                    // Status'u "Sevkiyata Hazır" yap
+                    // Status'u "Sevkiyata Hazır" yap (muhasebe tamamlandı, siparişe döndü)
                     order.Status = "Sevkiyata Hazır";
                     orderRepository.Update(order);
                     
                     // Event feed kaydı ekle
                     EventFeedService.OrderReadyForShipment(orderId, order.TrexOrderNo);
                     
-                    MessageBox.Show($"Sipariş {order.TrexOrderNo} sevkiyata hazır durumuna getirildi.", 
+                    MessageBox.Show($"Sipariş {order.TrexOrderNo} siparişe döndürüldü (Sevkiyata Hazır).", 
                         "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     
                     // Muhasebe listesini yenile
@@ -572,7 +602,7 @@ namespace ERP.UI.Managers
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Sipariş sevkiyata hazır durumuna getirilirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Sipariş siparişe döndürülürken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

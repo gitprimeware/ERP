@@ -38,7 +38,7 @@ namespace ERP.UI.Forms
         private SortDirection _sortDirection = SortDirection.None;
 
         public event EventHandler<Guid> ProductionDetailRequested;
-        public event EventHandler<Guid> ProductionSendToAccountingRequested;
+        public event EventHandler<Guid> ProductionReturnToOrderRequested;
         public event EventHandler<Guid> ProductionReportRequested;
 
         public ProductionListForm()
@@ -732,7 +732,7 @@ namespace ERP.UI.Forms
                                 // Emoji değeri sadece placeholder - gerçek çizim CellPainting'de yapılacak
                                 if (isInProduction && !isStockOrder)
                                 {
-                                    btnCell.Value = "💰 📋"; // Rapor, Ayrıntı, Muhasebeye Gönder
+                                    btnCell.Value = "📦 📋"; // Rapor, Ayrıntı, Siparişe Dön
                                 }
                                 else
                                 {
@@ -774,15 +774,15 @@ namespace ERP.UI.Forms
                     var cell = _dataGridView.Rows[e.RowIndex].Cells[e.ColumnIndex];
                     var cellRect = _dataGridView.GetCellDisplayRectangle(e.ColumnIndex, e.RowIndex, false);
                     var clickX = _dataGridView.PointToClient(Control.MousePosition).X - cellRect.X;
-                    var showAccountingButton = isInProduction && !isStockOrder;
-                    var emojiCount = showAccountingButton ? 3 : 2; // Rapor, Ayrıntı, (Muhasebe)
+                    var showReturnToOrderButton = isInProduction && !isStockOrder;
+                    var emojiCount = showReturnToOrderButton ? 3 : 2; // Rapor, Ayrıntı, (Siparişe Dön)
                     var emojiWidth = cellRect.Width / emojiCount;
 
                     int emojiIndex = (int)(clickX / emojiWidth);
 
-                    if (showAccountingButton)
+                    if (showReturnToOrderButton)
                     {
-                        // 📄 📋 💰 - Rapor, Ayrıntı, Muhasebeye Gönder
+                        // 📄 📋 📦 - Rapor, Ayrıntı, Siparişe Dön
                         switch (emojiIndex)
                         {
                             case 0: // 📄 Rapor
@@ -791,7 +791,7 @@ namespace ERP.UI.Forms
                             case 1: // 📋 Ayrıntı
                                 ProductionDetailRequested?.Invoke(this, order.Id);
                                 break;
-                            case 2: // 💰 Muhasebeye Gönder
+                            case 2: // 📦 Siparişe Dön
                                 // Paketleme kontrolü
                                 var packagings = _packagingRepository.GetByOrderId(order.Id);
                                 bool hasCompletedPackaging = packagings.Any(p => p.IsActive);
@@ -799,7 +799,7 @@ namespace ERP.UI.Forms
                                 if (!hasCompletedPackaging)
                                 {
                                     MessageBox.Show(
-                                        "Bu siparişi muhasebeye göndermek için önce paketleme işleminin tamamlanmış olması gerekir.",
+                                        "Bu siparişi siparişe döndürmek için önce paketleme işleminin tamamlanmış olması gerekir.",
                                         "Uyarı",
                                         MessageBoxButtons.OK,
                                         MessageBoxIcon.Warning);
@@ -807,13 +807,13 @@ namespace ERP.UI.Forms
                                 }
                                 
                                 var result = MessageBox.Show(
-                                    $"Sipariş {order.TrexOrderNo} muhasebeye gönderilecek. Emin misiniz?",
-                                    "Muhasebeye Gönder",
+                                    $"Sipariş {order.TrexOrderNo} siparişe döndürülecek. Emin misiniz?",
+                                    "Siparişe Dön",
                                     MessageBoxButtons.YesNo,
                                     MessageBoxIcon.Question);
                                 if (result == DialogResult.Yes)
                                 {
-                                    ProductionSendToAccountingRequested?.Invoke(this, order.Id);
+                                    ProductionReturnToOrderRequested?.Invoke(this, order.Id);
                                 }
                                 break;
                         }
@@ -1030,7 +1030,7 @@ namespace ERP.UI.Forms
             }
             yPos += 10;
 
-            // Butonlar - Rapor, Ayrıntı, (Muhasebeye Gönder)
+            // Butonlar - Rapor, Ayrıntı, (Siparişe Dön)
             var btnReport = ButtonFactory.CreateActionButton("📄 Rapor", ThemeColors.Info, Color.White, 100, 35);
             btnReport.Location = new Point(15, yPos);
             btnReport.Click += (s, e) => ProductionReportRequested?.Invoke(this, order.Id);
@@ -1041,12 +1041,12 @@ namespace ERP.UI.Forms
             btnDetail.Click += (s, e) => ProductionDetailRequested?.Invoke(this, order.Id);
             card.Controls.Add(btnDetail);
 
-            // Sadece üretimdeyse ve stok siparişi değilse muhasebeye gönder butonu (sarı)
+            // Sadece üretimdeyse ve stok siparişi değilse siparişe dön butonu
             if (isInProduction && !order.IsStockOrder)
             {
-                var btnSendToAccounting = ButtonFactory.CreateActionButton("💰 Muhasebe", ThemeColors.Warning, Color.White, 110, 35);
-                btnSendToAccounting.Location = new Point(225, yPos);
-                btnSendToAccounting.Click += (s, e) =>
+                var btnReturnToOrder = ButtonFactory.CreateActionButton("📦 Siparişe Dön", ThemeColors.Info, Color.White, 120, 35);
+                btnReturnToOrder.Location = new Point(225, yPos);
+                btnReturnToOrder.Click += (s, e) =>
                 {
                     // Paketleme kontrolü
                     var packagings = _packagingRepository.GetByOrderId(order.Id);
@@ -1055,7 +1055,7 @@ namespace ERP.UI.Forms
                     if (!hasCompletedPackaging)
                     {
                         MessageBox.Show(
-                            "Bu siparişi muhasebeye göndermek için önce paketleme işleminin tamamlanmış olması gerekir.",
+                            "Bu siparişi siparişe döndürmek için önce paketleme işleminin tamamlanmış olması gerekir.",
                             "Uyarı",
                             MessageBoxButtons.OK,
                             MessageBoxIcon.Warning);
@@ -1063,17 +1063,17 @@ namespace ERP.UI.Forms
                     }
                     
                     var result = MessageBox.Show(
-                        $"Sipariş {order.TrexOrderNo} muhasebeye gönderilecek. Emin misiniz?",
-                        "Muhasebeye Gönder",
+                        $"Sipariş {order.TrexOrderNo} siparişe döndürülecek. Emin misiniz?",
+                        "Siparişe Dön",
                         MessageBoxButtons.YesNo,
                         MessageBoxIcon.Question);
 
                     if (result == DialogResult.Yes)
                     {
-                        ProductionSendToAccountingRequested?.Invoke(this, order.Id);
+                        ProductionReturnToOrderRequested?.Invoke(this, order.Id);
                     }
                 };
-                card.Controls.Add(btnSendToAccounting);
+                card.Controls.Add(btnReturnToOrder);
             }
 
             card.Controls.Add(lblOrderNo);
@@ -1393,10 +1393,10 @@ namespace ERP.UI.Forms
 
                     if (isInProduction && !isStockOrder)
                     {
-                        // 📄 📋 💰 - Rapor, Ayrıntı, Muhasebeye Gönder
-                        emojis = new[] { "📄", "📋", "💰" };
-                        colors = new[] { ThemeColors.Info, ThemeColors.Primary, ThemeColors.Warning };
-                        tooltips = new[] { "Rapor", "Ayrıntı", "Muhasebeye Gönder" };
+                        // 📄 📋 📦 - Rapor, Ayrıntı, Siparişe Dön
+                        emojis = new[] { "📄", "📋", "📦" };
+                        colors = new[] { ThemeColors.Info, ThemeColors.Primary, ThemeColors.Info };
+                        tooltips = new[] { "Rapor", "Ayrıntı", "Siparişe Dön" };
                     }
                     else
                     {
@@ -1490,7 +1490,7 @@ namespace ERP.UI.Forms
                     string[] tooltips;
                     if (isInProduction && !isStockOrder)
                     {
-                        tooltips = new[] { "Rapor", "Ayrıntı", "Muhasebeye Gönder" };
+                        tooltips = new[] { "Rapor", "Ayrıntı", "Siparişe Dön" };
                     }
                     else
                     {

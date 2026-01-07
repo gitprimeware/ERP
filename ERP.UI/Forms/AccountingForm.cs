@@ -816,15 +816,15 @@ namespace ERP.UI.Forms
                             }
                             AccountingEntryRequested?.Invoke(this, order.Id);
                             break;
-                        case 2: // 📦 Sevkıyata Gönder
+                        case 2: // 📦 Siparişe Dön
                             if (!isInAccounting)
                             {
-                                MessageBox.Show("Bu sipariş muhasebede değil, sevkıyata gönderilemez.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                MessageBox.Show("Bu sipariş muhasebede değil, siparişe döndürülemez.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                 return;
                             }
                             var result = MessageBox.Show(
-                                $"Sipariş {order.TrexOrderNo} sevkıyata gönderilecek. Emin misiniz?",
-                                "Sevkıyata Gönder",
+                                $"Sipariş {order.TrexOrderNo} siparişe döndürülecek (Sevkiyata Hazır). Emin misiniz?",
+                                "Siparişe Dön",
                                 MessageBoxButtons.YesNo,
                                 MessageBoxIcon.Question);
 
@@ -1002,7 +1002,7 @@ namespace ERP.UI.Forms
             }
             yPos += 45;
 
-            var btnSendToShipment = ButtonFactory.CreateActionButton("📦 Siparişe Gönder", ThemeColors.Success, Color.White, 150, 35);
+            var btnSendToShipment = ButtonFactory.CreateActionButton("📦 Siparişe Dön", ThemeColors.Success, Color.White, 150, 35);
             btnSendToShipment.Location = new Point(15, yPos);
             
             if (isInAccounting)
@@ -1010,8 +1010,8 @@ namespace ERP.UI.Forms
                 btnSendToShipment.Click += (s, e) =>
                 {
                     var result = MessageBox.Show(
-                        $"Sipariş {order.TrexOrderNo} siparişe gönderilecek. Emin misiniz?",
-                        "Siparişe Gönder",
+                        $"Sipariş {order.TrexOrderNo} siparişe döndürülecek (Sevkiyata Hazır). Emin misiniz?",
+                        "Siparişe Dön",
                         MessageBoxButtons.YesNo,
                         MessageBoxIcon.Question);
 

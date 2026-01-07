@@ -98,7 +98,7 @@ namespace ERP.UI.Forms
 
         public event EventHandler BackRequested;
         public event EventHandler<Guid> ReportRequested;
-        public event EventHandler<Guid> SendToAccountingRequested;
+        public event EventHandler<Guid> ReturnToOrderRequested;
 
         public ProductionDetailForm(Guid orderId)
         {
@@ -496,9 +496,9 @@ namespace ERP.UI.Forms
                 Width = 400
             };
 
-            // Üretimdeyse sadece Muhasebeye Gönder butonu göster
+            // Üretimdeyse sadece Siparişe Dön butonu göster
             bool isInProduction = _order?.Status == "Üretimde";
-            // Stok siparişleri için muhasebeye gönder butonunu gizle
+            // Stok siparişleri için siparişe dön butonunu gizle
             bool isStockOrder = _order?.IsStockOrder ?? false;
 
             if (!isInProduction)
@@ -509,10 +509,10 @@ namespace ERP.UI.Forms
                 panel.Controls.Add(btnRapor);
             }
 
-            // Sadece üretimdeyse ve stok siparişi değilse muhasebeye gönder butonu göster
+            // Sadece üretimdeyse ve stok siparişi değilse siparişe dön butonu göster
             if (isInProduction && !isStockOrder)
             {
-                btnMuhasebeyeGonder = ButtonFactory.CreateActionButton("💰 Muhasebeye Gönder", ThemeColors.Success, Color.White, 180, 40);
+                btnMuhasebeyeGonder = ButtonFactory.CreateActionButton("📦 Siparişe Dön", ThemeColors.Info, Color.White, 180, 40);
                 btnMuhasebeyeGonder.Location = new Point(btnRapor != null ? 160 : 0, 5);
                 btnMuhasebeyeGonder.Click += BtnMuhasebeyeGonder_Click;
                 panel.Controls.Add(btnMuhasebeyeGonder);
@@ -860,7 +860,7 @@ namespace ERP.UI.Forms
             if (txtReportDurum != null)
                 txtReportDurum.Text = _order.Status ?? "";
 
-            // Buton panelini oluştur (üretimdeyse sadece muhasebeye gönder)
+            // Buton panelini oluştur (üretimdeyse sadece siparişe dön)
             var tabRapor = tabControl?.TabPages["📄 Rapor"];
             if (tabRapor != null)
             {
@@ -895,7 +895,7 @@ namespace ERP.UI.Forms
             if (!hasCompletedPackaging)
             {
                 MessageBox.Show(
-                    "Bu siparişi muhasebeye göndermek için önce paketleme işleminin tamamlanmış olması gerekir.",
+                    "Bu siparişi siparişe döndürmek için önce paketleme işleminin tamamlanmış olması gerekir.",
                     "Uyarı",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
@@ -903,14 +903,14 @@ namespace ERP.UI.Forms
             }
             
             var result = MessageBox.Show(
-                $"Sipariş {_order?.TrexOrderNo} muhasebeye gönderilecek. Emin misiniz?",
-                "Muhasebeye Gönder",
+                $"Sipariş {_order?.TrexOrderNo} siparişe döndürülecek. Emin misiniz?",
+                "Siparişe Dön",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Question);
 
             if (result == DialogResult.Yes)
             {
-                SendToAccountingRequested?.Invoke(this, _orderId);
+                ReturnToOrderRequested?.Invoke(this, _orderId);
             }
         }
 
