@@ -36,6 +36,11 @@ namespace ERP.UI.Forms
         private ComboBox _cmbIzolasyonType;
         private TextBox _txtIzolasyonQuantity;
         private Button _btnIzolasyonSave;
+        
+        // İzolasyon Sıvısı Sarfiyat kontrolleri
+        private ComboBox _cmbIzolasyonConsumptionType;
+        private TextBox _txtIzolasyonConsumptionKg;
+        private Button _btnIzolasyonConsumptionSave;
 
         public ConsumptionMaterialStockEntryForm()
         {
@@ -693,16 +698,54 @@ namespace ERP.UI.Forms
 
         private void CreateIzolasyonTabContent(TabPage tab)
         {
-            var panel = new Panel
+            var mainPanel = new Panel
             {
                 Dock = DockStyle.Fill,
                 BackColor = Color.White,
-                Padding = new Padding(30)
+                Padding = new Padding(20)
             };
 
+            // İki kolonlu TableLayoutPanel
+            var tableLayout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 1,
+                BackColor = Color.White
+            };
+            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            tableLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+            // Sol Panel - Stok Girişi
+            var leftPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.White,
+                Padding = new Padding(20)
+            };
+            CreateIzolasyonLeftPanel(leftPanel);
+            tableLayout.Controls.Add(leftPanel, 0, 0);
+
+            // Sağ Panel - Sarfiyat
+            var rightPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.White,
+                Padding = new Padding(20)
+            };
+            CreateIzolasyonRightPanel(rightPanel);
+            tableLayout.Controls.Add(rightPanel, 1, 0);
+
+            mainPanel.Controls.Add(tableLayout);
+            tab.Controls.Add(mainPanel);
+        }
+
+        private void CreateIzolasyonLeftPanel(Panel panel)
+        {
             int yPos = 30;
             int labelWidth = 150;
-            int controlWidth = 300;
+            int controlWidth = 250;
             int controlHeight = 32;
             int spacing = 40;
 
@@ -710,10 +753,10 @@ namespace ERP.UI.Forms
             var titleLabel = new Label
             {
                 Text = "➕ İzolasyon Sıvısı Stok Gir",
-                Font = new Font("Segoe UI", 18F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 16F, FontStyle.Bold),
                 ForeColor = ThemeColors.Primary,
                 AutoSize = true,
-                Location = new Point(30, yPos)
+                Location = new Point(20, yPos)
             };
             panel.Controls.Add(titleLabel);
             yPos += 50;
@@ -722,13 +765,13 @@ namespace ERP.UI.Forms
             var lblLiquidType = new Label
             {
                 Text = "Ürün Türü:",
-                Location = new Point(30, yPos),
+                Location = new Point(20, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold)
             };
             _cmbIzolasyonType = new ComboBox
             {
-                Location = new Point(190, yPos - 3),
+                Location = new Point(180, yPos - 3),
                 Width = controlWidth,
                 Height = controlHeight,
                 DropDownStyle = ComboBoxStyle.DropDownList,
@@ -745,13 +788,13 @@ namespace ERP.UI.Forms
             var lblQuantity = new Label
             {
                 Text = "Kilogram (kg):",
-                Location = new Point(30, yPos),
+                Location = new Point(20, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold)
             };
             _txtIzolasyonQuantity = new TextBox
             {
-                Location = new Point(190, yPos - 3),
+                Location = new Point(180, yPos - 3),
                 Width = controlWidth,
                 Height = controlHeight,
                 Font = new Font("Segoe UI", 10F)
@@ -764,7 +807,7 @@ namespace ERP.UI.Forms
             _btnIzolasyonSave = new Button
             {
                 Text = "💾 Kaydet",
-                Location = new Point(190, yPos),
+                Location = new Point(180, yPos),
                 Width = 150,
                 Height = 40,
                 BackColor = ThemeColors.Success,
@@ -775,8 +818,85 @@ namespace ERP.UI.Forms
             UIHelper.ApplyRoundedButton(_btnIzolasyonSave, 4);
             _btnIzolasyonSave.Click += BtnIzolasyonSave_Click;
             panel.Controls.Add(_btnIzolasyonSave);
+        }
 
-            tab.Controls.Add(panel);
+        private void CreateIzolasyonRightPanel(Panel panel)
+        {
+            int yPos = 30;
+            int labelWidth = 150;
+            int controlWidth = 250;
+            int controlHeight = 32;
+            int spacing = 40;
+
+            // Başlık
+            var titleLabel = new Label
+            {
+                Text = "➖ İzolasyon Sıvısı Sarfiyat",
+                Font = new Font("Segoe UI", 16F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(192, 57, 43),
+                AutoSize = true,
+                Location = new Point(20, yPos)
+            };
+            panel.Controls.Add(titleLabel);
+            yPos += 50;
+
+            // Ürün Türü
+            var lblConsumptionType = new Label
+            {
+                Text = "Ürün Türü:",
+                Location = new Point(20, yPos),
+                Width = labelWidth,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold)
+            };
+            _cmbIzolasyonConsumptionType = new ComboBox
+            {
+                Location = new Point(180, yPos - 3),
+                Width = controlWidth,
+                Height = controlHeight,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 10F)
+            };
+            _cmbIzolasyonConsumptionType.Items.Add("İzosiyanat");
+            _cmbIzolasyonConsumptionType.Items.Add("Poliol");
+            _cmbIzolasyonConsumptionType.Items.Add("MS Silikon");
+            panel.Controls.Add(lblConsumptionType);
+            panel.Controls.Add(_cmbIzolasyonConsumptionType);
+            yPos += spacing;
+
+            // Kilogram
+            var lblConsumptionKg = new Label
+            {
+                Text = "Kilogram (kg):",
+                Location = new Point(20, yPos),
+                Width = labelWidth,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold)
+            };
+            _txtIzolasyonConsumptionKg = new TextBox
+            {
+                Location = new Point(180, yPos - 3),
+                Width = controlWidth,
+                Height = controlHeight,
+                Font = new Font("Segoe UI", 10F)
+            };
+            panel.Controls.Add(lblConsumptionKg);
+            panel.Controls.Add(_txtIzolasyonConsumptionKg);
+            yPos += spacing + 20;
+
+            // Kaydet butonu
+            _btnIzolasyonConsumptionSave = new Button
+            {
+                Text = "💾 Kaydet",
+                Location = new Point(180, yPos),
+                Width = 150,
+                Height = 40,
+                BackColor = Color.FromArgb(192, 57, 43),
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            UIHelper.ApplyRoundedButton(_btnIzolasyonConsumptionSave, 4);
+            _btnIzolasyonConsumptionSave.Click += BtnIzolasyonConsumptionSave_Click;
+            panel.Controls.Add(_btnIzolasyonConsumptionSave);
         }
 
         private void BtnIzolasyonSave_Click(object sender, EventArgs e)
@@ -819,6 +939,73 @@ namespace ERP.UI.Forms
             catch (Exception ex)
             {
                 MessageBox.Show("İzolasyon sıvısı stoku kaydedilirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BtnIzolasyonConsumptionSave_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // Validasyon
+                if (_cmbIzolasyonConsumptionType.SelectedItem == null)
+                {
+                    MessageBox.Show("Lütfen ürün türü seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(_txtIzolasyonConsumptionKg.Text) || !decimal.TryParse(_txtIzolasyonConsumptionKg.Text, out decimal consumptionKg) || consumptionKg <= 0)
+                {
+                    MessageBox.Show("Lütfen geçerli bir kilogram değeri giriniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                string liquidType = _cmbIzolasyonConsumptionType.SelectedItem.ToString();
+
+                // Seçilen ürün türünden stok kontrolü
+                var stocks = _isolationStockRepository.GetAll()
+                    .Where(s => s.LiquidType == liquidType && s.Kilogram > 0)
+                    .OrderBy(s => s.EntryDate)
+                    .ToList();
+
+                decimal totalAvailableKg = stocks.Sum(s => s.Kilogram);
+
+                if (totalAvailableKg < consumptionKg)
+                {
+                    MessageBox.Show($"Yetersiz stok!\nGereken: {consumptionKg:F3} kg\nMevcut: {totalAvailableKg:F3} kg", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Stoktan tüketim yap (FIFO - First In First Out)
+                decimal remainingNeeded = consumptionKg;
+                foreach (var stock in stocks)
+                {
+                    if (remainingNeeded <= 0)
+                        break;
+
+                    decimal useKilogram = Math.Min(stock.Kilogram, remainingNeeded);
+                    stock.Kilogram -= useKilogram;
+
+                    if (stock.Kilogram <= 0)
+                    {
+                        _isolationStockRepository.Delete(stock.Id);
+                    }
+                    else
+                    {
+                        _isolationStockRepository.Update(stock);
+                    }
+
+                    remainingNeeded -= useKilogram;
+                }
+
+                MessageBox.Show($"{liquidType} sarfiyatı başarıyla kaydedildi!\nTüketilen: {consumptionKg:F3} kg", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                // Formu temizle
+                _cmbIzolasyonConsumptionType.SelectedIndex = -1;
+                _txtIzolasyonConsumptionKg.Text = "";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Sarfiyat kaydedilirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
