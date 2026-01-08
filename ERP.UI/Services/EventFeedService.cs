@@ -295,16 +295,42 @@ namespace ERP.UI.Services
             );
         }
 
+        // Paketleme talebi oluşturuldu
+        public static void PackagingRequestCreated(Guid packagingRequestId, Guid orderId, string orderNo)
+        {
+            CreateEvent(
+                "PackagingRequestCreated",
+                "Paketleme Emri Oluşturuldu",
+                $"{orderNo} siparişi için paketleme emri paylaşıldı",
+                "PackagingRequests",
+                packagingRequestId,
+                "PackagingRequest"
+            );
+        }
+
         // Paketleme tamamlandı
-        public static void PackagingCompleted(Guid packagingId, Guid orderId, string orderNo, int packagingCount)
+        public static void PackagingCompleted(Guid packagingRequestId, Guid orderId, string orderNo, int packagingCount)
         {
             CreateEvent(
                 "PackagingCompleted",
                 "Paketleme Tamamlandı",
                 $"{orderNo} siparişi için {packagingCount} adet paketleme tamamlandı, onay bekliyor",
                 "ProductionPlanning",
-                packagingId,
-                "Packaging"
+                packagingRequestId,
+                "PackagingRequest"
+            );
+        }
+
+        // Paketleme onaylandı
+        public static void PackagingApproved(Guid packagingRequestId, Guid orderId, string orderNo)
+        {
+            CreateEvent(
+                "PackagingApproved",
+                "Paketleme Onaylandı",
+                $"{orderNo} siparişi için paketleme onaylandı",
+                "PackagingRequests,ProductionPlanning",
+                packagingRequestId,
+                "PackagingRequest"
             );
         }
 

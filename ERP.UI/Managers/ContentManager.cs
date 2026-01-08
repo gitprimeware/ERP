@@ -724,6 +724,10 @@ namespace ERP.UI.Managers
             {
                 ShowForm("AssemblyRequests");
             }
+            else if (formTag == "PackagingRequests")
+            {
+                ShowForm("PackagingRequests");
+            }
             else if (formTag == "MRPReport")
             {
                 ShowForm("MRPReport");

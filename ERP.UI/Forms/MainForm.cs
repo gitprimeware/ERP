@@ -134,6 +134,10 @@ namespace ERP.UI.Forms
             {
                 _contentManager.ShowForm("AssemblyRequests");
             }
+            else if (formTag == "PackagingRequests")
+            {
+                _contentManager.ShowForm("PackagingRequests");
+            }
             else if (formTag == "StockTracking" || formTag == "RuloStokTakip" || formTag == "KesilmisStokTakip" || 
                      formTag == "PreslenmisStokTakip" || formTag == "KenetlenmisStokTakip")
             {

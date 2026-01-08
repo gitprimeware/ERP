@@ -83,6 +83,7 @@ namespace ERP.UI.Forms
         private AssemblyRepository _assemblyRepository;
         private IsolationRepository _isolationRepository;
         private PackagingRepository _packagingRepository;
+        private PackagingRequestRepository _packagingRequestRepository;
         private MachineRepository _machineRepository;
         private SerialNoRepository _serialNoRepository;
         private EmployeeRepository _employeeRepository;
@@ -117,6 +118,7 @@ namespace ERP.UI.Forms
             _assemblyRepository = new AssemblyRepository();
             _isolationRepository = new IsolationRepository();
             _packagingRepository = new PackagingRepository();
+            _packagingRequestRepository = new PackagingRequestRepository();
             _machineRepository = new MachineRepository();
             _serialNoRepository = new SerialNoRepository();
             _employeeRepository = new EmployeeRepository();
@@ -4133,6 +4135,12 @@ namespace ERP.UI.Forms
             btnOnayla.Location = new Point(buttonPanel.Width - 150, 5);
             buttonPanel.Controls.Add(btnOnayla);
 
+            // Paketlemeye Gönder butonu
+            var btnPaketlemeyeGonder = ButtonFactory.CreateActionButton("📦 Paketlemeye Gönder", ThemeColors.Primary, Color.White, 180, 35);
+            btnPaketlemeyeGonder.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnPaketlemeyeGonder.Location = new Point(buttonPanel.Width - 150 - 190, 5);
+            buttonPanel.Controls.Add(btnPaketlemeyeGonder);
+
             // DataGridView paneli
             var gridPanel = new Panel
             {
@@ -4210,6 +4218,7 @@ namespace ERP.UI.Forms
 
             // Event handler
             btnOnayla.Click += (s, e) => BtnPackagingOnayla_Click(dataGridView);
+            btnPaketlemeyeGonder.Click += (s, e) => BtnPaketlemeyeGonder_Click(dataGridView);
 
             // Verileri yükle
             LoadPackagingData(dataGridView);
@@ -4281,10 +4290,14 @@ namespace ERP.UI.Forms
                     EmployeeName = p.Employee != null ? $"{p.Employee.FirstName} {p.Employee.LastName}" : ""
                 }).ToList();
 
-                // Tamamlanmış izolasyon kayıtları (henüz paketlenmemiş olanlar)
+                // Paketleme talepleri oluşturulmuş izolasyon ID'lerini al
+                var packagingRequests = _packagingRequestRepository.GetByOrderId(_orderId);
+                var requestedIsolationIds = packagingRequests.Where(pr => pr.IsolationId.HasValue).Select(pr => pr.IsolationId.Value).ToList();
+                
+                // Tamamlanmış izolasyon kayıtları (henüz paketlenmemiş ve paketleme talebi oluşturulmamış olanlar)
                 var isolations = _isolationRepository.GetByOrderId(_orderId);
                 var packagedIsolationIds = packagings.Where(p => p.IsolationId.HasValue).Select(p => p.IsolationId.Value).ToList();
-                var unpackagedIsolations = isolations.Where(i => !packagedIsolationIds.Contains(i.Id)).ToList();
+                var unpackagedIsolations = isolations.Where(i => !packagedIsolationIds.Contains(i.Id) && !requestedIsolationIds.Contains(i.Id)).ToList();
                 
                 var pendingData = unpackagedIsolations.Select(i => new
                 {
@@ -4349,13 +4362,13 @@ namespace ERP.UI.Forms
             }
         }
 
-        private void BtnPackagingOnayla_Click(DataGridView dataGridView)
+        private void BtnPaketlemeyeGonder_Click(DataGridView dataGridView)
         {
             try
             {
                 if (dataGridView.SelectedRows.Count == 0)
                 {
-                    MessageBox.Show("Lütfen paketlenecek izolasyon kaydını seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("Lütfen paketlemeye gönderilecek izolasyon kaydını seçiniz.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
@@ -4386,6 +4399,14 @@ namespace ERP.UI.Forms
                 if (isolation == null)
                 {
                     MessageBox.Show("İzolasyon kaydı bulunamadı.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Bu izolasyon için zaten bir paketleme talebi var mı kontrol et
+                var existingRequests = _packagingRequestRepository.GetByOrderId(_orderId);
+                if (existingRequests.Any(r => r.IsolationId == isolationId && r.Status != "İptal"))
+                {
+                    MessageBox.Show("Bu izolasyon için zaten bir paketleme talebi mevcut.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
@@ -4460,21 +4481,8 @@ namespace ERP.UI.Forms
                         int packagingCount = (int)txtPackagingCount.Value;
                         int usedIsolationCount = isolation.IsolationCount;
 
-                        // Onaylama işlemi
-                        var result = MessageBox.Show(
-                            $"Paketleme yapılacak:\n\n" +
-                            $"Kullanılacak İzolasyon Adedi: {usedIsolationCount} adet\n" +
-                            $"Paketleme Adedi: {packagingCount} adet\n\n" +
-                            $"Paketlemek istediğinize emin misiniz?",
-                            "Paketleme Onayla",
-                            MessageBoxButtons.YesNo,
-                            MessageBoxIcon.Question);
-
-                        if (result != DialogResult.Yes)
-                            return;
-
-                        // Paketleme kaydı oluştur
-                        var packaging = new Packaging
+                        // Paketleme talebi oluştur
+                        var packagingRequest = new PackagingRequest
                         {
                             OrderId = isolation.OrderId,
                             IsolationId = isolation.Id,
@@ -4484,29 +4492,115 @@ namespace ERP.UI.Forms
                             Length = isolation.Length,
                             SerialNoId = isolation.SerialNoId,
                             MachineId = isolation.MachineId,
-                            PackagingCount = packagingCount,
-                            UsedAssemblyCount = usedIsolationCount, // İzolasyon adedi
-                            EmployeeId = isolation.EmployeeId,
-                            PackagingDate = DateTime.Now
+                            RequestedPackagingCount = packagingCount,
+                            UsedIsolationCount = usedIsolationCount,
+                            EmployeeId = isolation.EmployeeId, // İzolasyon işlemini yapan operatör
+                            Status = "Beklemede",
+                            RequestDate = DateTime.Now
                         };
-                        var packagingId = _packagingRepository.Insert(packaging);
+                        var requestId = _packagingRequestRepository.Insert(packagingRequest);
                         
                         // Event feed kaydı ekle
                         if (isolation.OrderId.HasValue)
                         {
-                            var orderForPackaging = _orderRepository.GetById(isolation.OrderId.Value);
-                            if (orderForPackaging != null)
+                            var orderForRequest = _orderRepository.GetById(isolation.OrderId.Value);
+                            if (orderForRequest != null)
                             {
-                                EventFeedService.PackagingCompleted(packagingId, isolation.OrderId.Value, orderForPackaging.TrexOrderNo, packagingCount);
+                                EventFeedService.PackagingRequestCreated(requestId, isolation.OrderId.Value, orderForRequest.TrexOrderNo);
                             }
                         }
                         
-                        MessageBox.Show("Paketleme işlemi tamamlandı!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        MessageBox.Show("Paketleme talebi oluşturuldu!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         
                         // Verileri yeniden yükle
                         LoadPackagingData(dataGridView);
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Paketleme talebi oluşturulurken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BtnPackagingOnayla_Click(DataGridView dataGridView)
+        {
+            try
+            {
+                // Bu siparişe ait "Tamamlandı" statusündeki paketleme taleplerini getir
+                var allRequests = _packagingRequestRepository.GetAll()
+                    .Where(r => r.OrderId == _orderId && r.Status == "Tamamlandı" && r.IsActive).ToList();
+                
+                // Bu siparişe ait tüm Packaging kayıtlarını al
+                var allPackagings = _packagingRepository.GetByOrderId(_orderId);
+                
+                // Henüz onaylanmamış talepleri filtrele
+                var pendingRequests = new List<PackagingRequest>();
+                foreach (var request in allRequests)
+                {
+                    // Bu talep için zaten bir Packaging kaydı var mı kontrol et
+                    bool alreadyApproved = allPackagings.Any(p => p.IsolationId == request.IsolationId);
+                    if (!alreadyApproved)
+                    {
+                        pendingRequests.Add(request);
+                    }
+                }
+
+                if (pendingRequests.Count == 0)
+                {
+                    MessageBox.Show("Onaylanacak paketleme talebi bulunmuyor.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                // İlk talebi seç (veya kullanıcıdan seçtirebilirsiniz)
+                var selectedRequest = pendingRequests.First();
+
+                // Onaylama işlemi
+                var result = MessageBox.Show(
+                    $"Paketleme talebi onaylanacak:\n\n" +
+                    $"İstenen Paketleme Adedi: {selectedRequest.RequestedPackagingCount} adet\n" +
+                    $"Yapılan Paketleme Adedi: {selectedRequest.ActualPackagingCount ?? selectedRequest.RequestedPackagingCount} adet\n" +
+                    $"Kullanılan İzolasyon Adedi: {selectedRequest.UsedIsolationCount ?? 0} adet\n\n" +
+                    $"Onaylamak istediğinize emin misiniz?",
+                    "Paketleme Talebi Onayla",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question);
+
+                if (result != DialogResult.Yes)
+                    return;
+
+                // Paketleme kaydı oluştur
+                var packaging = new Packaging
+                {
+                    OrderId = selectedRequest.OrderId,
+                    IsolationId = selectedRequest.IsolationId,
+                    PlateThickness = selectedRequest.PlateThickness,
+                    Hatve = selectedRequest.Hatve,
+                    Size = selectedRequest.Size,
+                    Length = selectedRequest.Length,
+                    SerialNoId = selectedRequest.SerialNoId,
+                    MachineId = selectedRequest.MachineId,
+                    PackagingCount = selectedRequest.ActualPackagingCount ?? selectedRequest.RequestedPackagingCount,
+                    UsedAssemblyCount = selectedRequest.UsedIsolationCount ?? 0,
+                    EmployeeId = selectedRequest.EmployeeId,
+                    PackagingDate = DateTime.Now
+                };
+                var packagingId = _packagingRepository.Insert(packaging);
+                
+                // Event feed kaydı ekle
+                if (selectedRequest.OrderId.HasValue)
+                {
+                    var orderForPackaging = _orderRepository.GetById(selectedRequest.OrderId.Value);
+                    if (orderForPackaging != null)
+                    {
+                        EventFeedService.PackagingApproved(selectedRequest.Id, selectedRequest.OrderId.Value, orderForPackaging.TrexOrderNo);
+                    }
+                }
+                
+                MessageBox.Show("Paketleme talebi onaylandı!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                
+                // Verileri yeniden yükle
+                LoadPackagingData(dataGridView);
             }
             catch (Exception ex)
             {

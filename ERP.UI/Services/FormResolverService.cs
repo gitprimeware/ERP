@@ -78,6 +78,7 @@ namespace ERP.UI.Services
             RegisterForm("ClampingRequests", typeof(ClampingRequestsForm), "Kenetleme Talepleri");
             RegisterForm("Clamping2Requests", typeof(Clamping2RequestsForm), "Kenetleme 2 Talepleri");
             RegisterForm("AssemblyRequests", typeof(AssemblyRequestsForm), "Montaj Talepleri");
+            RegisterForm("PackagingRequests", typeof(PackagingRequestsForm), "Paketleme Talepleri");
             RegisterForm("RuloStokTakip", typeof(RuloStokTakipForm), "Rulo Stok Takip");
             RegisterForm("KesilmisStokTakip", typeof(KesilmisStokTakipForm), "Kesilmiş Stok Takip");
             RegisterForm("PreslenmisStokTakip", typeof(PreslenmisStokTakipForm), "Preslenmiş Stok Takip");

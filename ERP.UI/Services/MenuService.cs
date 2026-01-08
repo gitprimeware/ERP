@@ -79,6 +79,8 @@ namespace ERP.UI.Services
                     return "Clamping2Requests";
                 case "AssemblyRequests":
                     return "AssemblyRequests";
+                case "PackagingRequests":
+                    return "PackagingRequests";
                 case "Consumption":
                     return "Consumption";
                 case "ConsumptionMaterialStock":
@@ -141,10 +143,11 @@ namespace ERP.UI.Services
                 new MenuItem("📋 Kenetleme Talepleri", "ClampingRequests", "📋", 7),
                 new MenuItem("📋 Kenetleme 2 Talepleri", "Clamping2Requests", "📋", 8),
                 new MenuItem("📋 Montaj Talepleri", "AssemblyRequests", "📋", 9),
+                new MenuItem("📦 Paketleme Talepleri", "PackagingRequests", "📦", 10),
                 consumptionItem,
                 consumptionMaterialStockItem,
                 reportsItem,
-                new MenuItem("⚙️ Ayarlar", "Settings", "⚙️", 11)
+                new MenuItem("⚙️ Ayarlar", "Settings", "⚙️", 12)
             };
         }
     }

@@ -39,6 +39,7 @@ namespace ERP.DAL
                     CreateAssemblyRequestsTable(connection);
                     CreateClamping2RequestsTable(connection);
                     CreateClamping2RequestItemsTable(connection);
+                    CreatePackagingRequestsTable(connection);
                     CreatePackagingsTable(connection);
                     CreateCoverStocksTable(connection);
                     CreateSideProfileStocksTable(connection);
@@ -1238,6 +1239,45 @@ namespace ERP.DAL
                         FOREIGN KEY ([OrderId]) REFERENCES [Orders]([Id]),
                         FOREIGN KEY ([SerialNoId]) REFERENCES [SerialNos]([Id]),
                         FOREIGN KEY ([ClampingId]) REFERENCES [Clampings]([Id]),
+                        FOREIGN KEY ([MachineId]) REFERENCES [Machines]([Id]),
+                        FOREIGN KEY ([EmployeeId]) REFERENCES [Employees]([Id])
+                    )
+                END";
+
+            using (var command = new SqlCommand(query, connection))
+            {
+                command.ExecuteNonQuery();
+            }
+        }
+
+        private static void CreatePackagingRequestsTable(SqlConnection connection)
+        {
+            var query = @"
+                IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[PackagingRequests]') AND type in (N'U'))
+                BEGIN
+                    CREATE TABLE [dbo].[PackagingRequests] (
+                        [Id] UNIQUEIDENTIFIER PRIMARY KEY,
+                        [OrderId] UNIQUEIDENTIFIER NULL,
+                        [IsolationId] UNIQUEIDENTIFIER NULL,
+                        [Hatve] DECIMAL(10,2) NOT NULL,
+                        [Size] DECIMAL(10,2) NOT NULL,
+                        [PlateThickness] DECIMAL(10,3) NOT NULL,
+                        [Length] DECIMAL(10,2) NOT NULL,
+                        [SerialNoId] UNIQUEIDENTIFIER NULL,
+                        [MachineId] UNIQUEIDENTIFIER NULL,
+                        [RequestedPackagingCount] INT NOT NULL,
+                        [ActualPackagingCount] INT NULL,
+                        [UsedIsolationCount] INT NULL,
+                        [EmployeeId] UNIQUEIDENTIFIER NULL,
+                        [Status] NVARCHAR(50) NOT NULL DEFAULT 'Beklemede',
+                        [RequestDate] DATETIME NOT NULL,
+                        [CompletionDate] DATETIME NULL,
+                        [CreatedDate] DATETIME NOT NULL,
+                        [ModifiedDate] DATETIME NULL,
+                        [IsActive] BIT NOT NULL DEFAULT 1,
+                        FOREIGN KEY ([OrderId]) REFERENCES [Orders]([Id]),
+                        FOREIGN KEY ([IsolationId]) REFERENCES [Isolations]([Id]),
+                        FOREIGN KEY ([SerialNoId]) REFERENCES [SerialNos]([Id]),
                         FOREIGN KEY ([MachineId]) REFERENCES [Machines]([Id]),
                         FOREIGN KEY ([EmployeeId]) REFERENCES [Employees]([Id])
                     )
