@@ -196,7 +196,7 @@ namespace ERP.UI.Managers
             }
         }
 
-        // Üretimden siparişe dön (Status: "Üretimde" → "Yeni")
+        // Üretimden siparişe dön (Status: "Üretimde" → "Fatura Kesimi Bekliyor")
         private void HandleReturnToOrderFromProduction(Guid orderId)
         {
             try
@@ -206,11 +206,14 @@ namespace ERP.UI.Managers
                 
                 if (order != null)
                 {
-                    // Status'u "Yeni" yap (üretim tamamlandı, siparişe döndü)
-                    order.Status = "Yeni";
+                    // Status'u "Fatura Kesimi Bekliyor" yap (üretim tamamlandı, fatura kesimi bekliyor)
+                    order.Status = "Fatura Kesimi Bekliyor";
                     orderRepository.Update(order);
                     
-                    MessageBox.Show($"Sipariş {order.TrexOrderNo} siparişe döndürüldü.", 
+                    // Event feed kaydı ekle - Siparişteki arkadaşa bildirim
+                    EventFeedService.OrderReturnedFromProduction(orderId, order.TrexOrderNo);
+                    
+                    MessageBox.Show($"Sipariş {order.TrexOrderNo} siparişe döndürüldü (Fatura Kesimi Bekliyor).", 
                         "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     
                     // Üretim listesini yenile
@@ -223,7 +226,7 @@ namespace ERP.UI.Managers
             }
         }
 
-        // Siparişten muhasebeye gönder (Status: "Yeni" → "Muhasebede")
+        // Siparişten muhasebeye gönder (Status: "Yeni" veya "Fatura Kesimi Bekliyor" → "Muhasebede")
         private void HandleSendToAccountingFromOrder(Guid orderId)
         {
             try
@@ -590,7 +593,7 @@ namespace ERP.UI.Managers
                     order.Status = "Sevkiyata Hazır";
                     orderRepository.Update(order);
                     
-                    // Event feed kaydı ekle
+                    // Event feed kaydı ekle - Siparişteki arkadaşa bildirim
                     EventFeedService.OrderReadyForShipment(orderId, order.TrexOrderNo);
                     
                     MessageBox.Show($"Sipariş {order.TrexOrderNo} siparişe döndürüldü (Sevkiyata Hazır).", 

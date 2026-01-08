@@ -72,13 +72,25 @@ namespace ERP.UI.Services
             );
         }
 
+        public static void OrderReturnedFromProduction(Guid orderId, string orderNo)
+        {
+            CreateEvent(
+                "OrderReturnedFromProduction",
+                "Sipariş Üretimden Döndü",
+                $"{orderNo} siparişi üretimden döndü, fatura kesimi bekliyor",
+                "OrderEntry",
+                orderId,
+                "Order"
+            );
+        }
+
         public static void OrderReadyForShipment(Guid orderId, string orderNo)
         {
             CreateEvent(
                 "OrderReadyForShipment",
                 "Sipariş Sevkiyata Hazır",
                 $"{orderNo} siparişi sevkiyata hazır durumuna getirildi",
-                "Accounting",
+                "OrderEntry,Accounting",
                 orderId,
                 "Order"
             );

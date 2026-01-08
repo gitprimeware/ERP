@@ -30,7 +30,7 @@ namespace ERP.Core.Models
         public DateTime? ShipmentDate { get; set; } // Sevk tarihi
         public decimal? CurrencyRate { get; set; } // Kur - Readonly
         
-        public string Status { get; set; } = "Yeni"; // Sipariş durumu (Yeni, Onaylandı, Üretimde, Tamamlandı, İptal)
+        public string Status { get; set; } = "Yeni"; // Sipariş durumu (Yeni, Fatura Kesimi Bekliyor, Üretimde, Muhasebede, Sevkiyata Hazır, Tamamlandı, İptal)
         
         public bool IsStockOrder { get; set; } = false; // Stok siparişi mi? (Stok siparişleri sadece kesim ve press işlemlerine kadar ilerler)
         

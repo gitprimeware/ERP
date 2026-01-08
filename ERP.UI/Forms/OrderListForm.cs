@@ -548,17 +548,18 @@ namespace ERP.UI.Forms
                         {
                             bool isReadyForShipment = order.Status == "Sevkiyata Hazır";
                             bool isNew = order.Status == "Yeni";
+                            bool isFaturaKesimiBekliyor = order.Status == "Fatura Kesimi Bekliyor";
                             var btnCell = row.Cells["Actions"] as DataGridViewButtonCell;
                             if (btnCell != null)
                             {
-                                // Sadece emoji'ler - Soldan sağa: Ayrıntılar, İş Emri, Üretim, Silme
+                                // Sadece emoji'ler - Soldan sağa: Ayrıntılar, İş Emri, Üretim, Muhasebe, Silme
                                 if (isReadyForShipment)
                                 {
                                     btnCell.Value = "📋 📄 🗑️"; // Detay, İş Emri, Sil (Üretime gönder yok)
                                 }
-                                else if (isNew)
+                                else if (isNew || isFaturaKesimiBekliyor)
                                 {
-                                    btnCell.Value = "📋 📄 🏭 🗑️"; // Detay, İş Emri, Üretim, Sil
+                                    btnCell.Value = "📋 📄 🏭 💰 🗑️"; // Detay, İş Emri, Üretim, Muhasebe, Sil
                                 }
                                 else
                                 {
@@ -589,9 +590,10 @@ namespace ERP.UI.Forms
                 var order = orders[e.RowIndex];
                 bool isReadyForShipment = order.Status == "Sevkiyata Hazır";
                 bool isNew = order.Status == "Yeni";
+                bool isFaturaKesimiBekliyor = order.Status == "Fatura Kesimi Bekliyor";
                 
-                // Emoji sayısını belirle - "Yeni" durumunda 5 buton (Detay, İş Emri, Üretime Gönder, Muhasebeye Gönder, Sil)
-                int emojiCount = isNew ? 5 : 3;
+                // Emoji sayısını belirle - "Yeni" veya "Fatura Kesimi Bekliyor" durumunda 5 buton (Detay, İş Emri, Üretime Gönder, Muhasebeye Gönder, Sil)
+                int emojiCount = (isNew || isFaturaKesimiBekliyor) ? 5 : 3;
 
                 // İşlemler kolonuna tıklandı
                 if (_dataGridView.Columns[e.ColumnIndex].Name == "Actions")
@@ -603,9 +605,9 @@ namespace ERP.UI.Forms
 
                     int emojiIndex = (int)(clickX / emojiWidth);
 
-                    if (isNew)
+                    if (isNew || isFaturaKesimiBekliyor)
                     {
-                        // 📋 📄 🏭 💰 🗑️ - "Yeni" durumunda 5 buton (Detay, İş Emri, Üretime Gönder, Muhasebeye Gönder, Sil)
+                        // 📋 📄 🏭 💰 🗑️ - "Yeni" veya "Fatura Kesimi Bekliyor" durumunda 5 buton (Detay, İş Emri, Üretime Gönder, Muhasebeye Gönder, Sil)
                         // emojiCount zaten üstte 5 olarak hesaplanmış, emojiIndex de doğru hesaplanmış
                         switch (emojiIndex)
                         {
@@ -615,15 +617,18 @@ namespace ERP.UI.Forms
                             case 1: // 📄 İş Emri Al
                                 OrderGetWorkOrderRequested?.Invoke(this, order.Id);
                                 break;
-                            case 2: // 🏭 Üretime Gönder
-                                var resultProduction = MessageBox.Show(
-                                    $"Sipariş {order.TrexOrderNo} üretime gönderilecek. Emin misiniz?",
-                                    "Üretime Gönder",
-                                    MessageBoxButtons.YesNo,
-                                    MessageBoxIcon.Question);
-                                if (resultProduction == DialogResult.Yes)
+                            case 2: // 🏭 Üretime Gönder (sadece "Yeni" durumunda aktif)
+                                if (isNew)
                                 {
-                                    OrderSendToProductionRequested?.Invoke(this, order.Id);
+                                    var resultProduction = MessageBox.Show(
+                                        $"Sipariş {order.TrexOrderNo} üretime gönderilecek. Emin misiniz?",
+                                        "Üretime Gönder",
+                                        MessageBoxButtons.YesNo,
+                                        MessageBoxIcon.Question);
+                                    if (resultProduction == DialogResult.Yes)
+                                    {
+                                        OrderSendToProductionRequested?.Invoke(this, order.Id);
+                                    }
                                 }
                                 break;
                             case 3: // 💰 Muhasebeye Gönder
@@ -815,6 +820,7 @@ namespace ERP.UI.Forms
 
             // Sadece "Yeni" durumunda Üretime Gönder butonu göster
             bool isNew = order.Status == "Yeni";
+            bool isFaturaKesimiBekliyor = order.Status == "Fatura Kesimi Bekliyor";
             var btnSendToProduction = ButtonFactory.CreateActionButton("🏭", ThemeColors.Warning, Color.White, 70, 30);
             btnSendToProduction.Location = new Point(165, yPos);
             if (!isNew)
@@ -839,8 +845,34 @@ namespace ERP.UI.Forms
                 };
             }
 
+            // "Fatura Kesimi Bekliyor" durumunda Muhasebeye Gönder butonu göster
+            var btnSendToAccounting = ButtonFactory.CreateActionButton("💰", ThemeColors.Accent, Color.White, 70, 30);
+            btnSendToAccounting.Location = new Point(240, yPos);
+            if (!isFaturaKesimiBekliyor)
+            {
+                // "Fatura Kesimi Bekliyor" değilse butonu gizle
+                btnSendToAccounting.Visible = false;
+            }
+            else
+            {
+                btnSendToAccounting.Click += (s, e) =>
+                {
+                    var result = MessageBox.Show(
+                        $"Sipariş {order.TrexOrderNo} muhasebeye gönderilecek. Emin misiniz?",
+                        "Muhasebeye Gönder",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Question);
+
+                    if (result == DialogResult.Yes)
+                    {
+                        OrderSendToAccountingRequested?.Invoke(this, order.Id);
+                    }
+                };
+                card.Controls.Add(btnSendToAccounting);
+            }
+
             var btnDelete = ButtonFactory.CreateActionButton("🗑️", ThemeColors.Error, Color.White, 70, 30);
-            btnDelete.Location = new Point(240, yPos);
+            btnDelete.Location = new Point(isFaturaKesimiBekliyor ? 315 : 240, yPos);
             btnDelete.Click += (s, e) =>
             {
                 var result = MessageBox.Show(
@@ -916,6 +948,7 @@ namespace ERP.UI.Forms
             return status switch
             {
                 "Yeni" => ThemeColors.Info,
+                "Fatura Kesimi Bekliyor" => ThemeColors.Warning,
                 "Üretimde" => ThemeColors.Warning,
                 "Muhasebede" => ThemeColors.Accent,
                 "Sevkiyata Hazır" => ThemeColors.Secondary,
