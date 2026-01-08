@@ -18,6 +18,7 @@ namespace ERP.UI.Forms
         private Button _btnRefresh;
         private System.Windows.Forms.Timer _refreshTimer;
         private Label _lblLastRefresh;
+        private CheckBox _chkShowUnreadOnly;
 
         public EventFeedForm()
         {
@@ -25,9 +26,9 @@ namespace ERP.UI.Forms
             InitializeCustomComponents();
             LoadEvents();
             
-            // 15 saniyede bir otomatik yenile
+            // 30 saniyede bir otomatik yenile
             _refreshTimer = new System.Windows.Forms.Timer();
-            _refreshTimer.Interval = 15000; // 15 saniye
+            _refreshTimer.Interval = 30000; // 30 saniye
             _refreshTimer.Tick += (s, e) => 
             {
                 LoadEvents();
@@ -65,7 +66,17 @@ namespace ERP.UI.Forms
             };
             _mainPanel.Controls.Add(titleLabel);
 
-            // Yenile butonu
+            // Son yenileme zamanı label'ı - Sağ üste
+            _lblLastRefresh = new Label
+            {
+                Text = "Son yenileme: " + DateTime.Now.ToString("HH:mm:ss"),
+                Font = new Font("Segoe UI", 9F),
+                ForeColor = ThemeColors.TextSecondary,
+                AutoSize = true
+            };
+            _mainPanel.Controls.Add(_lblLastRefresh);
+
+            // Yenile butonu - Sağ üste
             _btnRefresh = new Button
             {
                 Text = "🔄 Yenile",
@@ -73,7 +84,6 @@ namespace ERP.UI.Forms
                 ForeColor = Color.White,
                 BackColor = ThemeColors.Primary,
                 Size = new Size(100, 35),
-                Location = new Point(30, 80),
                 Cursor = Cursors.Hand
             };
             UIHelper.ApplyRoundedButton(_btnRefresh, 4);
@@ -84,23 +94,51 @@ namespace ERP.UI.Forms
             };
             _mainPanel.Controls.Add(_btnRefresh);
 
-            // Son yenileme zamanı label'ı
-            _lblLastRefresh = new Label
+            // Sadece okunmayanları göster checkbox'ı - Yenile butonunun soluna
+            _chkShowUnreadOnly = new CheckBox
             {
-                Text = "Son yenileme: " + DateTime.Now.ToString("HH:mm:ss"),
+                Text = "Sadece Okunmayanlar",
                 Font = new Font("Segoe UI", 9F),
-                ForeColor = ThemeColors.TextSecondary,
-                AutoSize = true,
-                Location = new Point(140, 88)
+                ForeColor = ThemeColors.TextPrimary,
+                AutoSize = true
             };
-            _mainPanel.Controls.Add(_lblLastRefresh);
+            _chkShowUnreadOnly.CheckedChanged += (s, e) =>
+            {
+                LoadEvents();
+            };
+            _mainPanel.Controls.Add(_chkShowUnreadOnly);
 
-            // Events panel
+            // Yenile butonu, checkbox ve son yenileme label'ının konumunu ayarla
+            _mainPanel.Resize += (s, e) =>
+            {
+                using (var g = _mainPanel.CreateGraphics())
+                {
+                    var refreshTextSize = TextRenderer.MeasureText(g, _lblLastRefresh.Text, _lblLastRefresh.Font);
+                    var checkboxSize = TextRenderer.MeasureText(g, _chkShowUnreadOnly.Text, _chkShowUnreadOnly.Font);
+                    
+                    _btnRefresh.Location = new Point(_mainPanel.Width - 110, 30);
+                    _lblLastRefresh.Location = new Point(_mainPanel.Width - refreshTextSize.Width - 120, 38);
+                    _chkShowUnreadOnly.Location = new Point(_btnRefresh.Location.X - checkboxSize.Width - 25, 38);
+                }
+            };
+
+            // İlk konumlandırma
+            using (var g = _mainPanel.CreateGraphics())
+            {
+                var refreshTextSize = TextRenderer.MeasureText(g, _lblLastRefresh.Text, _lblLastRefresh.Font);
+                var checkboxSize = TextRenderer.MeasureText(g, _chkShowUnreadOnly.Text, _chkShowUnreadOnly.Font);
+                
+                _btnRefresh.Location = new Point(_mainPanel.Width - 110, 30);
+                _lblLastRefresh.Location = new Point(_mainPanel.Width - refreshTextSize.Width - 120, 38);
+                _chkShowUnreadOnly.Location = new Point(_btnRefresh.Location.X - checkboxSize.Width - 25, 38);
+            }
+
+            // Events panel - Daha yukarıdan başlasın
             _eventsPanel = new FlowLayoutPanel
             {
-                Location = new Point(30, 130),
+                Location = new Point(30, 80),
                 Width = _mainPanel.Width - 60,
-                Height = _mainPanel.Height - 160,
+                Height = _mainPanel.Height - 110,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
                 AutoScroll = true,
                 FlowDirection = FlowDirection.TopDown,
@@ -114,7 +152,7 @@ namespace ERP.UI.Forms
             _mainPanel.Resize += (s, e) =>
             {
                 _eventsPanel.Width = _mainPanel.Width - 60;
-                _eventsPanel.Height = _mainPanel.Height - 160;
+                _eventsPanel.Height = _mainPanel.Height - 110;
             };
 
             this.Controls.Add(_mainPanel);
@@ -142,13 +180,21 @@ namespace ERP.UI.Forms
                 var user = UserSessionService.CurrentUser;
                 var events = _eventFeedRepository.GetByUserPermissions(user.Id, user.IsAdmin, limit: 100);
 
+                // Sadece okunmayanları göster filtresi
+                if (_chkShowUnreadOnly != null && _chkShowUnreadOnly.Checked)
+                {
+                    events = events.Where(e => !e.IsRead).ToList();
+                }
+
                 _eventsPanel.Controls.Clear();
 
                 if (events.Count == 0)
                 {
                     var noEventsLabel = new Label
                     {
-                        Text = "Henüz olay bulunmuyor",
+                        Text = _chkShowUnreadOnly != null && _chkShowUnreadOnly.Checked 
+                            ? "Okunmayan olay bulunmuyor" 
+                            : "Henüz olay bulunmuyor",
                         Font = new Font("Segoe UI", 12F),
                         ForeColor = ThemeColors.TextSecondary,
                         AutoSize = true,
@@ -173,11 +219,14 @@ namespace ERP.UI.Forms
 
         private Panel CreateEventCard(EventFeed eventItem)
         {
+            // Okunanları gri, okunmayanları beyaz yap
+            var cardBackColor = eventItem.IsRead ? Color.FromArgb(245, 245, 245) : Color.White;
+            
             var card = new Panel
             {
                 Width = _eventsPanel.Width - 40,
-                Height = 80,
-                BackColor = Color.White,
+                Height = 100, // Butonlar için yüksekliği artırdık
+                BackColor = cardBackColor,
                 Padding = new Padding(15),
                 Cursor = Cursors.Hand
             };
@@ -194,11 +243,14 @@ namespace ERP.UI.Forms
                 }
             };
 
-            // Hover efekti
+            // Hover efekti - Okunmuşsa biraz daha açık gri, okunmamışsa hafif gri
             var originalBackColor = card.BackColor;
             card.MouseEnter += (s, e) =>
             {
-                card.BackColor = Color.FromArgb(250, 250, 250);
+                if (eventItem.IsRead)
+                    card.BackColor = Color.FromArgb(235, 235, 235);
+                else
+                    card.BackColor = Color.FromArgb(250, 250, 250);
             };
             card.MouseLeave += (s, e) =>
             {
@@ -217,13 +269,13 @@ namespace ERP.UI.Forms
             };
             card.Controls.Add(accentLine);
 
-            // Tarih - Sağ üste
+            // Tarih - Sağ üste (okunmuşsa daha soluk)
             var dateText = eventItem.EventDate.ToString("dd.MM.yyyy HH:mm");
             var dateLabel = new Label
             {
                 Text = dateText,
                 Font = new Font("Segoe UI", 9F),
-                ForeColor = ThemeColors.TextSecondary,
+                ForeColor = eventItem.IsRead ? Color.FromArgb(180, 180, 180) : ThemeColors.TextSecondary,
                 AutoSize = true
             };
             card.Controls.Add(dateLabel);
@@ -234,12 +286,12 @@ namespace ERP.UI.Forms
                 dateLabel.Location = new Point(card.Width - dateSize.Width - 15, 15);
             }
 
-            // Başlık - Tarih için yer bırakarak
+            // Başlık - Tarih için yer bırakarak (okunmuşsa daha soluk)
             var titleLabel = new Label
             {
                 Text = eventItem.Title,
                 Font = new Font("Segoe UI", 14F, FontStyle.Bold),
-                ForeColor = ThemeColors.TextPrimary,
+                ForeColor = eventItem.IsRead ? Color.FromArgb(150, 150, 150) : ThemeColors.TextPrimary,
                 AutoSize = false,
                 Location = new Point(19, 15),
                 Width = card.Width - dateLabel.Width - 50,
@@ -247,18 +299,88 @@ namespace ERP.UI.Forms
             };
             card.Controls.Add(titleLabel);
 
-            // Mesaj
+            // Mesaj (okunmuşsa daha soluk)
             var messageLabel = new Label
             {
                 Text = eventItem.Message,
                 Font = new Font("Segoe UI", 10F),
-                ForeColor = ThemeColors.TextSecondary,
+                ForeColor = eventItem.IsRead ? Color.FromArgb(180, 180, 180) : ThemeColors.TextSecondary,
                 AutoSize = false,
                 Location = new Point(19, 45),
-                Width = card.Width - 39,
+                Width = card.Width - 260, // Butonlar için yer bırak (3 buton için)
                 Height = 30
             };
             card.Controls.Add(messageLabel);
+
+            // Okundu/Okunmadı/Sil butonları - Sağ alta
+            var btnRead = new Button
+            {
+                Text = "✓ Okundu",
+                Font = new Font("Segoe UI", 8F),
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(46, 204, 113),
+                Size = new Size(70, 25),
+                Location = new Point(card.Width - 250, card.Height - 35),
+                Cursor = Cursors.Hand,
+                FlatStyle = FlatStyle.Flat,
+                Enabled = !eventItem.IsRead // Okunmuşsa devre dışı (okunmamışsa aktif)
+            };
+            btnRead.FlatAppearance.BorderSize = 0;
+            UIHelper.ApplyRoundedButton(btnRead, 4);
+            btnRead.Click += (s, e) =>
+            {
+                MarkAsRead(eventItem.Id);
+            };
+            card.Controls.Add(btnRead);
+
+            var btnUnread = new Button
+            {
+                Text = "✗ Okunmadı",
+                Font = new Font("Segoe UI", 8F),
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(192, 57, 43),
+                Size = new Size(75, 25),
+                Location = new Point(card.Width - 170, card.Height - 35),
+                Cursor = Cursors.Hand,
+                FlatStyle = FlatStyle.Flat,
+                Enabled = eventItem.IsRead // Okunmamışsa devre dışı (okunmuşsa aktif)
+            };
+            btnUnread.FlatAppearance.BorderSize = 0;
+            UIHelper.ApplyRoundedButton(btnUnread, 4);
+            btnUnread.Click += (s, e) =>
+            {
+                MarkAsUnread(eventItem.Id);
+            };
+            card.Controls.Add(btnUnread);
+
+            // Sil butonu
+            var btnDelete = new Button
+            {
+                Text = "🗑️ Sil",
+                Font = new Font("Segoe UI", 8F),
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(127, 140, 141),
+                Size = new Size(60, 25),
+                Location = new Point(card.Width - 85, card.Height - 35),
+                Cursor = Cursors.Hand,
+                FlatStyle = FlatStyle.Flat
+            };
+            btnDelete.FlatAppearance.BorderSize = 0;
+            UIHelper.ApplyRoundedButton(btnDelete, 4);
+            btnDelete.Click += (s, e) =>
+            {
+                var result = MessageBox.Show(
+                    "Bu bildirimi silmek istediğinizden emin misiniz?",
+                    "Bildirimi Sil",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question);
+                
+                if (result == DialogResult.Yes)
+                {
+                    DeleteEvent(eventItem.Id);
+                }
+            };
+            card.Controls.Add(btnDelete);
 
             // Kart yeniden boyutlandığında tarih konumunu ve label genişliklerini güncelle
             card.Resize += (s, e) =>
@@ -269,17 +391,42 @@ namespace ERP.UI.Forms
                     dateLabel.Location = new Point(card.Width - dateSize.Width - 15, 15);
                 }
                 titleLabel.Width = card.Width - dateLabel.Width - 50;
-                messageLabel.Width = card.Width - 39;
+                messageLabel.Width = card.Width - 260; // Butonlar için yer bırak (3 buton için)
+                btnRead.Location = new Point(card.Width - 250, card.Height - 35);
+                btnUnread.Location = new Point(card.Width - 170, card.Height - 35);
+                btnDelete.Location = new Point(card.Width - 85, card.Height - 35);
             };
 
-            // Tıklama olayı - ilgili sayfaya yönlendir
-            card.Click += (s, e) => HandleEventClick(eventItem);
+            // Butonların tıklama olaylarını card click'inden ayır - Tag kullanarak
+            btnRead.Tag = "Button";
+            btnUnread.Tag = "Button";
+            btnDelete.Tag = "Button";
 
-            // Tüm child kontrollere de tıklama olayını ekle
+            // Tıklama olayı - ilgili sayfaya yönlendir (butonlar hariç)
+            card.Click += (s, e) => 
+            {
+                // Butonlara tıklanmadıysa
+                var mousePos = card.PointToClient(Control.MousePosition);
+                if (!btnRead.Bounds.Contains(mousePos) && !btnUnread.Bounds.Contains(mousePos) && !btnDelete.Bounds.Contains(mousePos))
+                {
+                    HandleEventClick(eventItem);
+                }
+            };
+
+            // Tüm child kontrollere de tıklama olayını ekle (butonlar hariç)
             foreach (Control control in card.Controls)
             {
-                control.Click += (s, e) => HandleEventClick(eventItem);
-                control.Cursor = Cursors.Hand;
+                if (control != btnRead && control != btnUnread && control != btnDelete && control != accentLine)
+                {
+                    control.Click += (s, e) => 
+                    {
+                        // Eğer buton tıklanmışsa işlem yapma
+                        if (s is Control ctrl && ctrl.Tag?.ToString() == "Button")
+                            return;
+                        HandleEventClick(eventItem);
+                    };
+                    control.Cursor = Cursors.Hand;
+                }
             }
 
             return card;
@@ -345,6 +492,63 @@ namespace ERP.UI.Forms
             if (_lblLastRefresh != null)
             {
                 _lblLastRefresh.Text = "Son yenileme: " + DateTime.Now.ToString("HH:mm:ss");
+            }
+        }
+
+        private void MarkAsRead(Guid eventFeedId)
+        {
+            try
+            {
+                if (!UserSessionService.IsLoggedIn)
+                    return;
+
+                var user = UserSessionService.CurrentUser;
+                _eventFeedRepository.MarkAsRead(eventFeedId, user.Id);
+                
+                // Event'leri yeniden yükle
+                LoadEvents();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Okundu olarak işaretlenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void MarkAsUnread(Guid eventFeedId)
+        {
+            try
+            {
+                if (!UserSessionService.IsLoggedIn)
+                    return;
+
+                var user = UserSessionService.CurrentUser;
+                _eventFeedRepository.MarkAsUnread(eventFeedId, user.Id);
+                
+                // Event'leri yeniden yükle
+                LoadEvents();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Okunmadı olarak işaretlenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void DeleteEvent(Guid eventFeedId)
+        {
+            try
+            {
+                if (!UserSessionService.IsLoggedIn)
+                    return;
+
+                var user = UserSessionService.CurrentUser;
+                _eventFeedRepository.Delete(eventFeedId, user.Id);
+                
+                // Event'leri yeniden yükle
+                LoadEvents();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Bildirim silinirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

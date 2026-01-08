@@ -121,6 +121,40 @@ namespace ERP.DAL.Repositories
             }
         }
 
+        public void MarkAsUnread(Guid eventFeedId, Guid userId)
+        {
+            using (var connection = DatabaseHelper.GetConnection())
+            {
+                connection.Open();
+                var query = @"UPDATE EventFeeds SET IsRead = 0, ModifiedDate = @ModifiedDate 
+                             WHERE Id = @Id";
+                
+                using (var command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@Id", eventFeedId);
+                    command.Parameters.AddWithValue("@ModifiedDate", DateTime.Now);
+                    command.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public void Delete(Guid eventFeedId, Guid userId)
+        {
+            using (var connection = DatabaseHelper.GetConnection())
+            {
+                connection.Open();
+                var query = @"UPDATE EventFeeds SET IsActive = 0, ModifiedDate = @ModifiedDate 
+                             WHERE Id = @Id";
+                
+                using (var command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@Id", eventFeedId);
+                    command.Parameters.AddWithValue("@ModifiedDate", DateTime.Now);
+                    command.ExecuteNonQuery();
+                }
+            }
+        }
+
         private void AddEventFeedParameters(SqlCommand command, EventFeed eventFeed)
         {
             command.Parameters.AddWithValue("@Id", eventFeed.Id);
