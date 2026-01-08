@@ -19,6 +19,7 @@ namespace ERP.UI.Forms
         private OrderRepository _orderRepository;
         private CompanyRepository _companyRepository;
         private AssemblyRepository _assemblyRepository;
+        private AssemblyRequestRepository _assemblyRequestRepository;
         private PackagingRepository _packagingRepository;
         private ClampingRequestRepository _clampingRequestRepository;
         private bool _isTableView = true; // Default tablo görünümü
@@ -46,6 +47,7 @@ namespace ERP.UI.Forms
             _orderRepository = new OrderRepository();
             _companyRepository = new CompanyRepository();
             _assemblyRepository = new AssemblyRepository();
+            _assemblyRequestRepository = new AssemblyRequestRepository();
             _packagingRepository = new PackagingRepository();
             _clampingRequestRepository = new ClampingRequestRepository();
             _actionToolTip = new ToolTip();
@@ -98,16 +100,17 @@ namespace ERP.UI.Forms
             var colorLegendPanel = new Panel
             {
                 Location = new Point(120, 12),
-                Width = 400,
+                Width = 550,
                 Height = 25,
                 BackColor = Color.Transparent
             };
             
             var legendItems = new[]
             {
-                new { Color = Color.FromArgb(244, 67, 54), Text = "İşlem Yok" },
-                new { Color = Color.FromArgb(255, 193, 7), Text = "Kenetleme" },
-                new { Color = Color.FromArgb(33, 150, 243), Text = "Paketleme" },
+                new { Color = Color.FromArgb(244, 67, 54), Text = "Bekliyor" },
+                new { Color = Color.FromArgb(255, 193, 7), Text = "Kenetli" },
+                new { Color = Color.FromArgb(33, 150, 243), Text = "Montajlı" },
+                new { Color = Color.FromArgb(156, 39, 176), Text = "Paketli" },
                 new { Color = Color.FromArgb(76, 175, 80), Text = "Gönderildi" }
             };
             
@@ -1152,26 +1155,38 @@ namespace ERP.UI.Forms
                     var packagings = _packagingRepository.GetByOrderId(orderId);
                     bool hasCompletedPackaging = packagings.Any(p => p.IsActive);
                     
-                    // Paketleme yapılmışsa mavi
+                    // Paketleme yapılmışsa mor
                     if (hasCompletedPackaging)
                     {
-                        rowColor = Color.FromArgb(120, 33, 150, 243); // Mavi - Paketleme
+                        rowColor = Color.FromArgb(120, 156, 39, 176); // Mor - Paketli
                     }
                     else
                     {
-                        // Kenetleme işlemi yapılmış mı kontrol et
-                        var clampingRequests = _clampingRequestRepository.GetByOrderId(orderId);
-                        bool hasClamping = clampingRequests.Any(cr => cr.IsActive);
+                        // Montaj işlemi yapılmış mı kontrol et
+                        var assemblyRequests = _assemblyRequestRepository.GetByOrderId(orderId);
+                        bool hasAssembly = assemblyRequests.Any(ar => ar.IsActive);
                         
-                        // Kenetleme yapılmışsa sarı
-                        if (hasClamping)
+                        // Montaj yapılmışsa mavi
+                        if (hasAssembly)
                         {
-                            rowColor = Color.FromArgb(120, 255, 193, 7); // Sarı - Kenetleme
+                            rowColor = Color.FromArgb(120, 33, 150, 243); // Mavi - Montajlı
                         }
                         else
                         {
-                            // Hiç işlem yapılmamışsa kırmızı
-                            rowColor = Color.FromArgb(120, 244, 67, 54); // Kırmızı - İşlem Yok
+                            // Kenetleme işlemi yapılmış mı kontrol et
+                            var clampingRequests = _clampingRequestRepository.GetByOrderId(orderId);
+                            bool hasClamping = clampingRequests.Any(cr => cr.IsActive);
+                            
+                            // Kenetleme yapılmışsa sarı
+                            if (hasClamping)
+                            {
+                                rowColor = Color.FromArgb(120, 255, 193, 7); // Sarı - Kenetli
+                            }
+                            else
+                            {
+                                // Hiç işlem yapılmamışsa kırmızı
+                                rowColor = Color.FromArgb(120, 244, 67, 54); // Kırmızı - Bekliyor
+                            }
                         }
                     }
                 }
@@ -1346,26 +1361,38 @@ namespace ERP.UI.Forms
                         var packagings = _packagingRepository.GetByOrderId(orderId);
                         bool hasCompletedPackaging = packagings.Any(p => p.IsActive);
                         
-                        // Paketleme yapılmışsa mavi
+                        // Paketleme yapılmışsa mor
                         if (hasCompletedPackaging)
                         {
-                            rowBgColor = Color.FromArgb(120, 33, 150, 243); // Mavi - Paketleme
+                            rowBgColor = Color.FromArgb(120, 156, 39, 176); // Mor - Paketli
                         }
                         else
                         {
-                            // Kenetleme işlemi yapılmış mı kontrol et
-                            var clampingRequests = _clampingRequestRepository.GetByOrderId(orderId);
-                            bool hasClamping = clampingRequests.Any(cr => cr.IsActive);
+                            // Montaj işlemi yapılmış mı kontrol et
+                            var assemblyRequests = _assemblyRequestRepository.GetByOrderId(orderId);
+                            bool hasAssembly = assemblyRequests.Any(ar => ar.IsActive);
                             
-                            // Kenetleme yapılmışsa sarı
-                            if (hasClamping)
+                            // Montaj yapılmışsa mavi
+                            if (hasAssembly)
                             {
-                                rowBgColor = Color.FromArgb(120, 255, 193, 7); // Sarı - Kenetleme
+                                rowBgColor = Color.FromArgb(120, 33, 150, 243); // Mavi - Montajlı
                             }
                             else
                             {
-                                // Hiç işlem yapılmamışsa kırmızı
-                                rowBgColor = Color.FromArgb(120, 244, 67, 54); // Kırmızı - İşlem Yok
+                                // Kenetleme işlemi yapılmış mı kontrol et
+                                var clampingRequests = _clampingRequestRepository.GetByOrderId(orderId);
+                                bool hasClamping = clampingRequests.Any(cr => cr.IsActive);
+                                
+                                // Kenetleme yapılmışsa sarı
+                                if (hasClamping)
+                                {
+                                    rowBgColor = Color.FromArgb(120, 255, 193, 7); // Sarı - Kenetli
+                                }
+                                else
+                                {
+                                    // Hiç işlem yapılmamışsa kırmızı
+                                    rowBgColor = Color.FromArgb(120, 244, 67, 54); // Kırmızı - Bekliyor
+                                }
                             }
                         }
                     }
@@ -1550,7 +1577,16 @@ namespace ERP.UI.Forms
             
             if (hasCompletedPackaging)
             {
-                return "Paketleme";
+                return "Paketli";
+            }
+            
+            // Montaj işlemi yapılmış mı kontrol et
+            var assemblyRequests = _assemblyRequestRepository.GetByOrderId(order.Id);
+            bool hasAssembly = assemblyRequests.Any(ar => ar.IsActive);
+            
+            if (hasAssembly)
+            {
+                return "Montajlı";
             }
             
             // Kenetleme işlemi yapılmış mı kontrol et
@@ -1559,11 +1595,11 @@ namespace ERP.UI.Forms
             
             if (hasClamping)
             {
-                return "Kenetleme";
+                return "Kenetli";
             }
             
             // Hiç işlem yapılmamışsa
-            return "İşlem Yok";
+            return "Bekliyor";
         }
 
         private string GetPlaceholderText(string columnName)

@@ -176,7 +176,7 @@ namespace ERP.UI.Forms
             var card = new Panel
             {
                 Width = _eventsPanel.Width - 40,
-                Height = 120,
+                Height = 80,
                 BackColor = Color.White,
                 Padding = new Padding(15),
                 Cursor = Cursors.Hand
@@ -217,7 +217,24 @@ namespace ERP.UI.Forms
             };
             card.Controls.Add(accentLine);
 
-            // Başlık
+            // Tarih - Sağ üste
+            var dateText = eventItem.EventDate.ToString("dd.MM.yyyy HH:mm");
+            var dateLabel = new Label
+            {
+                Text = dateText,
+                Font = new Font("Segoe UI", 9F),
+                ForeColor = ThemeColors.TextSecondary,
+                AutoSize = true
+            };
+            card.Controls.Add(dateLabel);
+            // Tarih label'ının genişliğini hesapla ve konumunu ayarla
+            using (var g = card.CreateGraphics())
+            {
+                var dateSize = TextRenderer.MeasureText(g, dateText, dateLabel.Font);
+                dateLabel.Location = new Point(card.Width - dateSize.Width - 15, 15);
+            }
+
+            // Başlık - Tarih için yer bırakarak
             var titleLabel = new Label
             {
                 Text = eventItem.Title,
@@ -225,7 +242,7 @@ namespace ERP.UI.Forms
                 ForeColor = ThemeColors.TextPrimary,
                 AutoSize = false,
                 Location = new Point(19, 15),
-                Width = card.Width - 39,
+                Width = card.Width - dateLabel.Width - 50,
                 Height = 25
             };
             card.Controls.Add(titleLabel);
@@ -239,20 +256,21 @@ namespace ERP.UI.Forms
                 AutoSize = false,
                 Location = new Point(19, 45),
                 Width = card.Width - 39,
-                Height = 40
+                Height = 30
             };
             card.Controls.Add(messageLabel);
 
-            // Tarih
-            var dateLabel = new Label
+            // Kart yeniden boyutlandığında tarih konumunu ve label genişliklerini güncelle
+            card.Resize += (s, e) =>
             {
-                Text = eventItem.EventDate.ToString("dd.MM.yyyy HH:mm"),
-                Font = new Font("Segoe UI", 9F),
-                ForeColor = ThemeColors.TextSecondary,
-                AutoSize = true,
-                Location = new Point(19, 90)
+                using (var g = card.CreateGraphics())
+                {
+                    var dateSize = TextRenderer.MeasureText(g, dateText, dateLabel.Font);
+                    dateLabel.Location = new Point(card.Width - dateSize.Width - 15, 15);
+                }
+                titleLabel.Width = card.Width - dateLabel.Width - 50;
+                messageLabel.Width = card.Width - 39;
             };
-            card.Controls.Add(dateLabel);
 
             // Tıklama olayı - ilgili sayfaya yönlendir
             card.Click += (s, e) => HandleEventClick(eventItem);

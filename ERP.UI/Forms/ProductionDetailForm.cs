@@ -856,9 +856,12 @@ namespace ERP.UI.Forms
             if (txtReportUrunTuru != null)
                 txtReportUrunTuru.Text = _order.ProductType ?? "";
 
-            // Durum
+            // Durum - üretim durumunu kontrol et
             if (txtReportDurum != null)
-                txtReportDurum.Text = _order.Status ?? "";
+            {
+                string statusText = GetProductionStatusText(_order);
+                txtReportDurum.Text = statusText;
+            }
 
             // Buton panelini oluştur (üretimdeyse sadece siparişe dön)
             var tabRapor = tabControl?.TabPages["📄 Rapor"];
@@ -1089,6 +1092,58 @@ namespace ERP.UI.Forms
                 default:
                     return status;
             }
+        }
+
+        private string GetProductionStatusText(Order order)
+        {
+            if (order == null) return "";
+            
+            // Üretimden geçmiş mi kontrol et (Muhasebede, Tamamlandı, Sevkiyata Hazır veya ShipmentDate dolu ise)
+            bool isProductionPassed = order.Status == "Muhasebede" || 
+                                     order.Status == "Tamamlandı" || 
+                                     order.Status == "Sevkiyata Hazır" ||
+                                     order.ShipmentDate.HasValue;
+            
+            if (isProductionPassed)
+            {
+                return "Gönderildi";
+            }
+            
+            // Üretimde değilse durumu direkt döndür
+            if (order.Status != "Üretimde")
+            {
+                return order.Status;
+            }
+            
+            // Paketleme işlemi yapılmış mı kontrol et
+            var packagings = _packagingRepository.GetByOrderId(order.Id);
+            bool hasCompletedPackaging = packagings.Any(p => p.IsActive);
+            
+            if (hasCompletedPackaging)
+            {
+                return "Paketli";
+            }
+            
+            // Montaj işlemi yapılmış mı kontrol et
+            var assemblyRequests = _assemblyRequestRepository.GetByOrderId(order.Id);
+            bool hasAssembly = assemblyRequests.Any(ar => ar.IsActive);
+            
+            if (hasAssembly)
+            {
+                return "Montajlı";
+            }
+            
+            // Kenetleme işlemi yapılmış mı kontrol et
+            var clampingRequests = _clampingRequestRepository.GetByOrderId(order.Id);
+            bool hasClamping = clampingRequests.Any(cr => cr.IsActive);
+            
+            if (hasClamping)
+            {
+                return "Kenetli";
+            }
+            
+            // Hiç işlem yapılmamışsa
+            return "Bekliyor";
         }
 
         private string GetHatveLetter(decimal hatveValue)
@@ -1822,8 +1877,8 @@ namespace ERP.UI.Forms
             };
 
             // Kolonları ekle
-            AddKesimColumn(dataGridView, "Hatve", "Hatve", 60);
-            AddKesimColumn(dataGridView, "Size", "Ölçü", 70);
+            AddKesimColumn(dataGridView, "Hatve", "Hatve (mm)", 80);
+            AddKesimColumn(dataGridView, "Size", "Ölçü (cm)", 80);
             AddKesimColumn(dataGridView, "MachineName", "Makina No", 80);
             AddKesimColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
             AddKesimColumn(dataGridView, "TotalKg", "Toplam Kg", 85);
@@ -2298,9 +2353,9 @@ namespace ERP.UI.Forms
 
             // Kolonları ekle
             AddPresColumn(dataGridView, "Date", "Tarih", 100);
-            AddPresColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 110);
-            AddPresColumn(dataGridView, "Hatve", "Hatve", 60);
-            AddPresColumn(dataGridView, "Size", "Ölçü", 70);
+            AddPresColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı (mm)", 130);
+            AddPresColumn(dataGridView, "Hatve", "Hatve (mm)", 80);
+            AddPresColumn(dataGridView, "Size", "Ölçü (cm)", 80);
             AddPresColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
             AddPresColumn(dataGridView, "PressNo", "Pres No", 80);
             AddPresColumn(dataGridView, "Pressure", "Basınç", 80);
@@ -2773,13 +2828,13 @@ namespace ERP.UI.Forms
             // Kolonları ekle
             AddClampingColumn(dataGridView, "Date", "Tarih", 100);
             AddClampingColumn(dataGridView, "OrderNo", "Sipariş No", 90);
-            AddClampingColumn(dataGridView, "Hatve", "Hatve", 60);
-            AddClampingColumn(dataGridView, "Size", "Ölçü", 70);
-            AddClampingColumn(dataGridView, "Length", "Uzunluk", 80);
+            AddClampingColumn(dataGridView, "Hatve", "Hatve (mm)", 80);
+            AddClampingColumn(dataGridView, "Size", "Ölçü (cm)", 80);
+            AddClampingColumn(dataGridView, "Length", "Uzunluk (mm)", 100);
             AddClampingColumn(dataGridView, "ClampCount", "Adet", 70, readOnly: false); // Editable - sadece bekleyen talepler için
             AddClampingColumn(dataGridView, "Customer", "Müşteri", 130);
             AddClampingColumn(dataGridView, "UsedPlateCount", "Kullanılan Plaka Adedi", 140);
-            AddClampingColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 110);
+            AddClampingColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı (mm)", 130);
             AddClampingColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
             AddClampingColumn(dataGridView, "MachineName", "Makina Adı", 100);
             AddClampingColumn(dataGridView, "EmployeeName", "Operatör", 120);
@@ -2943,13 +2998,13 @@ namespace ERP.UI.Forms
                     {
                         case "Date": column.HeaderText = "Tarih"; break;
                         case "OrderNo": column.HeaderText = "Sipariş No"; break;
-                        case "Hatve": column.HeaderText = "Hatve"; break;
-                        case "Size": column.HeaderText = "Ölçü"; break;
-                        case "Length": column.HeaderText = "Uzunluk"; break;
+                        case "Hatve": column.HeaderText = "Hatve (mm)"; break;
+                        case "Size": column.HeaderText = "Ölçü (cm)"; break;
+                        case "Length": column.HeaderText = "Uzunluk (mm)"; break;
                         case "ClampCount": column.HeaderText = "Adet"; break;
                         case "Customer": column.HeaderText = "Müşteri"; break;
                         case "UsedPlateCount": column.HeaderText = "Kullanılan Plaka Adedi"; break;
-                        case "PlateThickness": column.HeaderText = "Plaka Kalınlığı"; break;
+                        case "PlateThickness": column.HeaderText = "Plaka Kalınlığı (mm)"; break;
                         case "SerialNumber": column.HeaderText = "Rulo Seri No"; break;
                         case "MachineName": column.HeaderText = "Makina Adı"; break;
                         case "EmployeeName": column.HeaderText = "Operatör"; break;
@@ -3319,13 +3374,13 @@ namespace ERP.UI.Forms
             // Kolonları ekle
             AddAssemblyColumn(dataGridView, "Date", "Tarih", 100);
             AddAssemblyColumn(dataGridView, "OrderNo", "Sipariş No", 90);
-            AddAssemblyColumn(dataGridView, "Hatve", "Hatve", 60);
-            AddAssemblyColumn(dataGridView, "Size", "Ölçü", 70);
-            AddAssemblyColumn(dataGridView, "Length", "Uzunluk", 80);
+            AddAssemblyColumn(dataGridView, "Hatve", "Hatve (mm)", 80);
+            AddAssemblyColumn(dataGridView, "Size", "Ölçü (cm)", 80);
+            AddAssemblyColumn(dataGridView, "Length", "Uzunluk (mm)", 100);
             AddAssemblyColumn(dataGridView, "AssemblyCount", "Montaj Adedi", 90);
             AddAssemblyColumn(dataGridView, "Customer", "Müşteri", 130);
             AddAssemblyColumn(dataGridView, "UsedClampCount", "Kullanılan Kenet Adedi", 140);
-            AddAssemblyColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 110);
+            AddAssemblyColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı (mm)", 130);
             AddAssemblyColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
             AddAssemblyColumn(dataGridView, "EmployeeName", "Operatör", 120);
 
@@ -3442,13 +3497,13 @@ namespace ERP.UI.Forms
                     {
                         AddAssemblyColumn(dataGridView, "Date", "Tarih", 100);
                         AddAssemblyColumn(dataGridView, "OrderNo", "Sipariş No", 90);
-                        AddAssemblyColumn(dataGridView, "Hatve", "Hatve", 60);
-                        AddAssemblyColumn(dataGridView, "Size", "Ölçü", 70);
-                        AddAssemblyColumn(dataGridView, "Length", "Uzunluk", 80);
+                        AddAssemblyColumn(dataGridView, "Hatve", "Hatve (mm)", 80);
+                        AddAssemblyColumn(dataGridView, "Size", "Ölçü (cm)", 80);
+                        AddAssemblyColumn(dataGridView, "Length", "Uzunluk (mm)", 100);
                         AddAssemblyColumn(dataGridView, "AssemblyCount", "Montaj Adedi", 90);
                         AddAssemblyColumn(dataGridView, "Customer", "Müşteri", 130);
                         AddAssemblyColumn(dataGridView, "UsedClampCount", "Kullanılan Kenet Adedi", 140);
-                        AddAssemblyColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı", 110);
+                        AddAssemblyColumn(dataGridView, "PlateThickness", "Plaka Kalınlığı (mm)", 130);
                         AddAssemblyColumn(dataGridView, "SerialNumber", "Rulo Seri No", 100);
                         AddAssemblyColumn(dataGridView, "EmployeeName", "Operatör", 120);
                         AddAssemblyColumn(dataGridView, "Status", "Durum", 80);
@@ -4531,10 +4586,10 @@ namespace ERP.UI.Forms
             // Kolonları ekle
             AddClamping2Column(dataGridView, "Date", "Tarih", 100);
             AddClamping2Column(dataGridView, "OrderNo", "Sipariş No", 90);
-            AddClamping2Column(dataGridView, "Hatve", "Hatve", 60);
-            AddClamping2Column(dataGridView, "PlateThickness", "Lamel Kalınlığı", 110);
-            AddClamping2Column(dataGridView, "ResultedSize", "Sonuç Ölçü", 85);
-            AddClamping2Column(dataGridView, "ResultedLength", "Sonuç Uzunluk", 100);
+            AddClamping2Column(dataGridView, "Hatve", "Hatve (mm)", 80);
+            AddClamping2Column(dataGridView, "PlateThickness", "Lamel Kalınlığı (mm)", 130);
+            AddClamping2Column(dataGridView, "ResultedSize", "Sonuç Ölçü (cm)", 100);
+            AddClamping2Column(dataGridView, "ResultedLength", "Sonuç Uzunluk (mm)", 120);
             AddClamping2Column(dataGridView, "ClampingsList", "Kullanılacak Ürünler", 250);
             AddClamping2Column(dataGridView, "Count", "Adet", 70);
             AddClamping2Column(dataGridView, "EmployeeName", "Operatör", 120);
@@ -4656,10 +4711,10 @@ namespace ERP.UI.Forms
                 {
                     AddClamping2Column(dataGridView, "Date", "Tarih", 100);
                     AddClamping2Column(dataGridView, "OrderNo", "Sipariş No", 90);
-                    AddClamping2Column(dataGridView, "Hatve", "Hatve", 60);
-                    AddClamping2Column(dataGridView, "PlateThickness", "Lamel Kalınlığı", 110);
-                    AddClamping2Column(dataGridView, "ResultedSize", "Sonuç Ölçü", 85);
-                    AddClamping2Column(dataGridView, "ResultedLength", "Sonuç Uzunluk", 100);
+                    AddClamping2Column(dataGridView, "Hatve", "Hatve (mm)", 80);
+                    AddClamping2Column(dataGridView, "PlateThickness", "Lamel Kalınlığı (mm)", 130);
+                    AddClamping2Column(dataGridView, "ResultedSize", "Sonuç Ölçü (cm)", 100);
+                    AddClamping2Column(dataGridView, "ResultedLength", "Sonuç Uzunluk (mm)", 120);
                     AddClamping2Column(dataGridView, "ClampingsList", "Kullanılacak Ürünler", 250);
                     AddClamping2Column(dataGridView, "Count", "Adet", 70);
                     AddClamping2Column(dataGridView, "EmployeeName", "Operatör", 120);

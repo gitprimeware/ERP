@@ -77,7 +77,7 @@ namespace ERP.UI.Forms
             // Lamel Kalınlığı (ComboBox - tablodaki değerlerden)
             var lblPlateThickness = new Label
             {
-                Text = "Lamel Kalınlığı:",
+                Text = "Lamel Kalınlığı (mm):",
                 Location = new Point(20, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F)
@@ -98,7 +98,7 @@ namespace ERP.UI.Forms
             // Hatve (ComboBox - tablodaki değerlerden)
             var lblHatve = new Label
             {
-                Text = "Hatve:",
+                Text = "Hatve (mm):",
                 Location = new Point(20, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F)
@@ -119,7 +119,7 @@ namespace ERP.UI.Forms
             // Ölçü (ComboBox - tablodaki değerlerden)
             var lblSize = new Label
             {
-                Text = "Ölçü:",
+                Text = "Ölçü (cm):",
                 Location = new Point(20, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F)
@@ -140,7 +140,7 @@ namespace ERP.UI.Forms
             // Uzunluk (ComboBox - tablodaki değerlerden)
             var lblLength = new Label
             {
-                Text = "Uzunluk:",
+                Text = "Uzunluk (mm):",
                 Location = new Point(20, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F)

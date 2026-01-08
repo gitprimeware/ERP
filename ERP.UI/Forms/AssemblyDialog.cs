@@ -109,7 +109,7 @@ namespace ERP.UI.Forms
             // Plaka Kalınlığı (ReadOnly - kenetlenmiş plakadan otomatik gelecek)
             var lblPlateThickness = new Label
             {
-                Text = "Plaka Kalınlığı:",
+                Text = "Plaka Kalınlığı (mm):",
                 Location = new Point(20, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F)
@@ -130,7 +130,7 @@ namespace ERP.UI.Forms
             // Hatve (ReadOnly - kenetlenmiş plakadan otomatik gelecek)
             var lblHatve = new Label
             {
-                Text = "Hatve:",
+                Text = "Hatve (mm):",
                 Location = new Point(20, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F)
@@ -151,7 +151,7 @@ namespace ERP.UI.Forms
             // Ölçü (ReadOnly - kenetlenmiş plakadan otomatik gelecek)
             var lblSize = new Label
             {
-                Text = "Ölçü:",
+                Text = "Ölçü (cm):",
                 Location = new Point(20, yPos),
                 Width = labelWidth,
                 Font = new Font("Segoe UI", 10F)
