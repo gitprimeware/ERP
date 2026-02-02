@@ -37,6 +37,7 @@ namespace ERP.UI.Forms
         private Button btnDelete;
         private Button btnSendToProduction;
         private Button btnGetWorkOrder;
+        private Button btnShip;
         private Label lblTitle;
 
         private Guid _orderId = Guid.Empty;
@@ -419,8 +420,15 @@ namespace ERP.UI.Forms
             btnCancel.Click += BtnCancel_Click;
             btnCancel.Visible = true;
 
+            btnShip = ButtonFactory.CreateActionButton("Sevk Et", ThemeColors.Success, Color.White, 120, 35);
+            btnShip.Height = 35;
+            btnShip.Anchor = AnchorStyles.None;
+            btnShip.Visible = false;
+            btnShip.Click += BtnShip_Click;
+
             panel.Controls.Add(btnSave);
             panel.Controls.Add(btnCancel);
+            panel.Controls.Add(btnShip);
 
             // Buton konumlarını güncelle
             UpdateButtonPositions(panel);
@@ -447,6 +455,14 @@ namespace ERP.UI.Forms
             {
                 currentX -= btnCancel.Width;
                 btnCancel.Location = new Point(currentX, yPos);
+                currentX -= buttonSpacing;
+            }
+
+            // Sevk Et butonu
+            if (btnShip != null && btnShip.Visible)
+            {
+                currentX -= btnShip.Width;
+                btnShip.Location = new Point(currentX, yPos);
                 currentX -= buttonSpacing;
             }
 
@@ -754,7 +770,7 @@ namespace ERP.UI.Forms
 
         private void BtnSave_Click(object sender, EventArgs e)
         {
-            // Readonly modda kaydetme yapılamaz (Sevkiyata Hazır hariç)
+            // Readonly modda kaydetme yapılamaz (Üretimde veya Muhasebede)
             if (_isReadOnly)
             {
                 var orderRepository = new OrderRepository();
@@ -764,29 +780,6 @@ namespace ERP.UI.Forms
                 {
                     MessageBox.Show("Bu sipariş üretimde veya muhasebede olduğu için güncellenemez!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
-                }
-
-                // Sevkiyata Hazır durumunda sadece sevk tarihi güncellenebilir
-                if (currentOrder != null && currentOrder.Status == "Sevkiyata Hazır")
-                {
-                    try
-                    {
-                        currentOrder.ShipmentDate = dtpShipmentDate.Value;
-                        // Sevk tarihi seçildiğinde durumu "Sevk Edildi" olarak güncelle
-                        currentOrder.Status = "Sevk Edildi";
-                        orderRepository.Update(currentOrder);
-                        
-                        // Event feed kaydı ekle
-                        EventFeedService.OrderShipped(_orderId, currentOrder.TrexOrderNo);
-                        
-                        MessageBox.Show("Sevk tarihi güncellendi ve sipariş 'Sevk Edildi' durumuna getirildi!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        return;
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show("Sevk tarihi güncellenirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        return;
-                    }
                 }
             }
 
@@ -907,15 +900,14 @@ namespace ERP.UI.Forms
             else
             {
                 // Update modunda mevcut status'u veritabanından al ve koru
-                // Eğer sevk tarihi girildiyse ve status "Sevkiyata Hazır" ise "Sevk Edildi" yap
                 var orderRepository = new OrderRepository();
                 var currentOrder = orderRepository.GetById(_orderId);
                 if (currentOrder != null)
                 {
-                    // Sevkiyata Hazır durumunda sevk tarihi girildiyse "Sevk Edildi" yap
-                    if (currentOrder.Status == "Sevkiyata Hazır" && dtpShipmentDate.Enabled && dtpShipmentDate.Value != null)
+                    // İrsaliye kesildikten sonra sevk tarihi girildiyse "Sevkiyata Hazır" yap
+                    if (currentOrder.Status == "İrsaliye Kesildi" && dtpShipmentDate.Enabled)
                     {
-                        order.Status = "Sevk Edildi";
+                        order.Status = "Sevkiyata Hazır";
                     }
                     else
                     {
@@ -971,15 +963,15 @@ namespace ERP.UI.Forms
                 // Üretimde veya Muhasebede ise readonly yap
                 // Sevkiyata Hazır ise sadece sevk tarihi editable
                 _isReadOnly = order.Status == "Üretimde" || order.Status == "Muhasebede";
-                bool isReadyForShipment = order.Status == "Sevkiyata Hazır";
                 
                 UpdateFormTitle();
-                SetFormReadOnly(_isReadOnly, isReadyForShipment);
+                SetFormReadOnly(_isReadOnly, order.Status);
                 
                 // Buton görünürlüklerini güncelle
                 if (btnDelete != null) btnDelete.Visible = _isEditMode && !_isReadOnly;
                 if (btnSendToProduction != null) btnSendToProduction.Visible = _isEditMode && !_isReadOnly;
                 if (btnGetWorkOrder != null) btnGetWorkOrder.Visible = _isEditMode;
+                if (btnShip != null) btnShip.Visible = order.Status == "Sevkiyata Hazır";
                 
                 // Buton pozisyonlarını güncelle
                 var buttonPanel = btnSave?.Parent as Panel;
@@ -1058,10 +1050,13 @@ namespace ERP.UI.Forms
             }
         }
 
-        private void SetFormReadOnly(bool readOnly, bool isReadyForShipment = false)
+        private void SetFormReadOnly(bool readOnly, string status = null)
         {
-            // Sevkiyata Hazır durumunda sadece sevk tarihi editable
-            if (isReadyForShipment)
+            // İrsaliye/Sevkiyat aşamasında sadece sevk tarihi editable
+            bool isInvoiceIssued = status == "İrsaliye Kesildi";
+            bool isReadyForShipment = status == "Sevkiyata Hazır";
+
+            if (isInvoiceIssued || isReadyForShipment)
             {
                 // Tüm alanları readonly yap
                 if (cmbCompany != null)
@@ -1097,12 +1092,21 @@ namespace ERP.UI.Forms
                 
                 // Kaydet butonu görünür (sevk tarihi güncellemek için)
                 if (btnSave != null) btnSave.Visible = true;
+                if (btnShip != null) btnShip.Visible = isReadyForShipment;
                 
                 // Başlık güncelle
                 if (lblTitle != null)
                 {
-                    lblTitle.Text = "Sipariş Detayları - Sevkiyata Hazır (Sadece Sevk Tarihi Düzenlenebilir)";
-                    lblTitle.ForeColor = ThemeColors.Info;
+                    if (isInvoiceIssued)
+                    {
+                        lblTitle.Text = "Sipariş Detayları - İrsaliye Kesildi (Sevk Tarihi Düzenlenebilir)";
+                        lblTitle.ForeColor = ThemeColors.Info;
+                    }
+                    else
+                    {
+                        lblTitle.Text = "Sipariş Detayları - Sevkiyata Hazır (Sevk İçin Bekliyor)";
+                        lblTitle.ForeColor = ThemeColors.Info;
+                    }
                 }
                 
                 return;
@@ -1139,12 +1143,74 @@ namespace ERP.UI.Forms
             
             // Kaydet butonunu gizle
             if (btnSave != null) btnSave.Visible = !readOnly;
+            if (btnShip != null) btnShip.Visible = false;
             
             // Başlık güncelle
             if (lblTitle != null && readOnly)
             {
                 lblTitle.Text = "Sipariş Detayları (Sadece Görüntüleme)";
                 lblTitle.ForeColor = ThemeColors.Warning;
+            }
+        }
+
+        private void BtnShip_Click(object sender, EventArgs e)
+        {
+            if (_orderId == Guid.Empty) return;
+
+            try
+            {
+                var orderRepository = new OrderRepository();
+                var currentOrder = orderRepository.GetById(_orderId);
+
+                if (currentOrder == null)
+                {
+                    MessageBox.Show("Sipariş bulunamadı!", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                if (currentOrder.Status != "Sevkiyata Hazır")
+                {
+                    MessageBox.Show("Bu sipariş sevkiyata hazır değil. Önce irsaliye kesilmeli ve sevk tarihi girilmelidir.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                // Sevk tarihi yoksa, ekrandaki değeri kullan
+                if (!currentOrder.ShipmentDate.HasValue)
+                {
+                    if (dtpShipmentDate != null)
+                    {
+                        currentOrder.ShipmentDate = dtpShipmentDate.Value;
+                    }
+                }
+
+                if (!currentOrder.ShipmentDate.HasValue)
+                {
+                    MessageBox.Show("Sevk edilmeden önce sevk tarihi girilmelidir.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                var result = MessageBox.Show(
+                    $"Sipariş {currentOrder.TrexOrderNo} sevk edilecek. Emin misiniz?",
+                    "Sevk Et",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question);
+
+                if (result != DialogResult.Yes)
+                    return;
+
+                currentOrder.Status = "Sevk Edildi";
+                orderRepository.Update(currentOrder);
+
+                // Event feed kaydı ekle
+                EventFeedService.OrderShipped(_orderId, currentOrder.TrexOrderNo);
+
+                MessageBox.Show("Sipariş sevk edildi ve durum 'Sevk Edildi' olarak güncellendi!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                if (btnShip != null) btnShip.Visible = false;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Sevk işlemi sırasında hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }

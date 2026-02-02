@@ -50,6 +50,7 @@ namespace ERP.UI.Managers
                     orderListForm.OrderSendToAccountingRequested += (s, id) => HandleSendToAccountingFromOrder(id);
                     orderListForm.OrderGetWorkOrderRequested += (s, id) => HandleGetWorkOrder(id);
                     orderListForm.OrderGetBulkWorkOrderRequested += (s, ids) => HandleGetBulkWorkOrder(ids);
+                    orderListForm.OrderShippedRequested += (s, id) => HandleShipOrder(id);
                 }
 
                 // AccountingForm için event'leri bağla
@@ -574,6 +575,38 @@ namespace ERP.UI.Managers
             }
         }
 
+        // Sevk Et (Status: "İrsaliye Kesildi" veya "Sevkiyata Hazır" → "Sevk Edildi")
+        private void HandleShipOrder(Guid orderId)
+        {
+            try
+            {
+                var orderRepository = new ERP.DAL.Repositories.OrderRepository();
+                var order = orderRepository.GetById(orderId);
+                
+                if (order != null)
+                {
+                    // Status'u "Sevk Edildi" yap
+                    order.Status = "Sevk Edildi";
+                    // Sevk tarihini bugün olarak ayarla
+                    order.ShipmentDate = DateTime.Now;
+                    orderRepository.Update(order);
+                    
+                    // Event feed kaydı ekle
+                    EventFeedService.OrderShipped(orderId, order.TrexOrderNo);
+                    
+                    MessageBox.Show($"Sipariş {order.TrexOrderNo} sevk edildi.", 
+                        "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    
+                    // Sipariş listesini yenile
+                    ShowForm("OrderList");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Sipariş sevk edilirken hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
         private void ShowAccountingEntry(Guid orderId)
         {
             ShowForm("AccountingEntry", orderId);
@@ -589,14 +622,14 @@ namespace ERP.UI.Managers
                 
                 if (order != null)
                 {
-                    // Status'u "Sevkiyata Hazır" yap (muhasebe tamamlandı, siparişe döndü)
-                    order.Status = "Sevkiyata Hazır";
+                    // Status'u "İrsaliye Kesildi" yap (muhasebe tamamlandı, irsaliye kesildi; sevk tarihi bekleniyor)
+                    order.Status = "İrsaliye Kesildi";
                     orderRepository.Update(order);
                     
                     // Event feed kaydı ekle - Siparişteki arkadaşa bildirim
                     EventFeedService.OrderReadyForShipment(orderId, order.TrexOrderNo);
                     
-                    MessageBox.Show($"Sipariş {order.TrexOrderNo} siparişe döndürüldü (Sevkiyata Hazır).", 
+                    MessageBox.Show($"Sipariş {order.TrexOrderNo} için irsaliye kesildi. Sevk tarihi girildiğinde 'Sevkiyata Hazır' olacaktır.", 
                         "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     
                     // Muhasebe listesini yenile

@@ -34,6 +34,7 @@ namespace ERP.UI.Forms
         public event EventHandler<Guid> OrderSendToAccountingRequested; // Siparişten muhasebeye gönder
         public event EventHandler<Guid> OrderGetWorkOrderRequested;
         public event EventHandler<List<Guid>> OrderGetBulkWorkOrderRequested; // Toplu iş emri için
+        public event EventHandler<Guid> OrderShippedRequested; // Sevk Et için
 
         public OrderListForm()
         {
@@ -549,17 +550,22 @@ namespace ERP.UI.Forms
                             bool isReadyForShipment = order.Status == "Sevkiyata Hazır";
                             bool isNew = order.Status == "Yeni";
                             bool isFaturaKesimiBekliyor = order.Status == "Fatura Kesimi Bekliyor";
+                            bool isIrsaliyeKesildi = order.Status == "İrsaliye Kesildi";
                             var btnCell = row.Cells["Actions"] as DataGridViewButtonCell;
                             if (btnCell != null)
                             {
-                                // Sadece emoji'ler - Soldan sağa: Ayrıntılar, İş Emri, Üretim, Muhasebe, Silme
+                                // Sadece emoji'ler - Soldan sağa: Ayrıntılar, İş Emri, Üretim, Muhasebe, Sevk Et, Silme
                                 if (isReadyForShipment)
                                 {
-                                    btnCell.Value = "📋 📄 🗑️"; // Detay, İş Emri, Sil (Üretime gönder yok)
+                                    btnCell.Value = "📋 📄 � �️"; // Detay, İş Emri, Sevk Et, Sil
                                 }
                                 else if (isNew || isFaturaKesimiBekliyor)
                                 {
                                     btnCell.Value = "📋 📄 🏭 💰 🗑️"; // Detay, İş Emri, Üretim, Muhasebe, Sil
+                                }
+                                else if (isIrsaliyeKesildi)
+                                {
+                                    btnCell.Value = "📋 📄 🚚 🗑️"; // Detay, İş Emri, Sevk Et, Sil
                                 }
                                 else
                                 {
@@ -591,9 +597,22 @@ namespace ERP.UI.Forms
                 bool isReadyForShipment = order.Status == "Sevkiyata Hazır";
                 bool isNew = order.Status == "Yeni";
                 bool isFaturaKesimiBekliyor = order.Status == "Fatura Kesimi Bekliyor";
+                bool isIrsaliyeKesildi = order.Status == "İrsaliye Kesildi";
                 
-                // Emoji sayısını belirle - "Yeni" veya "Fatura Kesimi Bekliyor" durumunda 5 buton (Detay, İş Emri, Üretime Gönder, Muhasebeye Gönder, Sil)
-                int emojiCount = (isNew || isFaturaKesimiBekliyor) ? 5 : 3;
+                // Emoji sayısını belirle
+                int emojiCount;
+                if (isNew || isFaturaKesimiBekliyor)
+                {
+                    emojiCount = 5; // 📋 📄 🏭 💰 🗑️
+                }
+                else if (isReadyForShipment || isIrsaliyeKesildi)
+                {
+                    emojiCount = 4; // 📋 📄 🚚 🗑️
+                }
+                else
+                {
+                    emojiCount = 3; // 📋 📄 🗑️
+                }
 
                 // İşlemler kolonuna tıklandı
                 if (_dataGridView.Columns[e.ColumnIndex].Name == "Actions")
@@ -655,6 +674,43 @@ namespace ERP.UI.Forms
                                 break;
                         }
                     }
+                    else if (isReadyForShipment || isIrsaliyeKesildi)
+                    {
+                        // 📋 📄 🚚 🗑️ - "Sevkiyata Hazır" veya "İrsaliye Kesildi" durumunda 4 buton (Detay, İş Emri, Sevk Et, Sil)
+                        switch (emojiIndex)
+                        {
+                            case 0: // 📋 Detay
+                                OrderUpdateRequested?.Invoke(this, order.Id);
+                                break;
+                            case 1: // 📄 İş Emri Al
+                                OrderGetWorkOrderRequested?.Invoke(this, order.Id);
+                                break;
+                            case 2: // 🚚 Sevk Et
+                                var resultShipment = MessageBox.Show(
+                                    $"Sipariş {order.TrexOrderNo} sevk edilecek. Emin misiniz?",
+                                    "Sevk Et",
+                                    MessageBoxButtons.YesNo,
+                                    MessageBoxIcon.Question);
+                                if (resultShipment == DialogResult.Yes)
+                                {
+                                    // Sevk Et işlemi - Status "Sevk Edildi" yapılacak
+                                    // Bu işlemi ContentManager'da handle etmemiz gerekiyor
+                                    HandleShipOrder(order.Id);
+                                }
+                                break;
+                            case 3: // 🗑️ Sil
+                                var resultDelete = MessageBox.Show(
+                                    $"Sipariş {order.TrexOrderNo} silinecek. Emin misiniz?",
+                                    "Sipariş Sil",
+                                    MessageBoxButtons.YesNo,
+                                    MessageBoxIcon.Question);
+                                if (resultDelete == DialogResult.Yes)
+                                {
+                                    OrderDeleteRequested?.Invoke(this, order.Id);
+                                }
+                                break;
+                        }
+                    }
                     else
                     {
                         // 📋 📄 🗑️ - Diğer durumlarda 3 buton (Üretime Gönder yok)
@@ -681,6 +737,11 @@ namespace ERP.UI.Forms
                     }
                 }
             }
+        }
+
+        private void HandleShipOrder(Guid orderId)
+        {
+            OrderShippedRequested?.Invoke(this, orderId);
         }
 
         private void DataGridView_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
@@ -951,6 +1012,7 @@ namespace ERP.UI.Forms
                 "Fatura Kesimi Bekliyor" => ThemeColors.Warning,
                 "Üretimde" => ThemeColors.Warning,
                 "Muhasebede" => ThemeColors.Accent,
+                "İrsaliye Kesildi" => ThemeColors.Secondary,
                 "Sevkiyata Hazır" => ThemeColors.Secondary,
                 "Sevk Edildi" => ThemeColors.Success,
                 "Tamamlandı" => ThemeColors.Success,
@@ -1018,6 +1080,22 @@ namespace ERP.UI.Forms
             if (status == "Yeni")
             {
                 rowColor = Color.FromArgb(120, 33, 150, 243); // Mavi, hafif saydam
+            }
+            else if (status == "Fatura Kesimi Bekliyor")
+            {
+                rowColor = Color.FromArgb(120, 255, 193, 7); // Sarı, hafif saydam
+            }
+            else if (status == "Üretimde")
+            {
+                rowColor = Color.FromArgb(120, 255, 152, 0); // Turuncu, hafif saydam
+            }
+            else if (status == "Muhasebede")
+            {
+                rowColor = Color.FromArgb(120, 156, 39, 176); // Mor, hafif saydam
+            }
+            else if (status == "İrsaliye Kesildi")
+            {
+                rowColor = Color.FromArgb(120, 108, 117, 125); // Gri, hafif saydam
             }
             else if (status == "Sevkiyata Hazır")
             {
@@ -1130,6 +1208,22 @@ namespace ERP.UI.Forms
                 {
                     rowBgColor = Color.FromArgb(120, 33, 150, 243);
                 }
+                else if (status == "Fatura Kesimi Bekliyor")
+                {
+                    rowBgColor = Color.FromArgb(120, 255, 193, 7);
+                }
+                else if (status == "Üretimde")
+                {
+                    rowBgColor = Color.FromArgb(120, 255, 152, 0);
+                }
+                else if (status == "Muhasebede")
+                {
+                    rowBgColor = Color.FromArgb(120, 156, 39, 176);
+                }
+                else if (status == "İrsaliye Kesildi")
+                {
+                    rowBgColor = Color.FromArgb(120, 108, 117, 125);
+                }
                 else if (status == "Sevkiyata Hazır")
                 {
                     rowBgColor = Color.FromArgb(120, 255, 193, 7);
@@ -1155,17 +1249,21 @@ namespace ERP.UI.Forms
                         var order = orders[e.RowIndex];
                         bool isReadyForShipment = order.Status == "Sevkiyata Hazır";
                         bool isNew = order.Status == "Yeni";
+                        bool isFaturaKesimiBekliyor = order.Status == "Fatura Kesimi Bekliyor";
+                        bool isIrsaliyeKesildi = order.Status == "İrsaliye Kesildi";
 
                         string[] emojis;
                         Color[] colors;
 
-                        if (isReadyForShipment)
+                        if (isReadyForShipment || isIrsaliyeKesildi)
                         {
-                            emojis = new[] { "📋", "📄", "🗑️" };
-                            colors = new[] { ThemeColors.Info, ThemeColors.Primary, ThemeColors.Error };
+                            // Sevkiyata Hazır veya İrsaliye Kesildi: Detay, İş Emri, Sevk Et, Sil
+                            emojis = new[] { "📋", "📄", "🚚", "🗑️" };
+                            colors = new[] { ThemeColors.Info, ThemeColors.Primary, ThemeColors.Success, ThemeColors.Error };
                         }
-                        else if (isNew)
+                        else if (isNew || isFaturaKesimiBekliyor)
                         {
+                            // Yeni ve Fatura Kesimi Bekliyor: Detay, İş Emri, Üretim, Muhasebe, Sil
                             emojis = new[] { "📋", "📄", "🏭", "💰", "🗑️" };
                             colors = new[] { ThemeColors.Info, ThemeColors.Primary, ThemeColors.Warning, ThemeColors.Success, ThemeColors.Error };
                         }
@@ -1262,16 +1360,17 @@ namespace ERP.UI.Forms
                     var order = orders[e.RowIndex];
                     bool isReadyForShipment = order.Status == "Sevkiyata Hazır";
                     bool isNew = order.Status == "Yeni";
+                    bool isFaturaKesimiBekliyor = order.Status == "Fatura Kesimi Bekliyor";
                     
                     string[] tooltips;
-                    if (isNew)
+                    if (isNew || isFaturaKesimiBekliyor)
                     {
-                        // Sadece "Yeni" durumunda Üretime Gönder butonu var
-                        tooltips = new[] { "Ayrıntılar", "İş Emri Al", "Üretime Gönder", "Sil" };
+                        // "Yeni" ve "Fatura Kesimi Bekliyor" durumlarında: Detay, İş Emri, Üretime Gönder, Muhasebeye Gönder, Sil
+                        tooltips = new[] { "Ayrıntılar", "İş Emri Al", "Üretime Gönder", "Muhasebeye Gönder", "Sil" };
                     }
                     else
                     {
-                        // Diğer durumlarda Üretime Gönder butonu yok
+                        // Diğer durumlarda: Detay, İş Emri, Sil
                         tooltips = new[] { "Ayrıntılar", "İş Emri Al", "Sil" };
                     }
                     

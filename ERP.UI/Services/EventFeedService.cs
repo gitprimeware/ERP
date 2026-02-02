@@ -88,8 +88,8 @@ namespace ERP.UI.Services
         {
             CreateEvent(
                 "OrderReadyForShipment",
-                "Sipariş Sevkiyata Hazır",
-                $"{orderNo} siparişi sevkiyata hazır durumuna getirildi",
+                "Sipariş Muhasebeden Döndü",
+                $"{orderNo} siparişi için irsaliye kesildi, sevk tarihi bekleniyor",
                 "OrderEntry,Accounting",
                 orderId,
                 "Order"

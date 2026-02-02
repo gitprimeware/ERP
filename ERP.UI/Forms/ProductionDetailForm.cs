@@ -534,6 +534,17 @@ namespace ERP.UI.Forms
                     return;
                 }
 
+                // Bu ekran sadece "Üretimde" olan siparişler için kullanılmalı
+                if (_order.Status != "Üretimde")
+                {
+                    MessageBox.Show(
+                        $"Bu ekran sadece 'Üretimde' durumundaki siparişler için kullanılabilir.\nMevcut durum: {_order.Status}",
+                        "Bilgi",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                    return;
+                }
+
                 // Sipariş bilgilerini doldur (Formül sayfası)
                 txtTrexOrderNo.Text = _order.TrexOrderNo ?? "";
                 txtBypassOlcusu.Text = _order.BypassSize ?? "";

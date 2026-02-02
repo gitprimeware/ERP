@@ -13,16 +13,13 @@ namespace ERP.UI.Forms
     public partial class ProductionListForm : UserControl
     {
         private Panel _mainPanel;
-        private FlowLayoutPanel _cardsPanel;
         private DataGridView _dataGridView;
-        private CheckBox _chkTableView;
         private OrderRepository _orderRepository;
         private CompanyRepository _companyRepository;
         private AssemblyRepository _assemblyRepository;
         private AssemblyRequestRepository _assemblyRequestRepository;
         private PackagingRepository _packagingRepository;
         private ClampingRequestRepository _clampingRequestRepository;
-        private bool _isTableView = true; // Default tablo görünümü
         private ToolTip _actionToolTip;
         private string _currentToolTipText = "";
         
@@ -30,6 +27,19 @@ namespace ERP.UI.Forms
         private Panel _columnFilterPanel;
         private Dictionary<string, Control> _columnFilters = new Dictionary<string, Control>();
         private string _currentSortColumn = "";
+        
+        // Performans için cache'lenmiş çizim nesneleri
+        private static readonly Font _emojiFont = new Font("Segoe UI Emoji", 12F);
+        private static readonly SolidBrush _whiteBrush = new SolidBrush(Color.White);
+        private static readonly SolidBrush _blackBrush = new SolidBrush(Color.Black);
+        private static readonly StringFormat _centerStringFormat = new StringFormat
+        {
+            Alignment = StringAlignment.Center,
+            LineAlignment = StringAlignment.Center,
+            FormatFlags = StringFormatFlags.NoWrap
+        };
+        private static readonly Dictionary<Color, SolidBrush> _brushCache = new Dictionary<Color, SolidBrush>();
+        private static readonly Dictionary<Color, Pen> _penCache = new Dictionary<Color, Pen>();
         private enum SortDirection
         {
             None = 0,
@@ -163,37 +173,11 @@ namespace ERP.UI.Forms
                 }
             }
 
-            _chkTableView = new CheckBox
-            {
-                Text = "📊 Tablo Görünümü",
-                Font = new Font("Segoe UI", 10F),
-                ForeColor = ThemeColors.TextPrimary,
-                AutoSize = true,
-                Location = new Point(titlePanel.Width - 200, 12),
-                Anchor = AnchorStyles.Top | AnchorStyles.Right,
-                Checked = _isTableView
-            };
-            _chkTableView.CheckedChanged += ChkTableView_CheckedChanged;
-
             titlePanel.Controls.Add(titleLabel);
             titlePanel.Controls.Add(colorLegendPanel);
-            titlePanel.Controls.Add(_chkTableView);
             
             // Başlık panelinin yüksekliğini artır
             titlePanel.Height = 70;
-
-            // Cards panel
-            _cardsPanel = new FlowLayoutPanel
-            {
-                Location = new Point(30, 120),
-                Width = _mainPanel.Width - 60,
-                Height = _mainPanel.Height - 160,
-                AutoScroll = true,
-                FlowDirection = FlowDirection.LeftToRight,
-                WrapContents = true,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
-                Visible = !_isTableView
-            };
 
             // DataGridView - Filtre panelinin altında, header'lar görünür olacak şekilde
             _dataGridView = new DataGridView
@@ -212,15 +196,15 @@ namespace ERP.UI.Forms
                 BorderStyle = BorderStyle.None,
                 RowTemplate = { Height = 40 },
                 ScrollBars = ScrollBars.Vertical,
-                Visible = _isTableView
+                Visible = true
             };
             _dataGridView.CellClick += DataGridView_CellClick;
             _dataGridView.CellDoubleClick += DataGridView_CellDoubleClick;
-            _dataGridView.RowPrePaint += DataGridView_RowPrePaint;
+            // RowPrePaint kaldırıldı - CellPainting zaten yapıyor (çift çizim önlendi)
             _dataGridView.CellPainting += DataGridView_CellPainting;
             _dataGridView.CellMouseEnter += DataGridView_CellMouseEnter;
             _dataGridView.CellMouseLeave += DataGridView_CellMouseLeave;
-            _dataGridView.Scroll += DataGridView_Scroll;
+            // Scroll event'i kaldırıldı - DataGridView zaten otomatik çiziyor, gereksiz Invalidate() çağrısı önlendi
             _dataGridView.ColumnHeaderMouseClick += DataGridView_ColumnHeaderMouseClick;
             
             // DoubleBuffered özelliğini aç - scroll sırasında üst üste binmeyi önler
@@ -232,8 +216,6 @@ namespace ERP.UI.Forms
             {
                 if (titlePanel != null)
                     titlePanel.Width = _mainPanel.Width - 60;
-                _cardsPanel.Width = _mainPanel.Width - 60;
-                _cardsPanel.Height = _mainPanel.Height - 160;
                 _columnFilterPanel.Width = _mainPanel.Width - 60;
                 _dataGridView.Width = _mainPanel.Width - 60;
                 _dataGridView.Height = _mainPanel.Height - 200;
@@ -247,7 +229,7 @@ namespace ERP.UI.Forms
                 Width = _mainPanel.Width - 60,
                 Height = 40,
                 BackColor = Color.FromArgb(245, 245, 245),
-                Visible = _isTableView,
+                Visible = true,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
                 BorderStyle = BorderStyle.FixedSingle
             };
@@ -255,7 +237,6 @@ namespace ERP.UI.Forms
             _mainPanel.Controls.Add(titlePanel);
             _mainPanel.Controls.Add(_columnFilterPanel); // Önce filtre paneli (header'ların üstünde)
             _mainPanel.Controls.Add(_dataGridView); // Sonra DataGridView (filtre panelinin altında, header'lar görünür)
-            _mainPanel.Controls.Add(_cardsPanel);
 
             this.Controls.Add(_mainPanel);
             _mainPanel.BringToFront();
@@ -267,19 +248,19 @@ namespace ERP.UI.Forms
         {
             try
             {
-                // Tüm siparişleri getir
-                var allOrders = _orderRepository.GetAll().ToList();
+                // Üretimde olan ve üretimden sonraki tüm durumlardaki siparişleri getir
+                var allOrders = _orderRepository
+                    .GetAll()
+                    .Where(o => o.Status == "Üretimde" || 
+                               o.Status == "Fatura Kesimi Bekliyor" || 
+                               o.Status == "Muhasebede" || 
+                               o.Status == "İrsaliye Kesildi" || 
+                               o.Status == "Sevkiyata Hazır" || 
+                               o.Status == "Sevk Edildi")
+                    .ToList();
 
-                if (_isTableView)
-                {
-                    LoadDataGridView(allOrders);
-                    // Sütun filtrelerini uygula
-                    ApplyColumnFilters();
-                }
-                else
-                {
-                    LoadCardsView(allOrders);
-                }
+                LoadDataGridView(allOrders);
+                // ApplyColumnFilters kaldırıldı - LoadDataGridView zaten tüm verileri yüklüyor, gereksiz tekrar işlem
             }
             catch (Exception ex)
             {
@@ -437,30 +418,6 @@ namespace ERP.UI.Forms
             }
         }
 
-        private void LoadCardsView(List<Order> orders)
-        {
-            _cardsPanel.Controls.Clear();
-
-            if (orders.Count == 0)
-            {
-                var noDataLabel = new Label
-                {
-                    Text = "Sipariş bulunamadı.",
-                    Font = new Font("Segoe UI", 12F),
-                    ForeColor = ThemeColors.TextSecondary,
-                    AutoSize = true,
-                    Location = new Point(20, 20)
-                };
-                _cardsPanel.Controls.Add(noDataLabel);
-                return;
-            }
-
-            foreach (var order in orders)
-            {
-                var card = CreateProductionCard(order);
-                _cardsPanel.Controls.Add(card);
-            }
-        }
 
         private void LoadDataGridView(List<Order> orders)
         {
@@ -472,7 +429,7 @@ namespace ERP.UI.Forms
                 // Event handler'ları geçici olarak kaldır (üst üste gelmeyi önlemek için)
                 _dataGridView.DataBindingComplete -= DataGridView_DataBindingComplete;
                 _dataGridView.RowsAdded -= DataGridView_RowsAdded;
-                _dataGridView.RowPrePaint -= DataGridView_RowPrePaint;
+                // RowPrePaint kaldırıldı - CellPainting zaten yapıyor (performans optimizasyonu)
                 _dataGridView.CellPainting -= DataGridView_CellPainting;
 
                 // DataSource'u sıfırla ve kolonları temizle
@@ -481,12 +438,8 @@ namespace ERP.UI.Forms
                 _dataGridView.Rows.Clear();
                 _dataGridView.Tag = null;
 
-                // Görsel güncellemeyi zorla
-                _dataGridView.Refresh();
-                _dataGridView.Update();
-                
-                // Application.DoEvents() çağırarak UI'ın güncellenmesini sağla
-                Application.DoEvents();
+                // Refresh() + Update() + Application.DoEvents() kaldırıldı - performans optimizasyonu
+                // DataGridView zaten otomatik güncelleniyor, gereksiz UI bloklaması önlendi
 
             if (orders.Count == 0)
             {
@@ -628,6 +581,9 @@ namespace ERP.UI.Forms
             };
             _dataGridView.Columns.Add(actionsColumn);
 
+                // Status bilgilerini toplu yükle (performans optimizasyonu)
+                var statusCache = PreloadStatusData(orders);
+
                 // DataSource için özel bir liste oluştur - Ürün kodundan parse edilen değerlerle
                 var dataSource = orders.Select(o => 
                 {
@@ -646,7 +602,7 @@ namespace ERP.UI.Forms
                         LamelThickness = o.LamelThickness.HasValue ? o.LamelThickness.Value.ToString("0.000", System.Globalization.CultureInfo.GetCultureInfo("tr-TR")) : "",
                         CompanyName = o.Company?.Name ?? "",
                         TermDate = o.TermDate.ToString("dd.MM.yyyy", System.Globalization.CultureInfo.GetCultureInfo("tr-TR")),
-                        StatusText = GetStatusText(o),
+                        StatusText = statusCache.ContainsKey(o.Id) ? statusCache[o.Id] : GetStatusText(o),
                 o.Status,
                         IsInProduction = o.Status == "Üretimde",
                         IsStockOrder = o.IsStockOrder
@@ -661,7 +617,7 @@ namespace ERP.UI.Forms
                 // Event handler'ları tekrar ekle
                 _dataGridView.DataBindingComplete += DataGridView_DataBindingComplete;
                 _dataGridView.RowsAdded += DataGridView_RowsAdded;
-                _dataGridView.RowPrePaint += DataGridView_RowPrePaint;
+                // RowPrePaint kaldırıldı - CellPainting zaten yapıyor (performans optimizasyonu)
                 _dataGridView.CellPainting += DataGridView_CellPainting;
 
             // Stil ayarları
@@ -748,18 +704,6 @@ namespace ERP.UI.Forms
             }
         }
 
-        private void ChkTableView_CheckedChanged(object sender, EventArgs e)
-        {
-            _isTableView = _chkTableView.Checked;
-            _cardsPanel.Visible = !_isTableView;
-            _dataGridView.Visible = _isTableView;
-            _columnFilterPanel.Visible = _isTableView;
-            if (_isTableView)
-            {
-                UpdateColumnFilterPanel();
-            }
-            LoadProductionOrders(); // Filtreleri koruyarak arama yap
-        }
 
         private void DataGridView_CellClick(object sender, DataGridViewCellEventArgs e)
         {
@@ -854,238 +798,6 @@ namespace ERP.UI.Forms
             }
         }
 
-        private Panel CreateProductionCard(Order order)
-        {
-            var card = new Panel
-            {
-                Width = 350,
-                Height = 420,
-                BackColor = Color.White,
-                Margin = new Padding(15),
-                Padding = new Padding(20),
-                BorderStyle = BorderStyle.FixedSingle
-            };
-
-            // Üretimde olan siparişler için farklı arka plan rengi
-            bool isInProduction = order.Status == "Üretimde";
-            if (isInProduction)
-            {
-                card.BackColor = Color.FromArgb(255, 248, 249, 250); // Açık mavi-gri ton
-                card.BorderStyle = BorderStyle.FixedSingle;
-                card.Paint += (s, e) =>
-                {
-                    var rect = card.ClientRectangle;
-                    rect.Width -= 1;
-                    rect.Height -= 1;
-                    e.Graphics.DrawRectangle(new Pen(ThemeColors.Info, 3), rect);
-                };
-            }
-
-            // Yeni gelen sipariş için border rengi (Üretimde değilse)
-            bool isNew = !isInProduction && (order.ModifiedDate == null || 
-                        (DateTime.Now - order.ModifiedDate.Value).TotalHours < 24);
-            
-            if (isNew)
-            {
-                card.BorderStyle = BorderStyle.FixedSingle;
-                card.Paint += (s, e) =>
-                {
-                    var rect = card.ClientRectangle;
-                    rect.Width -= 1;
-                    rect.Height -= 1;
-                    e.Graphics.DrawRectangle(new Pen(ThemeColors.Warning, 2), rect);
-                };
-            }
-
-            int yPos = 15;
-
-            // Üretimde işareti
-            if (isInProduction)
-            {
-                var lblProduction = new Label
-                {
-                    Text = "🏭 ÜRETİMDE",
-                    Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                    ForeColor = ThemeColors.Info,
-                    AutoSize = true,
-                    Location = new Point(15, yPos)
-                };
-                card.Controls.Add(lblProduction);
-                yPos += 25;
-            }
-            // Yeni işareti (Üretimde değilse)
-            else if (isNew)
-            {
-                var lblNew = new Label
-                {
-                    Text = "🆕 YENİ",
-                    Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                    ForeColor = ThemeColors.Warning,
-                    AutoSize = true,
-                    Location = new Point(15, yPos)
-                };
-                card.Controls.Add(lblNew);
-                yPos += 25;
-            }
-
-            // Durum
-            var lblStatus = new Label
-            {
-                Text = $"Durum: {order.Status ?? "Yeni"}",
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                ForeColor = isInProduction ? ThemeColors.Info : ThemeColors.TextSecondary,
-                AutoSize = true,
-                Location = new Point(15, yPos)
-            };
-            card.Controls.Add(lblStatus);
-            yPos += 25;
-
-            // Sipariş No
-            var lblOrderNo = new Label
-            {
-                Text = $"Sipariş No: {order.TrexOrderNo}",
-                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
-                ForeColor = ThemeColors.Primary,
-                AutoSize = true,
-                Location = new Point(15, yPos)
-            };
-            yPos += 30;
-
-            // Müşteri Sipariş No
-            var lblCustomerOrderNo = new Label
-            {
-                Text = $"Müşteri Sipariş: {order.CustomerOrderNo}",
-                Font = new Font("Segoe UI", 10F),
-                ForeColor = ThemeColors.TextPrimary,
-                AutoSize = true,
-                Location = new Point(15, yPos)
-            };
-            yPos += 25;
-
-            // Firma
-            var lblCompany = new Label
-            {
-                Text = $"Firma: {order.Company?.Name ?? "Bilinmiyor"}",
-                Font = new Font("Segoe UI", 10F),
-                ForeColor = ThemeColors.TextSecondary,
-                AutoSize = true,
-                Location = new Point(15, yPos),
-                MaximumSize = new Size(310, 0)
-            };
-            yPos += 25;
-
-            // Cihaz Adı
-            if (!string.IsNullOrEmpty(order.DeviceName))
-            {
-                var lblDevice = new Label
-                {
-                    Text = $"Cihaz: {order.DeviceName}",
-                    Font = new Font("Segoe UI", 10F),
-                    ForeColor = ThemeColors.TextSecondary,
-                    AutoSize = true,
-                    Location = new Point(15, yPos),
-                    MaximumSize = new Size(310, 0)
-                };
-                card.Controls.Add(lblDevice);
-                yPos += 25;
-            }
-
-            // Ürün Kodu
-            if (!string.IsNullOrEmpty(order.ProductCode))
-            {
-                var lblProductCode = new Label
-                {
-                    Text = $"Ürün Kodu: {order.ProductCode}",
-                    Font = new Font("Segoe UI", 10F),
-                    ForeColor = ThemeColors.TextSecondary,
-                    AutoSize = true,
-                    Location = new Point(15, yPos),
-                    MaximumSize = new Size(310, 0)
-                };
-                card.Controls.Add(lblProductCode);
-                yPos += 25;
-            }
-
-            // Adet
-            var lblQuantity = new Label
-            {
-                Text = $"Adet: {order.Quantity}",
-                Font = new Font("Segoe UI", 10F),
-                ForeColor = ThemeColors.TextSecondary,
-                AutoSize = true,
-                Location = new Point(15, yPos)
-            };
-            yPos += 25;
-
-            // Lamel Kalınlığı
-            if (order.LamelThickness.HasValue)
-            {
-                var lblLamelThickness = new Label
-                {
-                    Text = $"Lamel Kalınlığı: {order.LamelThickness.Value.ToString("0.000")}",
-                    Font = new Font("Segoe UI", 10F),
-                    ForeColor = ThemeColors.TextSecondary,
-                    AutoSize = true,
-                    Location = new Point(15, yPos)
-                };
-                card.Controls.Add(lblLamelThickness);
-                yPos += 25;
-            }
-            yPos += 10;
-
-            // Butonlar - Rapor, Ayrıntı, (Siparişe Dön)
-            var btnReport = ButtonFactory.CreateActionButton("📄 Rapor", ThemeColors.Info, Color.White, 100, 35);
-            btnReport.Location = new Point(15, yPos);
-            btnReport.Click += (s, e) => ProductionReportRequested?.Invoke(this, order.Id);
-            card.Controls.Add(btnReport);
-
-            var btnDetail = ButtonFactory.CreateActionButton("📋 Ayrıntı", ThemeColors.Primary, Color.White, 100, 35);
-            btnDetail.Location = new Point(120, yPos);
-            btnDetail.Click += (s, e) => ProductionDetailRequested?.Invoke(this, order.Id);
-            card.Controls.Add(btnDetail);
-
-            // Sadece üretimdeyse ve stok siparişi değilse siparişe dön butonu
-            if (isInProduction && !order.IsStockOrder)
-            {
-                var btnReturnToOrder = ButtonFactory.CreateActionButton("📦 Siparişe Dön", ThemeColors.Info, Color.White, 120, 35);
-                btnReturnToOrder.Location = new Point(225, yPos);
-                btnReturnToOrder.Click += (s, e) =>
-                {
-                    // Paketleme kontrolü
-                    var packagings = _packagingRepository.GetByOrderId(order.Id);
-                    bool hasCompletedPackaging = packagings.Any(p => p.IsActive);
-                    
-                    if (!hasCompletedPackaging)
-                    {
-                        MessageBox.Show(
-                            "Bu siparişi siparişe döndürmek için önce paketleme işleminin tamamlanmış olması gerekir.",
-                            "Uyarı",
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Warning);
-                        return;
-                    }
-                    
-                    var result = MessageBox.Show(
-                        $"Sipariş {order.TrexOrderNo} siparişe döndürülecek. Emin misiniz?",
-                        "Siparişe Dön",
-                        MessageBoxButtons.YesNo,
-                        MessageBoxIcon.Question);
-
-                    if (result == DialogResult.Yes)
-                    {
-                        ProductionReturnToOrderRequested?.Invoke(this, order.Id);
-                    }
-                };
-                card.Controls.Add(btnReturnToOrder);
-            }
-
-            card.Controls.Add(lblOrderNo);
-            card.Controls.Add(lblCustomerOrderNo);
-            card.Controls.Add(lblCompany);
-            card.Controls.Add(lblQuantity);
-
-            return card;
-        }
 
         public void RefreshOrders()
         {
@@ -1256,24 +968,9 @@ namespace ERP.UI.Forms
             _dataGridView.Invalidate();
         }
 
-        private void DataGridView_RowPrePaint(object sender, DataGridViewRowPrePaintEventArgs e)
-        {
-            if (e.RowIndex >= 0 && e.RowIndex < _dataGridView.Rows.Count)
-            {
-                var row = _dataGridView.Rows[e.RowIndex];
-                ApplyRowColorToRow(row);
-            }
-        }
-
-        private void DataGridView_Scroll(object sender, ScrollEventArgs e)
-        {
-            // Scroll sırasında tüm görünür satırları yeniden çiz
-            if (e.ScrollOrientation == ScrollOrientation.VerticalScroll)
-            {
-                _dataGridView.Invalidate();
-                _dataGridView.Update();
-            }
-        }
+        // RowPrePaint kaldırıldı - CellPainting zaten yapıyor (performans optimizasyonu)
+        
+        // Scroll event'i kaldırıldı - DataGridView zaten otomatik çiziyor, gereksiz Invalidate() çağrısı önlendi
 
         private void DataGridView_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
         {
@@ -1285,8 +982,8 @@ namespace ERP.UI.Forms
                 var row = _dataGridView.Rows[e.RowIndex];
                 bool isActionsColumn = _dataGridView.Columns[e.ColumnIndex].Name == "Actions";
                 
-                // Önce hücreyi tamamen temizle (üst üste binmeyi önlemek için)
-                e.Graphics.FillRectangle(new SolidBrush(_dataGridView.BackgroundColor), e.CellBounds);
+                // Önce hücreyi tamamen temizle (üst üste binmeyi önlemek için) - cache'lenmiş brush kullan
+                e.Graphics.FillRectangle(_whiteBrush, e.CellBounds);
 
                 // Tag'dan Order listesini al
                 List<Order> orders = null;
@@ -1405,11 +1102,9 @@ namespace ERP.UI.Forms
                     bool isInProduction = actionOrder.Status == "Üretimde";
                     bool isStockOrder = actionOrder.IsStockOrder;
 
-                    // Actions kolonu için satır arka planını çiz
-                    using (SolidBrush bgBrush = new SolidBrush(rowBgColor))
-                    {
-                        e.Graphics.FillRectangle(bgBrush, e.CellBounds);
-                    }
+                    // Actions kolonu için satır arka planını çiz - cache'lenmiş brush kullan
+                    var bgBrush = GetCachedBrush(rowBgColor);
+                    e.Graphics.FillRectangle(bgBrush, e.CellBounds);
 
                     // Border'ı çiz
                     e.Paint(e.CellBounds, DataGridViewPaintParts.Border);
@@ -1434,7 +1129,6 @@ namespace ERP.UI.Forms
                     }
 
                     int emojiWidth = e.CellBounds.Width / emojis.Length;
-                    Font emojiFont = new Font("Segoe UI Emoji", 12F);
                     int circleSize = 20;
                     int emojiSize = 14;
 
@@ -1446,19 +1140,16 @@ namespace ERP.UI.Forms
                         int circleX = xCenter - (circleSize / 2);
                         int circleY = yCenter - (circleSize / 2);
 
-                        // Renkli arka plan çemberi
-                        using (SolidBrush bgBrush = new SolidBrush(Color.FromArgb(70, colors[i])))
-                        {
-                            e.Graphics.FillEllipse(bgBrush, circleX, circleY, circleSize, circleSize);
-                        }
+                        // Renkli arka plan çemberi - cache'lenmiş brush kullan
+                        var circleColor = Color.FromArgb(70, colors[i]);
+                        var circleBrush = GetCachedBrush(circleColor);
+                        e.Graphics.FillEllipse(circleBrush, circleX, circleY, circleSize, circleSize);
 
-                        // Renkli kenarlık
-                        using (Pen borderPen = new Pen(colors[i], 1.5f))
-                        {
-                            e.Graphics.DrawEllipse(borderPen, circleX, circleY, circleSize, circleSize);
-                        }
+                        // Renkli kenarlık - cache'lenmiş pen kullan
+                        var borderPen = GetCachedPen(colors[i], 1.5f);
+                        e.Graphics.DrawEllipse(borderPen, circleX, circleY, circleSize, circleSize);
 
-                        // Emoji'yi çiz
+                        // Emoji'yi çiz - cache'lenmiş font ve format kullan
                         RectangleF emojiRect = new RectangleF(
                             xCenter - (emojiSize / 2f),
                             yCenter - (emojiSize / 2f),
@@ -1466,16 +1157,8 @@ namespace ERP.UI.Forms
                             emojiSize
                         );
 
-                        using (StringFormat sf = new StringFormat())
-                        {
-                            sf.Alignment = StringAlignment.Center;
-                            sf.LineAlignment = StringAlignment.Center;
-                            sf.FormatFlags = StringFormatFlags.NoWrap;
-                            e.Graphics.DrawString(emojis[i], emojiFont, Brushes.Black, emojiRect, sf);
-                        }
+                        e.Graphics.DrawString(emojis[i], _emojiFont, _blackBrush, emojiRect, _centerStringFormat);
                     }
-
-                    emojiFont.Dispose();
                     e.Handled = true;
                     return;
                 }
@@ -1484,16 +1167,17 @@ namespace ERP.UI.Forms
                 {
                     if (rowBgColor != Color.White)
                     {
-                        // Önce arka planı tamamen temizle ve yeni rengi uygula
-                        e.Graphics.FillRectangle(new SolidBrush(rowBgColor), e.CellBounds);
+                        // Önce arka planı tamamen temizle ve yeni rengi uygula - cache'lenmiş brush kullan
+                        var bgBrush = GetCachedBrush(rowBgColor);
+                        e.Graphics.FillRectangle(bgBrush, e.CellBounds);
                         // İçeriği ve border'ı çiz
                         e.Paint(e.CellBounds, DataGridViewPaintParts.ContentForeground | DataGridViewPaintParts.Border);
                         e.Handled = true;
                     }
                     else
                     {
-                        // Beyaz arka plan için de temizle
-                        e.Graphics.FillRectangle(new SolidBrush(Color.White), e.CellBounds);
+                        // Beyaz arka plan için de temizle - cache'lenmiş brush kullan
+                        e.Graphics.FillRectangle(_whiteBrush, e.CellBounds);
                         e.Paint(e.CellBounds, DataGridViewPaintParts.All);
                         e.Handled = true;
                     }
@@ -1554,10 +1238,12 @@ namespace ERP.UI.Forms
         {
             if (order == null) return "";
             
-            // Üretimden geçmiş mi kontrol et (Muhasebede, Tamamlandı, Sevkiyata Hazır veya ShipmentDate dolu ise)
-            bool isProductionPassed = order.Status == "Muhasebede" || 
-                                     order.Status == "Tamamlandı" || 
+            // Üretimden geçmiş mi kontrol et (Üretimden sonraki tüm durumlar)
+            bool isProductionPassed = order.Status == "Fatura Kesimi Bekliyor" || 
+                                     order.Status == "Muhasebede" || 
+                                     order.Status == "İrsaliye Kesildi" ||
                                      order.Status == "Sevkiyata Hazır" ||
+                                     order.Status == "Sevk Edildi" ||
                                      order.ShipmentDate.HasValue;
             
             if (isProductionPassed)
@@ -1600,6 +1286,101 @@ namespace ERP.UI.Forms
             
             // Hiç işlem yapılmamışsa
             return "Bekliyor";
+        }
+
+        // Status bilgilerini toplu yükle (performans optimizasyonu)
+        private Dictionary<Guid, string> PreloadStatusData(List<Order> orders)
+        {
+            var statusCache = new Dictionary<Guid, string>();
+            
+            // Sadece "Üretimde" olan siparişler için veritabanı sorguları yap
+            var productionOrders = orders.Where(o => o.Status == "Üretimde").ToList();
+            
+            if (productionOrders.Count == 0)
+            {
+                // Üretimde olmayan siparişler için hızlı status belirleme
+                foreach (var order in orders)
+                {
+                    if (order.Status == "Fatura Kesimi Bekliyor" || 
+                        order.Status == "Muhasebede" || 
+                        order.Status == "İrsaliye Kesildi" ||
+                        order.Status == "Sevkiyata Hazır" ||
+                        order.Status == "Sevk Edildi" ||
+                        order.ShipmentDate.HasValue)
+                    {
+                        statusCache[order.Id] = "Gönderildi";
+                    }
+                    else if (order.Status != "Üretimde")
+                    {
+                        statusCache[order.Id] = order.Status;
+                    }
+                }
+                return statusCache;
+            }
+
+            // Toplu veri yükleme - tüm order ID'leri
+            var orderIds = productionOrders.Select(o => o.Id).ToList();
+
+            // Paketleme bilgilerini toplu yükle
+            var allPackagings = _packagingRepository.GetAll()
+                .Where(p => p.IsActive && p.OrderId.HasValue && orderIds.Contains(p.OrderId.Value))
+                .GroupBy(p => p.OrderId.Value)
+                .ToDictionary(g => g.Key, g => g.Any());
+
+            // Montaj bilgilerini toplu yükle
+            var allAssemblyRequests = _assemblyRequestRepository.GetAll()
+                .Where(ar => ar.IsActive && ar.OrderId.HasValue && orderIds.Contains(ar.OrderId.Value))
+                .GroupBy(ar => ar.OrderId.Value)
+                .ToDictionary(g => g.Key, g => g.Any());
+
+            // Kenetleme bilgilerini toplu yükle (ClampingRequest.OrderId nullable değil, direkt Guid)
+            var allClampingRequests = _clampingRequestRepository.GetAll()
+                .Where(cr => cr.IsActive && orderIds.Contains(cr.OrderId))
+                .GroupBy(cr => cr.OrderId)
+                .ToDictionary(g => g.Key, g => g.Any());
+
+            // Status'ları hesapla
+            foreach (var order in orders)
+            {
+                // Üretimden geçmiş mi kontrol et
+                bool isProductionPassed = order.Status == "Fatura Kesimi Bekliyor" || 
+                                         order.Status == "Muhasebede" || 
+                                         order.Status == "İrsaliye Kesildi" ||
+                                         order.Status == "Sevkiyata Hazır" ||
+                                         order.Status == "Sevk Edildi" ||
+                                         order.ShipmentDate.HasValue;
+                
+                if (isProductionPassed)
+                {
+                    statusCache[order.Id] = "Gönderildi";
+                }
+                else if (order.Status != "Üretimde")
+                {
+                    statusCache[order.Id] = order.Status;
+                }
+                else
+                {
+                    // Üretimde - sırayla kontrol et
+                    if (allPackagings.ContainsKey(order.Id) && allPackagings[order.Id])
+                    {
+                        statusCache[order.Id] = "Paketli";
+                    }
+                    else if (allAssemblyRequests.ContainsKey(order.Id) && allAssemblyRequests[order.Id])
+                    {
+                        statusCache[order.Id] = "Montajlı";
+                    }
+                    else if (allClampingRequests.ContainsKey(order.Id) && allClampingRequests[order.Id])
+                    {
+                        statusCache[order.Id] = "Kenetli";
+                    }
+                    else
+                    {
+                        statusCache[order.Id] = "Bekliyor";
+                    }
+                }
+            }
+
+            return statusCache;
         }
 
         private string GetPlaceholderText(string columnName)
@@ -1810,7 +1591,7 @@ namespace ERP.UI.Forms
 
         private void ApplyColumnFilters()
         {
-            if (!_isTableView || _dataGridView.Tag == null)
+            if (_dataGridView.Tag == null)
                 return;
 
             try
@@ -2000,6 +1781,27 @@ namespace ERP.UI.Forms
                     column.HeaderText = originalHeader;
                 }
             }
+        }
+
+        // Cache'lenmiş brush getir (performans optimizasyonu)
+        private static SolidBrush GetCachedBrush(Color color)
+        {
+            if (!_brushCache.ContainsKey(color))
+            {
+                _brushCache[color] = new SolidBrush(color);
+            }
+            return _brushCache[color];
+        }
+
+        // Cache'lenmiş pen getir (performans optimizasyonu)
+        private static Pen GetCachedPen(Color color, float width = 1.5f)
+        {
+            // Basit cache için sadece renk kullan (genişlik her zaman 1.5f)
+            if (!_penCache.ContainsKey(color))
+            {
+                _penCache[color] = new Pen(color, width);
+            }
+            return _penCache[color];
         }
     }
 }
