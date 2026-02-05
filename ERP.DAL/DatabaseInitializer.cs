@@ -10,12 +10,25 @@ namespace ERP.DAL
         {
             try
             {
-                // Ensure the database is created with the latest schema
-                DatabaseHelper.EnsureDatabaseCreated();
+                // Ensure both databases are created with the latest schema
+                DatabaseHelper.EnsureDatabasesCreated();
             }
             catch (Exception ex)
             {
                 throw new Exception("Veritabanı başlatma hatası: " + ex.Message, ex);
+            }
+        }
+
+        public static void InitializeWithMigrations()
+        {
+            try
+            {
+                // Apply migrations to both databases
+                DatabaseHelper.MigrateDatabases();
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Veritabanı göç hatası: " + ex.Message, ex);
             }
         }
     }

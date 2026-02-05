@@ -1,42 +1,28 @@
+using System;
 using Microsoft.EntityFrameworkCore;
-using System.IO;
+using ERP.DAL.Configuration;
 
 namespace ERP.DAL
 {
     public class DatabaseHelper
     {
-        private static string? _connectionString;
-        private const string DatabaseFileName = "ERPDB.db";
 
-        public static string ConnectionString
+        public static bool TestUserDbConnection()
         {
-            get
+            try
             {
-                if (_connectionString == null)
+                using (var context = new UserDbContext())
                 {
-                    LoadConnectionString();
+                    return context.Database.CanConnect();
                 }
-                return _connectionString ?? string.Empty;
             }
-            set { _connectionString = value; }
+            catch (Exception ex)
+            {
+                throw new Exception("User database connection failed: " + ex.Message, ex);
+            }
         }
 
-        private static void LoadConnectionString()
-        {
-            // Get application directory
-            var appDirectory = AppDomain.CurrentDomain.BaseDirectory;
-            var databasePath = Path.Combine(appDirectory, DatabaseFileName);
-            
-            _connectionString = $"Data Source={databasePath}";
-        }
-
-        public static string GetDatabasePath()
-        {
-            var appDirectory = AppDomain.CurrentDomain.BaseDirectory;
-            return Path.Combine(appDirectory, DatabaseFileName);
-        }
-
-        public static bool TestConnection()
+        public static bool TestErpDbConnection()
         {
             try
             {
@@ -47,23 +33,40 @@ namespace ERP.DAL
             }
             catch (Exception ex)
             {
-                throw new Exception("Veritabanı bağlantısı başarısız: " + ex.Message);
+                throw new Exception("ERP database connection failed: " + ex.Message, ex);
             }
         }
 
-        public static void EnsureDatabaseCreated()
+        public static bool TestConnections()
         {
-            using (var context = new ErpDbContext())
+            bool userDbOk = TestUserDbConnection();
+            bool erpDbOk = TestErpDbConnection();
+            return userDbOk && erpDbOk;
+        }
+
+        public static void EnsureDatabasesCreated()
+        {
+            using (var userContext = new UserDbContext())
             {
-                context.Database.EnsureCreated();
+                userContext.Database.EnsureCreated();
+            }
+
+            using (var erpContext = new ErpDbContext())
+            {
+                erpContext.Database.EnsureCreated();
             }
         }
 
-        public static void MigrateDatabase()
+        public static void MigrateDatabases()
         {
-            using (var context = new ErpDbContext())
+            using (var userContext = new UserDbContext())
             {
-                context.Database.Migrate();
+                userContext.Database.Migrate();
+            }
+
+            using (var erpContext = new ErpDbContext())
+            {
+                erpContext.Database.Migrate();
             }
         }
     }

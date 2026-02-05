@@ -1,4 +1,5 @@
 using ERP.DAL;
+using ERP.DAL.Configuration;
 using ERP.UI.Forms;
 using ERP.UI.Services;
 using System;
@@ -17,26 +18,31 @@ namespace ERP.UI
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             
-            // Veritabanını başlat
+            // Database initialization
             try
             {
                 DatabaseInitializer.InitializeDatabase();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Veritabanı başlatma hatası: {ex.Message}\n\nUygulama devam edecek ancak veritabanı işlemleri çalışmayabilir.", 
-                    "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(
+                    $"Database initialization error: {ex.Message}\n\n" +
+                    "The application will continue but database operations may not work.\n\n" +
+                    "Please check your database configuration.",
+                    "Warning", 
+                    MessageBoxButtons.OK, 
+                    MessageBoxIcon.Warning);
             }
             
-            // Login ekranını göster
+            // Show login screen
             using (var loginForm = new LoginForm())
             {
                 if (loginForm.ShowDialog() == DialogResult.OK && loginForm.LoggedInUser != null)
                 {
-                    // Kullanıcı oturumunu başlat
+                    // Start user session
                     UserSessionService.CurrentUser = loginForm.LoggedInUser;
                     
-                    // Ana formu göster
+                    // Show main form
                     Application.Run(new MainForm());
                 }
             }

@@ -20,7 +20,6 @@ namespace ERP.DAL.Repositories
         public override List<EventFeed> GetAll()
         {
             return _dbSet
-                .Include(e => e.CreatedByUser)
                 .Where(e => e.IsActive)
                 .OrderByDescending(e => e.EventDate)
                 .ToList();
@@ -29,7 +28,6 @@ namespace ERP.DAL.Repositories
         public List<EventFeed> GetUnreadEvents()
         {
             return _dbSet
-                .Include(e => e.CreatedByUser)
                 .Where(e => e.IsActive && !e.IsRead)
                 .OrderByDescending(e => e.EventDate)
                 .ToList();
@@ -38,16 +36,21 @@ namespace ERP.DAL.Repositories
         public List<EventFeed> GetByUserPermissions(Guid userId, bool isAdmin, int limit = 100)
         {
             var query = _dbSet
-                .Include(e => e.CreatedByUser)
                 .Where(e => e.IsActive);
 
             if (!isAdmin)
             {
-                // Get user's permissions
-                var userPermissions = _context.UserPermissions
-                    .Where(up => up.UserId == userId && up.IsActive)
-                    .Select(up => up.PermissionKey)
-                    .ToList();
+                // Get user's permissions from UserDbContext
+                List<string> userPermissions;
+                var userRepo = new UserPermissionRepository();
+                try
+                {
+                    userPermissions = userRepo.GetPermissionKeysByUserId(userId);
+                }
+                finally
+                {
+                    userRepo.Dispose();
+                }
 
                 // Filter events based on required permissions
                 query = query.Where(e => 

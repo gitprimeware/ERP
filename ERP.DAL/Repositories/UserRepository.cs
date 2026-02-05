@@ -8,19 +8,21 @@ namespace ERP.DAL.Repositories
 {
     public class UserRepository : BaseRepository<User>
     {
-        public UserRepository() : base()
+        public UserRepository() : base(new UserDbContext())
         {
         }
 
-        public UserRepository(ErpDbContext context) : base(context)
+        public UserRepository(UserDbContext context) : base(context)
         {
         }
+
         public override Guid Insert(User entity)
         {
             entity.PasswordHash = ComputeSha256Hash(entity.PasswordHash);
 
             return base.Insert(entity);
         }
+
         public User? GetByUsername(string username)
         {
             return _dbSet.FirstOrDefault(u => u.Username == username && u.IsActive);

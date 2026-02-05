@@ -9,11 +9,11 @@ namespace ERP.DAL.Repositories
 {
     public class UserPermissionRepository : BaseRepository<UserPermission>
     {
-        public UserPermissionRepository() : base()
+        public UserPermissionRepository() : base(new UserDbContext())
         {
         }
 
-        public UserPermissionRepository(ErpDbContext context) : base(context)
+        public UserPermissionRepository(UserDbContext context) : base(context)
         {
         }
 

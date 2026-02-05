@@ -6,7 +6,7 @@ namespace ERP.DAL.Repositories
 {
     public class BaseRepository<T> where T : BaseModel
     {
-        protected readonly ErpDbContext _context;
+        protected readonly DbContext _context;
         protected readonly DbSet<T> _dbSet;
 
         public BaseRepository()
@@ -15,6 +15,13 @@ namespace ERP.DAL.Repositories
             _dbSet = _context.Set<T>();
         }
 
+        public BaseRepository(DbContext context)
+        {
+            _context = context;
+            _dbSet = _context.Set<T>();
+        }
+
+        // For backward compatibility with existing code
         public BaseRepository(ErpDbContext context)
         {
             _context = context;

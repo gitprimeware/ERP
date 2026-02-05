@@ -10,8 +10,7 @@ namespace ERP.Core.Models
         public string RequiredPermission { get; set; } // Bu event'i görmek için gerekli izin anahtarı
         public Guid? RelatedEntityId { get; set; } // İlgili entity ID (OrderId, CuttingRequestId, vb.)
         public string RelatedEntityType { get; set; } // İlgili entity tipi (Order, CuttingRequest, vb.)
-        public Guid? CreatedByUserId { get; set; } // Event'i oluşturan kullanıcı
-        public User? CreatedByUser { get; set; } // Navigation property
+        public Guid? CreatedByUserId { get; set; } // Event'i oluşturan kullanıcı (User in separate database)
         public DateTime EventDate { get; set; } // Event'in oluştuğu tarih
         public bool IsRead { get; set; } // Kullanıcı tarafından okundu mu? (Gelecekte kullanılabilir)
     }
