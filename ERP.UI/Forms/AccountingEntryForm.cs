@@ -39,6 +39,7 @@ namespace ERP.UI.Forms
 
         public event EventHandler AccountingEntrySaved;
         public event EventHandler<Guid> OrderSendToShipmentRequested;
+        public event EventHandler CancelRequested;
 
         public AccountingEntryForm(Guid orderId)
         {
@@ -548,7 +549,7 @@ namespace ERP.UI.Forms
 
         private void BtnCancel_Click(object sender, EventArgs e)
         {
-            // Formu kapat - ContentManager'a geri dön
+            CancelRequested?.Invoke(this, EventArgs.Empty);
         }
     }
 }

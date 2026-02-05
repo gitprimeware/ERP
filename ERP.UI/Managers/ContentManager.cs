@@ -105,6 +105,11 @@ namespace ERP.UI.Managers
                         // Muhasebe listesini yenile
                         ShowForm("Accounting");
                     };
+                    accountingEntryForm.CancelRequested += (s, e) =>
+                    {
+                        // Muhasebe listesini yenile
+                        ShowForm("Accounting");
+                    };
                     accountingEntryForm.OrderSendToShipmentRequested += (s, id) => HandleSendToShipment(id);
                 }
 

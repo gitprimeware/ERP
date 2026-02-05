@@ -547,7 +547,7 @@ namespace ERP.UI.Forms
                 // Kuru girilmemiş (0 veya null) → Sarı
                 if (order.CurrencyRate == null || order.CurrencyRate == 0)
                 {
-                    return Color.FromArgb(255, 255, 235, 59); // Sarı
+                    return Color.FromArgb(255, 33, 43, 243); // Sarı
                 }
                 
                 // Kuru girilmiş → Yeşil
