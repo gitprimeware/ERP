@@ -80,7 +80,7 @@
             // 
             // customerOrderNo
             // 
-            this.customerOrderNo.Font = new DevExpress.Drawing.DXFont("Calibri", 11F);
+            this.customerOrderNo.Font = new System.Drawing.Font("Calibri", 11F);
             this.customerOrderNo.Multiline = true;
             this.customerOrderNo.Name = "customerOrderNo";
             this.customerOrderNo.StylePriority.UseFont = false;
@@ -90,7 +90,7 @@
             // 
             // DeviceName
             // 
-            this.DeviceName.Font = new DevExpress.Drawing.DXFont("Calibri", 11F);
+            this.DeviceName.Font = new System.Drawing.Font("Calibri", 11F);
             this.DeviceName.Multiline = true;
             this.DeviceName.Name = "DeviceName";
             this.DeviceName.StylePriority.UseFont = false;
@@ -103,7 +103,7 @@
             this.xrTableCell8.Borders = ((DevExpress.XtraPrinting.BorderSide)((((DevExpress.XtraPrinting.BorderSide.Left | DevExpress.XtraPrinting.BorderSide.Top) 
             | DevExpress.XtraPrinting.BorderSide.Right) 
             | DevExpress.XtraPrinting.BorderSide.Bottom)));
-            this.xrTableCell8.Font = new DevExpress.Drawing.DXFont("Calibri", 11F);
+            this.xrTableCell8.Font = new System.Drawing.Font("Calibri", 11F);
             this.xrTableCell8.Multiline = true;
             this.xrTableCell8.Name = "xrTableCell8";
             this.xrTableCell8.StylePriority.UseBorders = false;
@@ -114,7 +114,7 @@
             // 
             // bypasOlcusu
             // 
-            this.bypasOlcusu.Font = new DevExpress.Drawing.DXFont("Calibri", 11F);
+            this.bypasOlcusu.Font = new System.Drawing.Font("Calibri", 11F);
             this.bypasOlcusu.Multiline = true;
             this.bypasOlcusu.Name = "bypasOlcusu";
             this.bypasOlcusu.StylePriority.UseFont = false;
@@ -124,7 +124,7 @@
             // 
             // bypasTuru
             // 
-            this.bypasTuru.Font = new DevExpress.Drawing.DXFont("Calibri", 11F);
+            this.bypasTuru.Font = new System.Drawing.Font("Calibri", 11F);
             this.bypasTuru.Multiline = true;
             this.bypasTuru.Name = "bypasTuru";
             this.bypasTuru.StylePriority.UseFont = false;
@@ -134,7 +134,7 @@
             // 
             // pieces
             // 
-            this.pieces.Font = new DevExpress.Drawing.DXFont("Calibri", 11F);
+            this.pieces.Font = new System.Drawing.Font("Calibri", 11F);
             this.pieces.Multiline = true;
             this.pieces.Name = "pieces";
             this.pieces.StylePriority.UseFont = false;
@@ -144,7 +144,7 @@
             // 
             // productType
             // 
-            this.productType.Font = new DevExpress.Drawing.DXFont("Calibri", 11F);
+            this.productType.Font = new System.Drawing.Font("Calibri", 11F);
             this.productType.Multiline = true;
             this.productType.Name = "productType";
             this.productType.StylePriority.UseFont = false;
@@ -175,10 +175,10 @@
             this.Borders = ((DevExpress.XtraPrinting.BorderSide)((((DevExpress.XtraPrinting.BorderSide.Left | DevExpress.XtraPrinting.BorderSide.Top) 
             | DevExpress.XtraPrinting.BorderSide.Right) 
             | DevExpress.XtraPrinting.BorderSide.Bottom)));
-            this.Margins = new DevExpress.Drawing.DXMargins(0F, 0F, 0F, 0F);
+            this.Margins = new System.Drawing.Printing.Margins(0, 0, 0, 0);
             this.PageHeight = 1169;
             this.PageWidth = 827;
-            this.PaperKind = DevExpress.Drawing.Printing.DXPaperKind.A4;
+            this.PaperKind = System.Drawing.Printing.PaperKind.A4;
             this.Version = "23.1";
             ((System.ComponentModel.ISupportInitialize)(this.xrTable1)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this)).EndInit();

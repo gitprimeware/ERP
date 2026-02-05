@@ -1,67 +1,33 @@
 using System;
 using System.Collections.Generic;
-using System.Data;
-using Microsoft.Data.SqlClient;
+using System.Linq;
 using ERP.Core.Models;
-using ERP.DAL;
 
 namespace ERP.DAL.Repositories
 {
-    public class IsolationStockRepository
+    public class IsolationStockRepository : BaseRepository<IsolationStock>
     {
-        public List<IsolationStock> GetAll()
+        public IsolationStockRepository() : base()
         {
-            var stocks = new List<IsolationStock>();
-            
-            using (var connection = DatabaseHelper.GetConnection())
-            {
-                connection.Open();
-                var query = @"SELECT Id, LiquidType, Kilogram, Quantity, Liter, EntryDate, 
-                             CreatedDate, ModifiedDate, IsActive
-                             FROM IsolationStocks
-                             WHERE IsActive = 1
-                             ORDER BY EntryDate DESC";
-                
-                using (var command = new SqlCommand(query, connection))
-                {
-                    using (var reader = command.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            stocks.Add(MapToIsolationStock(reader));
-                        }
-                    }
-                }
-            }
-            
-            return stocks;
         }
 
-        public IsolationStock GetById(Guid id)
+        public IsolationStockRepository(ErpDbContext context) : base(context)
         {
-            using (var connection = DatabaseHelper.GetConnection())
-            {
-                connection.Open();
-                var query = @"SELECT Id, LiquidType, Kilogram, Quantity, Liter, EntryDate, 
-                             CreatedDate, ModifiedDate, IsActive
-                             FROM IsolationStocks
-                             WHERE Id = @Id AND IsActive = 1";
-                
-                using (var command = new SqlCommand(query, connection))
-                {
-                    command.Parameters.AddWithValue("@Id", id);
-                    
-                    using (var reader = command.ExecuteReader())
-                    {
-                        if (reader.Read())
-                        {
-                            return MapToIsolationStock(reader);
-                        }
-                    }
-                }
-            }
-            
-            return null;
+        }
+
+        public List<IsolationStock> GetAllActiveStocks()
+        {
+            return _dbSet.Where(i => i.IsActive).OrderByDescending(i => i.EntryDate).ToList();
+        }
+
+        public IsolationStock? GetById(Guid id)
+        {
+            return _dbSet.FirstOrDefault(i => i.Id == id && i.IsActive);
+        }
+
+        public IsolationStock? GetByLiquidType(string liquidType)
+        {
+            return _dbSet.FirstOrDefault(i => i.LiquidType == liquidType && i.IsActive);
         }
 
         public Guid Insert(IsolationStock stock)
@@ -71,19 +37,9 @@ namespace ERP.DAL.Repositories
             stock.EntryDate = DateTime.Now;
             stock.IsActive = true;
 
-            using (var connection = DatabaseHelper.GetConnection())
-            {
-                connection.Open();
-                var query = @"INSERT INTO IsolationStocks (Id, LiquidType, Kilogram, Quantity, Liter, EntryDate, CreatedDate, IsActive) 
-                             VALUES (@Id, @LiquidType, @Kilogram, @Quantity, @Liter, @EntryDate, @CreatedDate, @IsActive)";
-                
-                using (var command = new SqlCommand(query, connection))
-                {
-                    AddIsolationStockParameters(command, stock);
-                    command.ExecuteNonQuery();
-                }
-            }
-            
+            _dbSet.Add(stock);
+            _context.SaveChanges();
+
             return stock.Id;
         }
 
@@ -91,46 +47,20 @@ namespace ERP.DAL.Repositories
         {
             stock.ModifiedDate = DateTime.Now;
 
-            using (var connection = DatabaseHelper.GetConnection())
-            {
-                connection.Open();
-                var query = @"UPDATE IsolationStocks SET 
-                             LiquidType = @LiquidType,
-                             Kilogram = @Kilogram,
-                             Quantity = @Quantity,
-                             Liter = @Liter,
-                             EntryDate = @EntryDate,
-                             ModifiedDate = @ModifiedDate
-                             WHERE Id = @Id";
-                
-                using (var command = new SqlCommand(query, connection))
-                {
-                    command.Parameters.AddWithValue("@Id", stock.Id);
-                    command.Parameters.AddWithValue("@LiquidType", stock.LiquidType);
-                    command.Parameters.AddWithValue("@Kilogram", stock.Kilogram);
-                    command.Parameters.AddWithValue("@Quantity", stock.Quantity);
-                    command.Parameters.AddWithValue("@Liter", stock.Liter);
-                    command.Parameters.AddWithValue("@EntryDate", stock.EntryDate);
-                    command.Parameters.AddWithValue("@ModifiedDate", stock.ModifiedDate ?? (object)DBNull.Value);
-                    
-                    command.ExecuteNonQuery();
-                }
-            }
+            _dbSet.Update(stock);
+            _context.SaveChanges();
         }
 
         public void Delete(Guid id)
         {
-            using (var connection = DatabaseHelper.GetConnection())
+            var stock = GetById(id);
+            if (stock != null)
             {
-                connection.Open();
-                var query = @"UPDATE IsolationStocks SET IsActive = 0, ModifiedDate = @ModifiedDate WHERE Id = @Id";
-                
-                using (var command = new SqlCommand(query, connection))
-                {
-                    command.Parameters.AddWithValue("@Id", id);
-                    command.Parameters.AddWithValue("@ModifiedDate", DateTime.Now);
-                    command.ExecuteNonQuery();
-                }
+                stock.IsActive = false;
+                stock.ModifiedDate = DateTime.Now;
+
+                _dbSet.Update(stock);
+                _context.SaveChanges();
             }
         }
 
@@ -141,7 +71,7 @@ namespace ERP.DAL.Repositories
             decimal totalPoliol = 0;
             decimal totalLiter = 0;
 
-            var stocks = GetAll();
+            var stocks = GetAllActiveStocks();
             foreach (var stock in stocks)
             {
                 if (stock.LiquidType == "İzosiyanat")
@@ -165,65 +95,6 @@ namespace ERP.DAL.Repositories
             }
 
             return (totalIsosiyanat, totalPoliol, totalLiter);
-        }
-
-        private void AddIsolationStockParameters(SqlCommand command, IsolationStock stock)
-        {
-            command.Parameters.AddWithValue("@Id", stock.Id);
-            command.Parameters.AddWithValue("@LiquidType", stock.LiquidType);
-            command.Parameters.AddWithValue("@Kilogram", stock.Kilogram);
-            command.Parameters.AddWithValue("@Quantity", stock.Quantity);
-            command.Parameters.AddWithValue("@Liter", stock.Liter);
-            command.Parameters.AddWithValue("@EntryDate", stock.EntryDate);
-            command.Parameters.AddWithValue("@CreatedDate", stock.CreatedDate);
-            command.Parameters.AddWithValue("@IsActive", stock.IsActive);
-        }
-
-        private IsolationStock MapToIsolationStock(SqlDataReader reader)
-        {
-            var stock = new IsolationStock
-            {
-                Id = reader.GetGuid("Id"),
-                LiquidType = reader.GetString("LiquidType"),
-                EntryDate = reader.GetDateTime("EntryDate"),
-                CreatedDate = reader.GetDateTime("CreatedDate"),
-                ModifiedDate = reader.IsDBNull("ModifiedDate") ? (DateTime?)null : reader.GetDateTime("ModifiedDate"),
-                IsActive = reader.GetBoolean("IsActive")
-            };
-            
-            // Kilogram kolonu varsa onu kullan, yoksa Quantity'den hesapla (geriye uyumluluk)
-            if (HasColumn(reader, "Kilogram"))
-            {
-                stock.Kilogram = reader.IsDBNull("Kilogram") ? 0 : reader.GetDecimal("Kilogram");
-            }
-            else
-            {
-                // Eski veriler için Quantity'den kg'a çevir (geriye uyumluluk)
-                int quantity = reader.IsDBNull("Quantity") ? 0 : reader.GetInt32("Quantity");
-                if (stock.LiquidType == "İzosiyanat")
-                    stock.Kilogram = quantity * 250m; // 1 adet = 250 kg
-                else if (stock.LiquidType == "Poliol")
-                    stock.Kilogram = quantity * 25m; // 1 adet = 25 kg
-                else if (stock.LiquidType == "MS Silikon")
-                    stock.Kilogram = quantity * 0.95m; // 1 adet = 0.95 kg (950 gr)
-                else
-                    stock.Kilogram = 0;
-            }
-            
-            stock.Quantity = reader.IsDBNull("Quantity") ? 0 : reader.GetInt32("Quantity");
-            stock.Liter = reader.IsDBNull("Liter") ? 0 : reader.GetDecimal("Liter");
-            
-            return stock;
-        }
-        
-        private bool HasColumn(SqlDataReader reader, string columnName)
-        {
-            for (int i = 0; i < reader.FieldCount; i++)
-            {
-                if (reader.GetName(i).Equals(columnName, StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-            return false;
         }
     }
 }

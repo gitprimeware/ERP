@@ -8,6 +8,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="DevExpress.Data" Version="22.1.5" />
+    <PackageReference Include="DevExpress.Document.Processor" Version="22.1.5" />
+    <PackageReference Include="DevExpress.Drawing" Version="22.1.5" />
+    <PackageReference Include="DevExpress.ExpressApp" Version="22.1.5" />
+    <PackageReference Include="DevExpress.ExpressApp.Win" Version="22.1.5" />
+    <PackageReference Include="DevExpress.Printing.Core" Version="22.1.5" />
+    <PackageReference Include="DevExpress.Utils" Version="22.1.5" />
+    <PackageReference Include="DevExpress.Win.Design" Version="22.1.5" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\ERP.Core\ERP.Core.csproj" />
   </ItemGroup>
 
@@ -24,31 +35,6 @@
   <!-- C:\Program Files (x86)\DevExpress 24.1\Components\Bin\Framework\DevExpress.XtraReports.v24.1.dll -->
   
   <!-- DevExpress 23.1 DLL referansları - XtraReports için -->
-  <ItemGroup>
-    <Reference Include="DevExpress.XtraReports.v23.1">
-      <HintPath>C:\Program Files\DevExpress 23.1\Components\Bin\Framework\DevExpress.XtraReports.v23.1.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="DevExpress.Data.v23.1">
-      <HintPath>C:\Program Files\DevExpress 23.1\Components\Bin\Framework\DevExpress.Data.v23.1.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="DevExpress.Printing.v23.1.Core">
-      <HintPath>C:\Program Files\DevExpress 23.1\Components\Bin\Framework\DevExpress.Printing.v23.1.Core.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="DevExpress.Drawing.v23.1">
-      <HintPath>C:\Program Files\DevExpress 23.1\Components\Bin\Framework\DevExpress.Drawing.v23.1.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-  </ItemGroup>
-	<ItemGroup>
-		<PackageReference Include="DevExpress.Document.Processor" Version="23.1.15" />
-		<PackageReference Include="DevExpress.ExpressApp" Version="23.1.15" />
-		<PackageReference Include="DevExpress.ExpressApp.Win" Version="23.1.15" />
-		<PackageReference Include="DevExpress.Utils" Version="23.1.15" />
-		<PackageReference Include="DevExpress.Win.Design" Version="23.1.15" />
-	</ItemGroup>
   <!-- System.Security.Permissions .NET 6.0'ı desteklemiyor, kaldırıldı -->
   
   <!-- Metadata file hatasını önlemek için -->

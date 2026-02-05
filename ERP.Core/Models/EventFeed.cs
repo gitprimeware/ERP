@@ -11,6 +11,7 @@ namespace ERP.Core.Models
         public Guid? RelatedEntityId { get; set; } // İlgili entity ID (OrderId, CuttingRequestId, vb.)
         public string RelatedEntityType { get; set; } // İlgili entity tipi (Order, CuttingRequest, vb.)
         public Guid? CreatedByUserId { get; set; } // Event'i oluşturan kullanıcı
+        public User? CreatedByUser { get; set; } // Navigation property
         public DateTime EventDate { get; set; } // Event'in oluştuğu tarih
         public bool IsRead { get; set; } // Kullanıcı tarafından okundu mu? (Gelecekte kullanılabilir)
     }
