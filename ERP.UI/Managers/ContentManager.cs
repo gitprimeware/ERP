@@ -94,6 +94,7 @@ namespace ERP.UI.Managers
                     orderEntryForm.OrderDeleteRequested += (s, id) => HandleOrderDelete(id);
                     orderEntryForm.OrderSendToProductionRequested += (s, id) => HandleSendToProduction(id);
                     orderEntryForm.OrderGetWorkOrderRequested += (s, id) => HandleGetWorkOrder(id);
+                    orderEntryForm.CancelRequested += (s, id) => HandleOrderEntityCanceled(id);
                 }
 
                 // AccountingEntryForm için event'leri bağla
@@ -410,6 +411,20 @@ namespace ERP.UI.Managers
             }
         }
 
+        private void HandleOrderEntityCanceled(Guid orderId)
+        {
+            try
+            {
+                if (orderId == Guid.Empty)
+                    _contentPanel.Controls.Clear();
+                else // Listeyi yenile
+                    ShowForm("OrderList");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Sipariş listesini güncellerken bir hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
         private void HandleGetBulkWorkOrder(List<Guid> orderIds)
         {
             try

@@ -47,6 +47,7 @@ namespace ERP.UI.Forms
         public event EventHandler<Guid> OrderDeleteRequested;
         public event EventHandler<Guid> OrderSendToProductionRequested;
         public event EventHandler<Guid> OrderGetWorkOrderRequested;
+        public event EventHandler<Guid> CancelRequested;
 
         public Guid OrderId
         {
@@ -942,6 +943,8 @@ namespace ERP.UI.Forms
             txtTotalPriceUSD.Text = "0,00 USD";
             txtCurrencyRate.Text = "0,00";
             txtTotalPriceTL.Text = "0,00";
+
+            CancelRequested?.Invoke(this, _orderId);
         }
 
         public void LoadOrderData(Guid orderId)
