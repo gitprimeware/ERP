@@ -1,13 +1,14 @@
+using ERP.Core.Models;
+using ERP.DAL.Repositories;
+using ERP.UI.Factories;
+using ERP.UI.UI;
+using ERP.UI.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
-using ERP.Core.Models;
-using ERP.DAL.Repositories;
-using ERP.UI.Factories;
-using ERP.UI.UI;
 
 namespace ERP.UI.Forms
 {
@@ -26,6 +27,7 @@ namespace ERP.UI.Forms
         private DateTimePicker _dtpEndDate;
         private Button _btnSearch;
         private Button _btnRefresh;
+        private Button _btnExportExcel;
 
         public event EventHandler<Guid> ConsumptionDetailRequested;
 
@@ -172,7 +174,7 @@ namespace ERP.UI.Forms
             var tableLayout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                ColumnCount = 11,
+                ColumnCount = 12,
                 RowCount = 1,
                 AutoSize = true,
                 BackColor = Color.Transparent
@@ -189,6 +191,7 @@ namespace ERP.UI.Forms
             tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 10F)); // Bitiş tarihi
             tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); // Ara butonu
             tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); // Yenile butonu
+            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); // Excel butonu
             tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 5F)); // Sağ boşluk
 
             // Ara
@@ -292,6 +295,7 @@ namespace ERP.UI.Forms
             _btnSearch.Click += (s, e) => PerformSearch();
             tableLayout.Controls.Add(_btnSearch, 8, 0);
 
+            // refresh
             _btnRefresh = ButtonFactory.CreateActionButton("🔄 Yenile", ThemeColors.Secondary, Color.White, 90, 30);
             _btnRefresh.Anchor = AnchorStyles.Left | AnchorStyles.Top;
             _btnRefresh.Margin = new Padding(5, 12, 5, 8);
@@ -303,6 +307,13 @@ namespace ERP.UI.Forms
                 PerformSearch();
             };
             tableLayout.Controls.Add(_btnRefresh, 9, 0);
+
+            // excel
+            _btnExportExcel = ButtonFactory.CreateActionButton("📊 Excel'e Aktar", ThemeColors.Success, Color.White, 140, 30);
+            _btnExportExcel.Anchor = AnchorStyles.Left | AnchorStyles.Top;
+            _btnExportExcel.Margin = new Padding(5, 12, 5, 8);
+            _btnExportExcel.Click += BtnExportExcel_Click;
+            tableLayout.Controls.Add(_btnExportExcel, 10, 0);
 
             panel.Controls.Add(tableLayout);
             return panel;
@@ -511,7 +522,7 @@ namespace ERP.UI.Forms
                 _dataGridView.DefaultCellStyle.BackColor = Color.White;
                 _dataGridView.DefaultCellStyle.ForeColor = ThemeColors.TextPrimary;
                 _dataGridView.DefaultCellStyle.SelectionBackColor = Color.FromArgb(220, ThemeColors.Primary.R, ThemeColors.Primary.G, ThemeColors.Primary.B);
-                _dataGridView.DefaultCellStyle.SelectionForeColor = Color.White;
+                _dataGridView.DefaultCellStyle.SelectionForeColor = ThemeColors.TextSecondary;
                 _dataGridView.DefaultCellStyle.Font = new Font("Segoe UI", 9F);
                 _dataGridView.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
                 _dataGridView.ColumnHeadersDefaultCellStyle.BackColor = ThemeColors.Primary;
@@ -747,6 +758,25 @@ namespace ERP.UI.Forms
                 
                 e.Handled = true;
             }
+        }
+        private void BtnExportExcel_Click(object sender, EventArgs e)
+        {
+            if (_dataGridView.Rows.Count == 0)
+            {
+                MessageBox.Show(
+                    "Aktarılacak sipariş bulunamadı.",
+                    "Uyarı",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            ExcelExportHelper.ExportToExcel(
+                _dataGridView,
+                defaultFileName: "Sarf",
+                sheetName: "Sarf Kayıtları",
+                skippedColumnNames: new[] { "Actions", "IsSelected" },
+                title: "Sarf Listesi");
         }
     }
 }

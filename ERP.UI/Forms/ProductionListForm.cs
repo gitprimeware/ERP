@@ -1,12 +1,13 @@
+using ERP.Core.Models;
+using ERP.DAL.Repositories;
+using ERP.UI.Factories;
+using ERP.UI.UI;
+using ERP.UI.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
-using ERP.Core.Models;
-using ERP.DAL.Repositories;
-using ERP.UI.Factories;
-using ERP.UI.UI;
 
 namespace ERP.UI.Forms
 {
@@ -173,8 +174,13 @@ namespace ERP.UI.Forms
                 }
             }
 
+            var _btnExportExcel = ButtonFactory.CreateActionButton("📊 Excel'e Aktar", ThemeColors.Success, Color.White, 140, 30);
+            _btnExportExcel.Location = new Point(titlePanel.Width - _btnExportExcel.Width, 10); // Adjust position as needed
+            _btnExportExcel.Click += BtnExportExcel_Click;
+
             titlePanel.Controls.Add(titleLabel);
             titlePanel.Controls.Add(colorLegendPanel);
+            titlePanel.Controls.Add(_btnExportExcel);
             
             // Başlık panelinin yüksekliğini artır
             titlePanel.Height = 70;
@@ -212,6 +218,10 @@ namespace ERP.UI.Forms
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.SetProperty,
                 null, _dataGridView, new object[] { true });
 
+            titlePanel.Resize += (s, e) =>
+            {
+                _btnExportExcel.Location = new Point(titlePanel.Width - _btnExportExcel.Width, 10); // Adjust position as needed
+            };
             _mainPanel.Resize += (s, e) =>
             {
                 if (titlePanel != null)
@@ -1802,6 +1812,25 @@ namespace ERP.UI.Forms
                 _penCache[color] = new Pen(color, width);
             }
             return _penCache[color];
+        }
+        private void BtnExportExcel_Click(object sender, EventArgs e)
+        {
+            if (_dataGridView.Rows.Count == 0)
+            {
+                MessageBox.Show(
+                    "Aktarılacak veri bulunamadı.",
+                    "Uyarı",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            ExcelExportHelper.ExportToExcel(
+                _dataGridView,
+                defaultFileName: "Uretim",
+                sheetName: "Üretim Listesi",
+                skippedColumnNames: new[] { "Actions", "IsSelected" },
+                title: "Üretim Takip");
         }
     }
 }

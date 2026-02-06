@@ -7,6 +7,7 @@ using ERP.Core.Models;
 using ERP.DAL.Repositories;
 using ERP.UI.Factories;
 using ERP.UI.UI;
+using ERP.UI.Utilities;
 
 namespace ERP.UI.Forms
 {
@@ -19,6 +20,7 @@ namespace ERP.UI.Forms
         private ComboBox _cmbCompanyFilter;
         private Button _btnSearch;
         private Button _btnRefresh;
+        private Button _btnExportExcel;
         private CheckBox _chkTableView;
         private OrderRepository _orderRepository;
         private CompanyRepository _companyRepository;
@@ -231,12 +233,17 @@ namespace ERP.UI.Forms
             _btnRefresh.Location = new Point(810, 12);
             _btnRefresh.Click += (s, e) => PerformSearch();
 
+            _btnExportExcel = ButtonFactory.CreateActionButton("📊 Excel'e Aktar", ThemeColors.Success, Color.White, 140, 30);
+            _btnExportExcel.Location = new Point(920, 12);
+            _btnExportExcel.Click += BtnExportExcel_Click;
+
             panel.Controls.Add(lblSearch);
             panel.Controls.Add(_txtSearch);
             panel.Controls.Add(lblCompany);
             panel.Controls.Add(_cmbCompanyFilter);
             panel.Controls.Add(_btnSearch);
             panel.Controls.Add(_btnRefresh);
+            panel.Controls.Add(_btnExportExcel);
 
             return panel;
         }
@@ -1400,6 +1407,26 @@ namespace ERP.UI.Forms
             // Tooltip'i gizle
             _actionToolTip.Hide(_dataGridView);
             _currentToolTipText = "";
+        }
+
+        private void BtnExportExcel_Click(object sender, EventArgs e)
+        {
+            if (_dataGridView.Rows.Count == 0)
+            {
+                MessageBox.Show(
+                    "Aktarılacak sipariş bulunamadı.",
+                    "Uyarı",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            ExcelExportHelper.ExportToExcel(
+                _dataGridView,
+                defaultFileName: "Siparisler",
+                sheetName: "Siparişler",
+                skippedColumnNames: new[] { "Actions", "IsSelected" },
+                title: "Sipariş Listesi");
         }
     }
 

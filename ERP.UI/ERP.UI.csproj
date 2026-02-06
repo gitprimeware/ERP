@@ -23,6 +23,7 @@
   </ItemGroup>
 	
   <ItemGroup>
+    <PackageReference Include="ClosedXML" Version="0.102.2" />
     <PackageReference Include="DevExpress.Data" Version="22.1.5" />
     <PackageReference Include="DevExpress.Document.Processor" Version="22.1.5" />
     <PackageReference Include="DevExpress.Drawing" Version="22.1.5" />
@@ -36,4 +37,5 @@
   <!-- System.Security.Permissions .NET 6.0'ı desteklemiyor, kaldırıldı -->
 
 </Project>
+
 

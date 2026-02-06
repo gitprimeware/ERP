@@ -1,12 +1,13 @@
+using ERP.Core.Models;
+using ERP.DAL.Repositories;
+using ERP.UI.UI;
+using ERP.UI.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using System.Windows.Forms;
-using ERP.Core.Models;
-using ERP.DAL.Repositories;
-using ERP.UI.UI;
 
 namespace ERP.UI.Forms
 {
@@ -30,6 +31,7 @@ namespace ERP.UI.Forms
         private ComboBox _cmbMusteri;
         private Button _btnFiltrele;
         private Button _btnFiltreleriTemizle;
+        private Button _btnExportExcel;
 
         public KenetlenmisStokTakipForm()
         {
@@ -211,6 +213,20 @@ namespace ERP.UI.Forms
             };
             _btnFiltreleriTemizle.FlatAppearance.BorderSize = 0;
 
+            // Excele aktar butonu
+            _btnExportExcel = new Button
+            {
+                Text = "📊 Excel'e Aktar",
+                Location = new Point(1250, 10),
+                Width = 140,
+                Height = 30,
+                BackColor = ThemeColors.Secondary,
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
+            };
+            _btnExportExcel.FlatAppearance.BorderSize = 0;
+
             filterPanel.Controls.Add(lblSiparisNo);
             filterPanel.Controls.Add(_cmbSiparisNo);
             filterPanel.Controls.Add(lblHatve);
@@ -225,6 +241,7 @@ namespace ERP.UI.Forms
             filterPanel.Controls.Add(_cmbMusteri);
             filterPanel.Controls.Add(_btnFiltrele);
             filterPanel.Controls.Add(_btnFiltreleriTemizle);
+            filterPanel.Controls.Add(_btnExportExcel);
 
             // DataGridView
             _dataGridView = new DataGridView
@@ -256,6 +273,7 @@ namespace ERP.UI.Forms
             // Event handlers
             _btnFiltrele.Click += BtnFiltrele_Click;
             _btnFiltreleriTemizle.Click += BtnFiltreleriTemizle_Click;
+            _btnExportExcel.Click += BtnExportExcel_Click;
 
             // Kolonlar - Resimdeki sıraya göre
             _dataGridView.Columns.Add(new DataGridViewTextBoxColumn
@@ -774,6 +792,25 @@ namespace ERP.UI.Forms
             _cmbMusteri.SelectedIndex = -1;
             _cmbMusteri.Text = "";
             LoadData();
+        }
+        private void BtnExportExcel_Click(object sender, EventArgs e)
+        {
+            if (_dataGridView.Rows.Count == 0)
+            {
+                MessageBox.Show(
+                    "Aktarılacak veri bulunamadı.",
+                    "Uyarı",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            ExcelExportHelper.ExportToExcel(
+                _dataGridView,
+                defaultFileName: "KenetlenmisStok",
+                sheetName: "Kenetlenmiş Stok",
+                skippedColumnNames: new[] { "Actions", "IsSelected" },
+                title: "Kenetlenmiş Stok Takip");
         }
     }
 }

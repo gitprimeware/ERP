@@ -1,13 +1,14 @@
+using ERP.Core.Models;
+using ERP.DAL.Repositories;
+using ERP.UI.Factories;
+using ERP.UI.UI;
+using ERP.UI.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using System.Windows.Forms;
-using ERP.Core.Models;
-using ERP.DAL.Repositories;
-using ERP.UI.Factories;
-using ERP.UI.UI;
 
 namespace ERP.UI.Forms
 {
@@ -22,6 +23,7 @@ namespace ERP.UI.Forms
         private ComboBox _cmbCompanyFilter;
         private Button _btnSearch;
         private Button _btnRefresh;
+        private Button _btnExportExcel;
 
         public MaterialExitForm()
         {
@@ -111,7 +113,7 @@ namespace ERP.UI.Forms
             var tableLayout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                ColumnCount = 8,
+                ColumnCount = 9,
                 RowCount = 1,
                 AutoSize = true,
                 BackColor = Color.Transparent
@@ -125,6 +127,7 @@ namespace ERP.UI.Forms
             tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); // Ara butonu
             tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); // Yenile butonu
             tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); // Ekle butonu
+            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); // Excell butonu
             tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 5F)); // Sağ boşluk
 
             // Ara
@@ -194,6 +197,11 @@ namespace ERP.UI.Forms
             _btnAdd = ButtonFactory.CreateActionButton("➕ Ekle", ThemeColors.Success, Color.White, 100, 30);
             _btnAdd.Click += BtnAdd_Click;
             tableLayout.Controls.Add(_btnAdd, 6, 0);
+
+            _btnExportExcel = ButtonFactory.CreateActionButton("📊 Excel'e Aktar", ThemeColors.Success, Color.White, 140, 30);
+            _btnExportExcel.Location = new Point(920, 12); // Adjust position as needed
+            _btnExportExcel.Click += BtnExportExcel_Click;
+            tableLayout.Controls.Add(_btnExportExcel, 7, 0);
 
             panel.Controls.Add(tableLayout);
             return panel;
@@ -410,6 +418,25 @@ namespace ERP.UI.Forms
                     }
                 }
             }
+        }
+        private void BtnExportExcel_Click(object sender, EventArgs e)
+        {
+            if (_dataGridView.Rows.Count == 0)
+            {
+                MessageBox.Show(
+                    "Aktarılacak veri bulunamadı.",
+                    "Uyarı",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            ExcelExportHelper.ExportToExcel(
+                _dataGridView,
+                defaultFileName: "MalzemeCikis",
+                sheetName: "Malzeme Çıkışları",
+                skippedColumnNames: new[] { "Actions", "IsSelected" },
+                title: "Malzeme Çıkış Listesi");
         }
     }
 }

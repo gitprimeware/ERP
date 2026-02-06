@@ -1,12 +1,14 @@
+using ERP.Core.Models;
+using ERP.DAL.Repositories;
+using ERP.UI.Factories;
+using ERP.UI.UI;
+using ERP.UI.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using System.Windows.Forms;
-using ERP.Core.Models;
-using ERP.DAL.Repositories;
-using ERP.UI.UI;
 
 namespace ERP.UI.Forms
 {
@@ -17,6 +19,7 @@ namespace ERP.UI.Forms
         private MaterialEntryRepository _entryRepository;
         private MaterialExitRepository _exitRepository;
         private OrderRepository _orderRepository;
+        private Button _btnExportExcel;
 
         // Malzeme listesi (kullanıcının verdiği liste)
         private readonly List<MaterialInfo> _materials = new List<MaterialInfo>
@@ -97,6 +100,10 @@ namespace ERP.UI.Forms
                 Location = new Point(30, 30)
             };
 
+            // Excell
+            _btnExportExcel = ButtonFactory.CreateActionButton("📊 Excel'e Aktar", ThemeColors.Success, Color.White, 140, 30);
+            _btnExportExcel.Click += BtnExportExcel_Click;
+
             // DataGridView
             _dataGridView = new DataGridView
             {
@@ -118,9 +125,11 @@ namespace ERP.UI.Forms
             {
                 _dataGridView.Width = _mainPanel.Width - 60;
                 _dataGridView.Height = _mainPanel.Height - 130;
+                _btnExportExcel.Location = new Point(_mainPanel.Width - _btnExportExcel.Width - 30, 30); // Adjust position as needed
             };
 
             _mainPanel.Controls.Add(titleLabel);
+            _mainPanel.Controls.Add(_btnExportExcel);
             _mainPanel.Controls.Add(_dataGridView);
 
             this.Controls.Add(_mainPanel);
@@ -228,7 +237,7 @@ namespace ERP.UI.Forms
             _dataGridView.DefaultCellStyle.BackColor = ThemeColors.Surface;
             _dataGridView.DefaultCellStyle.ForeColor = ThemeColors.TextPrimary;
             _dataGridView.DefaultCellStyle.SelectionBackColor = ThemeColors.Primary;
-            _dataGridView.DefaultCellStyle.SelectionForeColor = Color.White;
+            _dataGridView.DefaultCellStyle.SelectionForeColor = ThemeColors.TextSecondary;
             _dataGridView.ColumnHeadersDefaultCellStyle.BackColor = ThemeColors.Primary;
             _dataGridView.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
             _dataGridView.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
@@ -619,7 +628,25 @@ namespace ERP.UI.Forms
                 default: return 0m;
             }
         }
+        private void BtnExportExcel_Click(object sender, EventArgs e)
+        {
+            if (_dataGridView.Rows.Count == 0)
+            {
+                MessageBox.Show(
+                    "Aktarılacak veri bulunamadı.",
+                    "Uyarı",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
 
+            ExcelExportHelper.ExportToExcel(
+                _dataGridView,
+                defaultFileName: "StokDetay",
+                sheetName: "Stok Detayı",
+                skippedColumnNames: new[] { "Actions", "IsSelected" },
+                title: "Stok Detay Raporu");
+        }
         private class MaterialInfo
         {
             public string MaterialType { get; set; }

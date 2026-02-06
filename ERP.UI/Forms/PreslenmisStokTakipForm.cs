@@ -1,12 +1,14 @@
+using ERP.Core.Models;
+using ERP.DAL.Repositories;
+using ERP.UI.Factories;
+using ERP.UI.UI;
+using ERP.UI.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using System.Windows.Forms;
-using ERP.Core.Models;
-using ERP.DAL.Repositories;
-using ERP.UI.UI;
 
 namespace ERP.UI.Forms
 {
@@ -78,25 +80,44 @@ namespace ERP.UI.Forms
                 Location = new Point(0, 10)
             };
 
+            // Excel'e aktar butonu
+            //var btnExportExcel = ButtonFactory.CreateActionButton("📊 Excel'e Aktar", ThemeColors.Success, Color.White, 140, 35);
+            var btnExportExcel = new Button
+            {
+                Text = "📊 Excel'e Aktar",
+                Location = new Point(headerPanel.Width - 140, 5),
+                Width = 140,
+                Height = 35,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                BackColor = ThemeColors.Secondary,
+                ForeColor = Color.White,
+                Cursor = Cursors.Hand,
+                FlatStyle = FlatStyle.Flat
+            };
+            btnExportExcel.Location = new Point(headerPanel.Width - 10, 5); // Adjust position as needed
+            btnExportExcel.FlatAppearance.BorderSize = 0;
+            btnExportExcel.Click += BtnExportExcel_Click;
+
             // Yeni Kenetleme Ekle butonu
             var btnKenetlemeEkle = new Button
             {
                 Text = "➕ Yeni Kenetleme Ekle",
-                Location = new Point(headerPanel.Width - 200, 5),
+                Location = new Point(headerPanel.Width - 350, 5),
                 Width = 180,
                 Height = 35,
                 Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 BackColor = ThemeColors.Primary,
                 ForeColor = Color.White,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 Cursor = Cursors.Hand,
                 FlatStyle = FlatStyle.Flat
             };
             btnKenetlemeEkle.FlatAppearance.BorderSize = 0;
             btnKenetlemeEkle.Click += BtnKenetlemeEkle_Click;
-            UIHelper.ApplyRoundedButton(btnKenetlemeEkle, 4);
+
+
 
             headerPanel.Controls.Add(titleLabel);
+            headerPanel.Controls.Add(btnExportExcel);
             headerPanel.Controls.Add(btnKenetlemeEkle);
 
             // DataGridView
@@ -122,7 +143,8 @@ namespace ERP.UI.Forms
                 _dataGridView.Width = _mainPanel.Width - 40;
                 _dataGridView.Height = _mainPanel.Height - 140;
                 headerPanel.Width = _mainPanel.Width - 40;
-                btnKenetlemeEkle.Location = new Point(headerPanel.Width - 200, 5);
+                btnExportExcel.Location = new Point(headerPanel.Width - 140, 5); // Adjust position as needed
+                btnKenetlemeEkle.Location = new Point(headerPanel.Width - 330, 5);
             };
 
             // Kolonlar
@@ -255,7 +277,25 @@ namespace ERP.UI.Forms
 
             return $"{modelLetter}{sizeNumber}";
         }
+        private void BtnExportExcel_Click(object sender, EventArgs e)
+        {
+            if (_dataGridView.Rows.Count == 0)
+            {
+                MessageBox.Show(
+                    "Aktarılacak veri bulunamadı.",
+                    "Uyarı",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
 
+            ExcelExportHelper.ExportToExcel(
+                _dataGridView,
+                defaultFileName: "PerslenmisStok",
+                sheetName: "Perslenmiş Stok",
+                skippedColumnNames: new[] { "Actions", "IsSelected" },
+                title: "Perslenmiş Stok Takip");
+        }
         private void BtnKenetlemeEkle_Click(object sender, EventArgs e)
         {
             try
