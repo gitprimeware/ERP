@@ -4,6 +4,7 @@ using System.Windows.Forms;
 using ERP.Core.Models;
 using ERP.DAL.Repositories;
 using ERP.UI.UI;
+using ERP.UI.Utilities;
 
 namespace ERP.UI.Forms
 {
@@ -24,7 +25,7 @@ namespace ERP.UI.Forms
 
         private void InitializeCustomComponents()
         {
-            this.Text = "ERP Sistemi - Giriş";
+            this.Text = $"{AppInfo.Title} - Giriş";
             this.Size = new Size(500, 550);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -49,7 +50,7 @@ namespace ERP.UI.Forms
             // Başlık
             var lblTitle = new Label
             {
-                Text = "🔐 ERP Sistemi",
+                Text = AppInfo.FullTitle,
                 Font = new Font("Segoe UI", 28F, FontStyle.Bold),
                 ForeColor = ThemeColors.Primary,
                 AutoSize = true,

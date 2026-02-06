@@ -1,3 +1,5 @@
+using ERP.UI.Utilities;
+
 namespace ERP.UI.Forms
 {
     partial class MainForm
@@ -36,7 +38,7 @@ namespace ERP.UI.Forms
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1200, 700);
             this.Name = "MainForm";
-            this.Text = "ERP Sistemi";
+            this.Text = AppInfo.Title;
             this.ResumeLayout(false);
         }
 

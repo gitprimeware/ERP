@@ -5,6 +5,7 @@ using ERP.UI.Components;
 using ERP.UI.Managers;
 using ERP.UI.Services;
 using ERP.UI.UI;
+using ERP.UI.Utilities;
 
 namespace ERP.UI.Forms
 {
@@ -34,7 +35,7 @@ namespace ERP.UI.Forms
         private void InitializeCustomComponents()
         {
             this.BackColor = ThemeColors.Background;
-            this.Text = "ERP Sistemi";
+            this.Text = AppInfo.Title;
             this.WindowState = FormWindowState.Maximized;
             this.StartPosition = FormStartPosition.CenterScreen;
             this.MinimumSize = new Size(1200, 700);

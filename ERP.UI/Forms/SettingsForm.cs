@@ -5,6 +5,8 @@ using System.Linq;
 using System.Windows.Forms;
 using ERP.UI.UI;
 using ERP.UI.Services;
+using System.Reflection;
+using ERP.UI.Utilities;
 
 namespace ERP.UI.Forms
 {
@@ -139,32 +141,36 @@ namespace ERP.UI.Forms
             // Hero içeriği - Padding içinde
             var heroTitle = new Label
             {
-                Text = "📊 ERP Yönetim Sistemi",
+                Text = AppInfo.FullTitle,
                 Font = new Font("Segoe UI", 28F, FontStyle.Bold),
                 ForeColor = Color.White,
                 AutoSize = true,
                 Location = new Point(0, 40),
+                BackColor = Color.Transparent,
                 MaximumSize = new Size(heroPanel.Width - 100, 0) // Maksimum genişlik belirle
             };
             heroPanel.Controls.Add(heroTitle);
 
             var heroSubtitle = new Label
             {
-                Text = "Kurumsal Kaynak Planlama ve Üretim Yönetimi",
+                Text = AppInfo.Description,
                 Font = new Font("Segoe UI", 13F),
                 ForeColor = Color.FromArgb(240, 240, 240),
                 AutoSize = true,
                 Location = new Point(0, 85),
+                BackColor = Color.Transparent,
                 MaximumSize = new Size(heroPanel.Width - 100, 0) // Maksimum genişlik belirle
             };
             heroPanel.Controls.Add(heroSubtitle);
+            var version = Assembly.GetExecutingAssembly().GetName().Version;
 
             var versionLabel = new Label
             {
-                Text = "Versiyon 1.0.0",
+                Text = AppInfo.VersionString,
                 Font = new Font("Segoe UI", 10F),
                 ForeColor = Color.FromArgb(220, 220, 220),
                 AutoSize = true,
+                BackColor = Color.Transparent,
                 Location = new Point(0, 110)
             };
             heroPanel.Controls.Add(versionLabel);
@@ -179,7 +185,7 @@ namespace ERP.UI.Forms
             };
             mainPanel.Controls.Add(contentPanel);
 
-            int yPos = 0;
+            int yPos = 180;
 
             // Program Açıklaması Kartı - Modern tasarım
             var descriptionCard = CreateModernCard(
@@ -262,18 +268,6 @@ namespace ERP.UI.Forms
             }
 
             yPos += 30;
-
-            // Teknoloji Bilgisi
-            var techCard = CreateModernCard(
-                "🔧 Teknoloji",
-                "Sistem, modern teknolojiler kullanılarak geliştirilmiştir:\n" +
-                "• .NET 6.0 Framework\n" +
-                "• Windows Forms UI\n" +
-                "• SQL Server Database\n" +
-                "• Modern ve Responsive Tasarım",
-                0, yPos, contentPanel.Width, Color.FromArgb(52, 73, 94));
-            contentPanel.Controls.Add(techCard);
-
             // Resize event'leri
             scrollPanel.Resize += (s, e) =>
             {
@@ -283,7 +277,6 @@ namespace ERP.UI.Forms
                 contentPanel.Width = mainPanel.Width;
                 
                 descriptionCard.Width = contentPanel.Width;
-                techCard.Width = contentPanel.Width;
                 
                 // Hero içindeki label'ların maksimum genişliğini güncelle
                 foreach (Control ctrl in heroPanel.Controls)
@@ -366,6 +359,7 @@ namespace ERP.UI.Forms
                 Font = new Font("Segoe UI", 28F, FontStyle.Bold),
                 ForeColor = Color.White,
                 AutoSize = true,
+                BackColor = Color.Transparent,
                 Location = new Point(0, 30),
                 MaximumSize = new Size(heroPanel.Width - 100, 0) // Maksimum genişlik belirle
             };
@@ -377,6 +371,7 @@ namespace ERP.UI.Forms
                 Font = new Font("Segoe UI", 12F),
                 ForeColor = Color.FromArgb(240, 240, 240),
                 AutoSize = true,
+                BackColor = Color.Transparent,
                 Location = new Point(0, 75),
                 MaximumSize = new Size(heroPanel.Width - 100, 0) // Maksimum genişlik belirle
             };
@@ -392,7 +387,7 @@ namespace ERP.UI.Forms
             };
             mainPanel.Controls.Add(contentPanel);
 
-            int yPos = 0;
+            int yPos = 160;
 
             // Şirket Bilgileri Kartı
             var companyCard = CreateModernCard(
@@ -446,8 +441,8 @@ namespace ERP.UI.Forms
             var contactCards = new[]
             {
                 ("🌐", "Web Sitesi", "https://www.primeware.com.tr", Color.FromArgb(52, 152, 219)),
-                ("📧", "E-posta", "info@primeware.com.tr", Color.FromArgb(230, 126, 34)),
-                ("📞", "Telefon", "+90 (212) XXX XX XX", Color.FromArgb(155, 89, 182))
+                ("📧", "E-posta", "primeware@outlook.com.tr", Color.FromArgb(230, 126, 34)),
+                ("📞", "Telefon", "+90 (533) 655 92 87", Color.FromArgb(155, 89, 182))
             };
 
             int contactCardWidth = contentPanel.Width / 3; // Üç sütun, tam genişlik kullan
@@ -621,6 +616,7 @@ namespace ERP.UI.Forms
                 Font = new Font("Segoe UI", 16F, FontStyle.Bold),
                 ForeColor = ThemeColors.TextPrimary,
                 AutoSize = true,
+                BackColor = Color.Transparent,
                 Location = new Point(30, 25)
             };
             card.Controls.Add(titleLabel);
@@ -641,6 +637,7 @@ namespace ERP.UI.Forms
                 Width = labelWidth,
                 Height = 200,
                 TextAlign = ContentAlignment.TopLeft,
+                BackColor = Color.Transparent,
                 UseMnemonic = false
             };
             card.Controls.Add(contentLabel);
@@ -697,7 +694,8 @@ namespace ERP.UI.Forms
                 Text = emoji,
                 Font = emojiFont,
                 AutoSize = true,
-                Location = new Point(emojiX, emojiY)
+                Location = new Point(emojiX, emojiY),
+                BackColor = Color.Transparent,
             };
             card.Controls.Add(emojiLabel);
             
@@ -712,6 +710,7 @@ namespace ERP.UI.Forms
                 ForeColor = Color.FromArgb(50, 50, 50),
                 AutoSize = true,
                 Location = new Point(textX, textY),
+                BackColor = Color.Transparent,
                 UseMnemonic = false
             };
             card.Controls.Add(titleLabel);
@@ -723,6 +722,7 @@ namespace ERP.UI.Forms
                 ForeColor = Color.FromArgb(100, 100, 100),
                 AutoSize = true,
                 Location = new Point(textX, textY + 20),
+                BackColor = Color.Transparent,
                 UseMnemonic = false
             };
             card.Controls.Add(descLabel);
@@ -777,6 +777,7 @@ namespace ERP.UI.Forms
                 Text = emoji,
                 Font = emojiFont,
                 AutoSize = true,
+                BackColor = Color.Transparent,
                 Location = new Point(emojiX, emojiY)
             };
             card.Controls.Add(emojiLabel);
@@ -784,20 +785,20 @@ namespace ERP.UI.Forms
             // Yazılar - Emoji'nin sağında, dinamik konumlandırma
             var textX = emojiX + emojiSize.Width + 15; // Emoji'nin sağından 15 piksel boşluk
             var textY = (height - 50) / 2; // Dikey ortalama için
-            
-            // Başlık - Solda, emoji'nin yanında
+
+            //Başlık - Solda, emoji'nin yanında
             var titleLabel = new Label
             {
                 Text = title,
                 Font = new Font("Segoe UI", 13F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(50, 50, 50),
-                AutoSize = false,
+                AutoSize = true,
                 Location = new Point(textX, textY),
-                Width = width - textX - 15, // Sağdan 15 piksel boşluk
-                Height = 25,
                 TextAlign = ContentAlignment.TopLeft,
+                BackColor = Color.Transparent,
                 UseMnemonic = false
             };
+            card.Controls.Add(titleLabel);
             // Başlık yüksekliğini ölç
             using (var g = card.CreateGraphics())
             {
@@ -816,10 +817,9 @@ namespace ERP.UI.Forms
                     Text = info,
                     Font = new Font("Segoe UI", 10F, FontStyle.Regular),
                     ForeColor = accentColor,
-                    AutoSize = false,
+                    AutoSize = true,
                     Location = new Point(textX, infoY),
-                    Width = width - textX - 15, // Emoji ile aynı hizada, sağdan 15 piksel boşluk
-                    Height = height - infoY - 10,
+                    BackColor = Color.Transparent,
                     Cursor = Cursors.Hand,
                     TextAlign = ContentAlignment.TopLeft,
                     UseMnemonic = false
@@ -841,10 +841,11 @@ namespace ERP.UI.Forms
                     Text = info,
                     Font = new Font("Segoe UI", 10.5F),
                     ForeColor = Color.FromArgb(80, 80, 80),
-                    AutoSize = false,
+                    AutoSize = true,
                     Location = new Point(textX, infoY),
-                    Width = width - textX - 15, // Emoji ile aynı hizada, sağdan 15 piksel boşluk
-                    Height = height - infoY - 10,
+                    //Width = width - textX - 15, // Emoji ile aynı hizada, sağdan 15 piksel boşluk
+                    //Height = height - infoY - 10,
+                    BackColor = Color.Transparent,
                     TextAlign = ContentAlignment.TopLeft,
                     UseMnemonic = false
                 };
