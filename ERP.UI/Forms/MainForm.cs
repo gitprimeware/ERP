@@ -67,7 +67,8 @@ namespace ERP.UI.Forms
             _menuPanel = new Panel
             {
                 Dock = DockStyle.Left,
-                Width = 250
+                Width = 250,
+                AutoScroll = true
             };
 
             _menuManager = new MenuManager(_menuPanel, _menuService);
